@@ -149,17 +149,22 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	/**
 	 * Exposes active connection blocks cached on our standalone network model [3].
-	 * Upgraded with a loaded-chunk safety shell filter to skip capabilities inside
-	 * unloaded chunks [3].
+	 * Upgraded with a double-pass check querying graph sleep states and chunk
+	 * loading bounds [3].
 	 *
 	 * @return a list of scanned targets [3]
 	 */
 	public List<ConnectionBlock> getInventories() {
 		List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
 		if (this.level != null) {
+			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
 			for (ConnectionBlock block : scanned) {
-				// Check if chunk is loaded; if false, flag the target status as SLEEPING [3]
-				if (!this.level.hasChunkAt(block.getBlockPos())) {
+				int nodeId = map.getNodeId(block.getBlockPos());
+				// Double-Pass safety: evaluate the graph sleep bitset AND physical chunk
+				// boundaries [3]
+				if (nodeId != -1 && map.isNodeSleeping(nodeId)) {
+					block.setSleeping(true);
+				} else if (!this.level.hasChunkAt(block.getBlockPos())) {
 					block.setSleeping(true);
 				} else {
 					block.setSleeping(false);

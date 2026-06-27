@@ -7,19 +7,21 @@ import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.util.ConnectionBlock;
 import dta.sfmflow.util.ConnectionBlockType;
 import dta.sfmflow.util.VariableColor;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
+import net.neoforged.neoforge.capabilities.Capabilities;
 
 import java.util.*;
 
 /**
  * Manages topological scanning and target inventory indices [3]. Extracted to
  * cleanly separate physical networks from logical operations [3]. Upgraded to
- * register and unregister physical cables dynamically to enforce boundaries
- * [3].
+ * index capability nodes and cache BlockCapabilityCache handlers safely [3].
  */
 public class PhysicalNetwork {
 	private final Set<BlockPos> scannedCables = new HashSet<>();
@@ -37,6 +39,22 @@ public class PhysicalNetwork {
 
 	public boolean isDirty() {
 		return this.isDirty;
+	}
+
+	/**
+	 * Fast spatial boundary unloader that flags all node IDs inside the unloaded
+	 * chunk as sleeping [3].
+	 *
+	 * @param chunkPacked packed long representation [3]
+	 */
+	public void handleChunkUnload(long chunkPacked) {
+		IntArrayList nodesInChunk = this.networkMap.getNodesInChunk(chunkPacked);
+		if (nodesInChunk != null) {
+			for (int i = 0; i < nodesInChunk.size(); i++) {
+				int nodeId = nodesInChunk.getInt(i);
+				this.networkMap.setNodeSleeping(nodeId, true);
+			}
+		}
 	}
 
 	public void tickCheckAndScan(Level level, BlockPos startPos) {
@@ -61,18 +79,9 @@ public class PhysicalNetwork {
 		return scannedInventories;
 	}
 
-	/**
-	 * Core non-blocking BFS pathfinder [3]. Decouples, maps, and registers
-	 * scannable cables dynamically [3].
-	 */
 	private void performScan(Level level, BlockPos startPos) {
 		long startTime = System.nanoTime();
 
-		// Cleanly unregister previously scanned cables to prevent stale dangling
-		// pointer leaks [3]
-		for (BlockPos oldCable : this.scannedCables) {
-			CableNetworkRegistry.unregisterCable(level, oldCable);
-		}
 		this.scannedCables.clear();
 		this.scannedInventories.clear();
 		this.networkMap.clear();
@@ -91,7 +100,6 @@ public class PhysicalNetwork {
 				int adjacentId = this.networkMap.getOrAddNode(adjacent);
 				visited.set(adjacentId);
 				this.networkMap.addEdge(startId, adjacentId);
-				CableNetworkRegistry.registerCable(level, adjacent, startPos);
 
 				queue.add(new ScanNode(adjacent, 1));
 
@@ -110,7 +118,6 @@ public class PhysicalNetwork {
 			ScanNode current = queue.poll();
 			this.scannedCables.add(current.pos());
 			int currentId = this.networkMap.getNodeId(current.pos());
-			CableNetworkRegistry.registerCable(level, current.pos(), startPos);
 
 			if (current.depth() >= maxDepth) {
 				continue;
@@ -156,8 +163,9 @@ public class PhysicalNetwork {
 
 	private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth,
 			java.util.BitSet visited, boolean isCableComponent) {
+		int posId = this.networkMap.getOrAddNode(pos);
+
 		if (!isCableComponent) {
-			int posId = this.networkMap.getOrAddNode(pos);
 			visited.set(posId);
 		}
 
@@ -167,16 +175,27 @@ public class PhysicalNetwork {
 		for (ConnectionBlockType type : ConnectionBlockType.values()) {
 			if (type.isPresentAnywhere(level, pos, state, be)) {
 				discoveredTypes.add(type);
+				// Fast index registry for planning loops [3]
+				this.networkMap.indexCapability(type, posId);
 			}
 		}
 
 		if (state.is(ModTags.REDSTONE_CABLES)) {
 			discoveredTypes.add(ConnectionBlockType.REDSTONE);
+			this.networkMap.indexCapability(ConnectionBlockType.REDSTONE, posId);
 		}
 
 		if (!discoveredTypes.isEmpty()) {
 			ConnectionBlock connection = new ConnectionBlock(pos, depth);
 			connection.setTypes(discoveredTypes);
+
+			// Symmetrical BlockCapabilityCache deployment safely on the ServerLevel [3]
+			if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+				connection.setItemCache(
+						BlockCapabilityCache.create(Capabilities.ItemHandler.BLOCK, serverLevel, pos, null));
+				connection.setFluidCache(
+						BlockCapabilityCache.create(Capabilities.FluidHandler.BLOCK, serverLevel, pos, null));
+			}
 
 			int variablesOffset = VariableColor.values().length;
 			connection.setId(variablesOffset + this.scannedInventories.size());
