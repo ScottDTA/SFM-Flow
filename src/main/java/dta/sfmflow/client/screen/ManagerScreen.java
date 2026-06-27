@@ -26,91 +26,33 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Main visual workspace representing ManagerBlock configurations [3]. Delegates
- * mouse interactions directly to a clean helper handler class [3]. Features
- * localized scale adjustments, rendering depth protection layers, and side-safe
- * operation [3].
+ * Main visual workspace representing ManagerBlock configurations [3]. Upgraded
+ * with bottom drawer panels and scissor-locked scrolling lists [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
-	/**
-	 * Resource path locating the left-half background panel asset [3].
-	 */
 	private static final ResourceLocation GUI_BG1 = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/background1.png");
-
-	/**
-	 * Resource path locating the right-half background panel asset [3].
-	 */
 	private static final ResourceLocation GUI_BG2 = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/background2.png");
 
-	/**
-	 * Deferred queue holding components marked for removal to bypass concurrent
-	 * modification checks during rendering [3].
-	 */
 	private final List<FlowWidgetContainer> componentsToRemove = new ArrayList<>();
-
-	/**
-	 * Currently visible floating category hover sub-panel, or null [3].
-	 */
 	private CategoryHoverSubmenu activeSubmenu = null;
-
-	/**
-	 * Currently visible blocking overlay modal popup, or null [3].
-	 */
 	private AbstractModalPopup activeModalPopup = null;
-
-	/**
-	 * Reference pointing to the most recently clicked block entity container card
-	 * [3].
-	 */
 	private FlowWidgetContainer lastClickedContainer = null;
-
-	/**
-	 * Currently visible component detail customization settings panel, or null [3].
-	 */
 	private NodeSettingsOverlay activeSettingsOverlay = null;
-
-	/**
-	 * Reference pointing to the active context menu dropdown list, or null [3].
-	 */
 	private DropdownMenuWidget openedDropdown = null;
-
-	/**
-	 * Organized Mouse Input Coordinator managing interaction physics [3].
-	 */
 	private final ManagerMouseHandler mouseHandler;
-
-	/**
-	 * Remaining network sync tick-rate throttle ensuring layout changes do not
-	 * corrupt active drags [3].
-	 */
 	private int refreshCooldown = 0;
-
-	/**
-	 * Cached system gui scale configuration retrieved on initialization [3].
-	 */
 	private final int originalGuiScale;
-
-	/**
-	 * Localized game client pointer [3].
-	 */
 	private final Minecraft mc;
 
-	/**
-	 * Constructs the main manager screen layout context [3].
-	 *
-	 * @param menu            the screen's menu container handler [3]
-	 * @param playerInventory local player inventory context [3]
-	 * @param title           title header text [3]
-	 */
 	public ManagerScreen(ManagerMenu menu, net.minecraft.world.entity.player.Inventory playerInventory,
 			Component title) {
 		super(menu, playerInventory, title);
 		this.imageWidth = 512;
-		this.imageHeight = 256;
+		this.imageHeight = 352; // Increased to accommodate bottom drawer panels [3]
 		this.mc = Minecraft.getInstance();
 		this.originalGuiScale = this.mc.options.guiScale().get();
 		this.mouseHandler = new ManagerMouseHandler(this);
@@ -121,14 +63,13 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		super.init();
 
 		int requiredWidth = 512;
-		int requiredHeight = 256;
+		int requiredHeight = 352;
 		int rawWidth = this.mc.getWindow().getWidth();
 		int rawHeight = this.mc.getWindow().getHeight();
 		int currentScale = this.mc.options.guiScale().get();
 
 		boolean scaleApplied = false;
 
-		// Pass 1: Forced Scale Evaluation [3]
 		int forcedScale = dta.sfmflow.ClientConfig.FORCE_GUI_SCALE.get();
 		if (forcedScale > 0) {
 			int testWidth = rawWidth / forcedScale;
@@ -138,8 +79,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				if (currentScale != forcedScale) {
 					this.mc.options.guiScale().set(forcedScale);
 					this.mc.resizeDisplay();
-					return; // Exit initialization immediately to let Minecraft refresh the screen state
-							// [3].
+					return;
 				}
 				scaleApplied = true;
 			} else {
@@ -149,8 +89,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Pass 2: Adaptive Fallback Scaling (Only run if forced scale was not applied)
-		// [3]
 		if (!scaleApplied) {
 			int actualScale = (int) this.mc.getWindow().getGuiScale();
 
@@ -216,9 +154,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	@Override
 	public void removed() {
 		super.removed();
-
-		// Scale Restoration Shield: Ensure scale is reverted cleanly only if it differs
-		// from the original cached setting [3].
 		this.mc.tell(() -> {
 			if (this.mc.options.guiScale().get() != this.originalGuiScale) {
 				this.mc.options.guiScale().set(this.originalGuiScale);
@@ -227,13 +162,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		});
 	}
 
-	/**
-	 * Sorts and populates all visual node card containers retrieved from the
-	 * manager entity [3].
-	 *
-	 * @param x parent boundary offset alignment on X axis [3]
-	 * @param y parent boundary offset alignment on Y axis [3]
-	 */
 	private void buildComponents(int x, int y) {
 		List<FlowWidgetContainer> componentContainers = new ArrayList<>();
 		for (AbstractFlowComponent component : this.getMenu().getManagerBlockEntity().getFlowComponents().values()) {
@@ -253,9 +181,35 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		RenderSystem.setShaderTexture(0, GUI_BG1);
 		int x = (width - imageWidth) / 2;
 		int y = (height - imageHeight) / 2;
+
+		// Draw top canvas (0-256)
 		guiGraphics.blit(GUI_BG1, x, y, 0, 0, 256, 256);
 		RenderSystem.setShaderTexture(1, GUI_BG2);
 		guiGraphics.blit(GUI_BG2, x + 256, y, 0, 0, 256, 256);
+
+		// Draw bottom drawers panel (256-352) [3]
+		guiGraphics.fill(x, y + 256, x + 512, y + 352, 0xFF2B2B2B);
+		guiGraphics.renderOutline(x, y + 256, 512, 96, 0xFFD4AF37);
+
+		// Divider boundaries
+		guiGraphics.fill(x + 170, y + 256, x + 172, y + 352, 0xFF151515);
+		guiGraphics.fill(x + 342, y + 256, x + 344, y + 352, 0xFF151515);
+
+		// Player slots recess outlines
+		for (int r = 0; r < 3; r++) {
+			for (int c = 0; c < 9; c++) {
+				int slotX = x + 174 + c * 18;
+				int slotY = y + 265 + r * 18;
+				guiGraphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF151515);
+				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF434343);
+			}
+		}
+		for (int c = 0; c < 9; c++) {
+			int slotX = x + 174 + c * 18;
+			int slotY = y + 323;
+			guiGraphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF151515);
+			guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF434343);
+		}
 	}
 
 	@Override
@@ -272,12 +226,55 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		RenderSystem.enableDepthTest();
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-		// 🔥 MILESTONE 1.10: Vector Wire Rendering Pass [3]
-		// Drawn on top of standard components, but beneath hover panels and dropdowns
-		// [3]
 		dta.sfmflow.client.render.VectorWireRenderer.renderWires(guiGraphics, this, mouseX, mouseY, partialTick);
 
 		RenderSystem.disableDepthTest();
+
+		int x = this.leftPos;
+		int y = this.topPos;
+
+		// Draw Left Column Variables (Inventory Groups) [3]
+		guiGraphics.enableScissor(x + 4, y + 256, x + 166, y + 352);
+		var groupVars = getMenu().getManagerBlockEntity().getGroupVariables();
+		for (int i = 0; i < groupVars.size(); i++) {
+			var varItem = groupVars.get(i);
+			int entryX = x + 4;
+			int entryY = y + 260 + i * 16;
+			boolean hovered = mouseX >= entryX && mouseX < entryX + 162 && mouseY >= entryY && mouseY < entryY + 14;
+
+			guiGraphics.fill(entryX, entryY, entryX + 162, entryY + 14, hovered ? 0xFF555555 : 0xFF222222);
+			guiGraphics.renderOutline(entryX, entryY, 162, 14, 0xFFD4AF37);
+			guiGraphics.drawString(font, varItem.name(), entryX + 4, entryY + 3, 0xFFFFFFFF, false);
+		}
+		guiGraphics.disableScissor();
+
+		// Draw Right Column Variables (Item Filters) [3]
+		guiGraphics.enableScissor(x + 346, y + 256, x + 508, y + 352);
+		var filterVars = getMenu().getManagerBlockEntity().getFilterVariables();
+		for (int i = 0; i < filterVars.size(); i++) {
+			var varItem = filterVars.get(i);
+			int entryX = x + 346;
+			int entryY = y + 260 + i * 16;
+			boolean hovered = mouseX >= entryX && mouseX < entryX + 162 && mouseY >= entryY && mouseY < entryY + 14;
+
+			guiGraphics.fill(entryX, entryY, entryX + 162, entryY + 14, hovered ? 0xFF555555 : 0xFF222222);
+			guiGraphics.renderOutline(entryX, entryY, 162, 14, 0xFFD4AF37);
+			guiGraphics.drawString(font, varItem.name(), entryX + 4, entryY + 3, 0xFFFFFFFF, false);
+		}
+		guiGraphics.disableScissor();
+
+		// Render Translucent Dragging Variable [3]
+		if (this.mouseHandler.isDraggingVariable()) {
+			int drawX = mouseX - 40;
+			int drawY = mouseY - 7;
+			guiGraphics.pose().pushPose();
+			guiGraphics.pose().translate(0.0F, 0.0F, 700.0F); // Draw on top of panels
+			guiGraphics.fill(drawX, drawY, drawX + 80, drawY + 14, 0xAA222222);
+			guiGraphics.renderOutline(drawX, drawY, 80, 14, 0xAAD4AF37);
+			guiGraphics.drawString(font, this.mouseHandler.getDraggedVariableName(), drawX + 4, drawY + 3, 0xAAFFFFFF,
+					false);
+			guiGraphics.pose().popPose();
+		}
 
 		CategoryButton hoveredCategoryButton = null;
 		for (Renderable renderable : this.renderables) {
@@ -307,8 +304,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				}
 			}
 		}
-		// Shift menu overlays up to +150.0F to render beautifully on top of shifted
-		// card elements [3]
 		float baseZ = (maxZ * 10.0F) + 150.0F;
 
 		if (this.activeSubmenu != null) {
@@ -358,12 +353,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 	}
 
-	/**
-	 * Recursively resets interaction flags (hovered, tooltip visibility) on the
-	 * widget tree [3].
-	 *
-	 * @param renderable the root renderable to reset [3]
-	 */
 	private void resetFlagsRecursive(Renderable renderable) {
 		if (renderable instanceof AbstractFlowWidget widget) {
 			widget.setShowCustomTooltip(false);
@@ -382,21 +371,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 	}
 
-	/**
-	 * Clears existing visual component widgets and completely rebuilds the layout
-	 * [3]. This is triggered during server delta syncs or layout refreshes [3].
-	 */
 	public void refreshWidgetLayout() {
 		this.clearWidgets();
 		this.init();
 	}
 
-	/**
-	 * Schedules a container to be safely removed from the rendering and event
-	 * handling pipelines on the next render pass [3].
-	 *
-	 * @param container the container widget to remove [3]
-	 */
 	public void removeComponent(FlowWidgetContainer container) {
 		this.componentsToRemove.add(container);
 	}
@@ -447,12 +426,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		this.activeSubmenu = submenu;
 	}
 
-	/**
-	 * Package-private getter allowing the mouse coordinator subclass to
-	 * compile-safely access elements [3].
-	 *
-	 * @return renderables list [3]
-	 */
 	public List<Renderable> getRenderables() {
 		return this.renderables;
 	}
@@ -594,12 +567,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 	}
 
-	/**
-	 * Unpacks a received serverbound node layout delta packet, updating client-side
-	 * data maps [3].
-	 *
-	 * @param packet sync component layout descriptor packet [3]
-	 */
 	public void handleDeltaUpdate(SyncComponentDeltaPacket packet) {
 		AbstractFlowComponent localComponent = this.getMenu().getManagerBlockEntity().getFlowComponents()
 				.get(packet.componentId());
@@ -656,5 +623,4 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	public ManagerMouseHandler getMouseHandler() {
 		return this.mouseHandler;
 	}
-
 }

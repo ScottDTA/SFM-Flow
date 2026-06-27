@@ -11,6 +11,7 @@ import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
+import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
@@ -38,6 +39,11 @@ public class ManagerMouseHandler {
 	private FlowWidgetOutputNode activeWiringSource = null;
 	private double wiringCurrentMouseX = 0;
 	private double wiringCurrentMouseY = 0;
+
+	// Interactive Drag-and-Drop Variables Caching [3]
+	private UUID activeDraggedVariableId = null;
+	private boolean isDraggingGroupVariable = false;
+	private String draggedVariableName = "";
 
 	/**
 	 * Constructs a new ManagerMouseHandler associated with the parent screen [3].
@@ -72,6 +78,14 @@ public class ManagerMouseHandler {
 
 	public void clearWiring() {
 		this.activeWiringSource = null;
+	}
+
+	public boolean isDraggingVariable() {
+		return this.activeDraggedVariableId != null;
+	}
+
+	public String getDraggedVariableName() {
+		return this.draggedVariableName;
 	}
 
 	public void updateTopHoveredElement(double mouseX, double mouseY) {
@@ -121,9 +135,37 @@ public class ManagerMouseHandler {
 			}
 		}
 
-		// Proximity wire hit testing pass on Shift-Left-Click [3]
 		if (button == 0 && checkWireShiftClick(mouseX, mouseY)) {
 			return true;
+		}
+
+		// Variable Drawer click checking [3]
+		int x = screen.getLeftPos();
+		int y = screen.getTopPos();
+		if (button == 0) {
+			// Left Drawer (Inventory Groups) [3]
+			if (mouseX >= x + 4 && mouseX < x + 166 && mouseY >= y + 256 && mouseY < y + 352) {
+				var groupVars = screen.getMenu().getManagerBlockEntity().getGroupVariables();
+				int clickedIdx = (int) ((mouseY - (y + 260)) / 16);
+				if (clickedIdx >= 0 && clickedIdx < groupVars.size()) {
+					this.activeDraggedVariableId = groupVars.get(clickedIdx).id();
+					this.isDraggingGroupVariable = true;
+					this.draggedVariableName = groupVars.get(clickedIdx).name();
+					return true;
+				}
+			}
+
+			// Right Drawer (Item Filters) [3]
+			if (mouseX >= x + 346 && mouseX < x + 508 && mouseY >= y + 256 && mouseY < y + 352) {
+				var filterVars = screen.getMenu().getManagerBlockEntity().getFilterVariables();
+				int clickedIdx = (int) ((mouseY - (y + 260)) / 16);
+				if (clickedIdx >= 0 && clickedIdx < filterVars.size()) {
+					this.activeDraggedVariableId = filterVars.get(clickedIdx).id();
+					this.isDraggingGroupVariable = false;
+					this.draggedVariableName = filterVars.get(clickedIdx).name();
+					return true;
+				}
+			}
 		}
 
 		FlowWidgetBase clickedBase = getTopBaseAt(mouseX, mouseY);
@@ -210,6 +252,11 @@ public class ManagerMouseHandler {
 			return true;
 		}
 
+		// Track active variables dragging [3]
+		if (this.activeDraggedVariableId != null) {
+			return true;
+		}
+
 		if (this.activeDragged != null) {
 			int newX = clampCoordinate((int) (mouseX - this.dragStartX), false, activeDragged);
 			int newY = clampCoordinate((int) (mouseY - this.dragStartY), true, activeDragged);
@@ -243,6 +290,19 @@ public class ManagerMouseHandler {
 						screen.getMenu().getManagerBlockEntity().getBlockPos(), srcId, outIdx, tgtId, inIdx));
 			}
 			this.activeWiringSource = null;
+			return true;
+		}
+
+		// Finalize variables drop hit-testing on cards [3]
+		if (button == 0 && this.activeDraggedVariableId != null) {
+			FlowWidgetBase hitBase = getTopBaseAt(mouseX, mouseY);
+			if (hitBase != null) {
+				UUID cardId = hitBase.getContainer().getComponent().getId();
+				PacketDistributor
+						.sendToServer(new BindVariablePacket(screen.getMenu().getManagerBlockEntity().getBlockPos(),
+								cardId, this.activeDraggedVariableId, this.isDraggingGroupVariable));
+			}
+			this.activeDraggedVariableId = null;
 			return true;
 		}
 
@@ -504,15 +564,6 @@ public class ManagerMouseHandler {
 		}
 	}
 
-	/**
-	 * Reconstructs active connections and evaluates if a Shift-Left-Click hit
-	 * registers on a wire [3]. If hit, fires a serverbound RemoveConnectionPacket
-	 * to delete the wire [3].
-	 *
-	 * @param mouseX cursor horizontal offset [3]
-	 * @param mouseY cursor vertical offset [3]
-	 * @return true if a wire was successfully hit and deleted [3]
-	 */
 	private boolean checkWireShiftClick(double mouseX, double mouseY) {
 		if (!net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
 			return false;
@@ -565,8 +616,6 @@ public class ManagerMouseHandler {
 						+ t3 * tgtPinY;
 
 				double distToMouseSq = (x - mouseX) * (x - mouseX) + (y - mouseY) * (y - mouseY);
-				// Proximity evaluation: check if cursor resides within 4 pixels of the wire
-				// coordinate [3]
 				if (distToMouseSq <= 16.0) {
 					PacketDistributor.sendToServer(new RemoveConnectionPacket(
 							screen.getMenu().getManagerBlockEntity().getBlockPos(), conn.getSourceComponentId(),

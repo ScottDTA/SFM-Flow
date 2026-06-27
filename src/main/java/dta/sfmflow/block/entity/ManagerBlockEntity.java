@@ -66,6 +66,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	// High-performance ring buffer pre-allocated to hold up to 1024 transfer frames
 	// [3]
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
+	private final List<dta.sfmflow.api.variable.InventoryGroupVariable> groupVariables = new java.util.ArrayList<>();
+	private final List<dta.sfmflow.api.variable.ItemFilterVariable> filterVariables = new java.util.ArrayList<>();
 
 	/**
 	 * Instantiates a new Manager block entity and binds synchronized container
@@ -245,6 +247,15 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			flatPosArray[idx++] = mappedPos.asLong();
 		}
 		pTag.putLongArray("ScannedCablePositions", flatPosArray);
+		dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
+				.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.groupVariables)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
+				.ifPresent(nbt -> pTag.put("GroupVariables", nbt));
+
+		dta.sfmflow.api.variable.ItemFilterVariable.CODEC.codec().listOf()
+				.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.filterVariables)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
+				.ifPresent(nbt -> pTag.put("FilterVariables", nbt));
 
 		super.saveAdditional(pTag, pRegistries);
 	}
@@ -275,6 +286,25 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			for (long longVal : dirOrdinals(flatPosOrdinals(flatPosArray))) {
 				map.getOrAddNode(BlockPos.of(longVal));
 			}
+		}
+
+		if (pTag.contains("GroupVariables")) {
+			dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
+					.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("GroupVariables"))
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
+					.ifPresent(list -> {
+						this.groupVariables.clear();
+						this.groupVariables.addAll(list);
+					});
+		}
+		if (pTag.contains("FilterVariables")) {
+			dta.sfmflow.api.variable.ItemFilterVariable.CODEC.codec().listOf()
+					.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("FilterVariables"))
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
+					.ifPresent(list -> {
+						this.filterVariables.clear();
+						this.filterVariables.addAll(list);
+					});
 		}
 
 		commandCount = flowchart.components().size();
@@ -466,4 +496,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private long[] dirOrdinals(long[] arr) {
 		return arr;
 	}
+
+	public List<dta.sfmflow.api.variable.InventoryGroupVariable> getGroupVariables() {
+		return this.groupVariables;
+	}
+
+	public List<dta.sfmflow.api.variable.ItemFilterVariable> getFilterVariables() {
+		return this.filterVariables;
+	}
+
 }

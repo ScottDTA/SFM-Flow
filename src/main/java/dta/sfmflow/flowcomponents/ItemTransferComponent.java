@@ -5,74 +5,62 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
+import java.util.Optional;
 import java.util.UUID;
+
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Unified logic component handling both item inputs (extractions) and item
- * outputs (depositions) [3]. Consolidates old redundant class files into a
- * single parameterized MVC data model [3]. Structurally safe: holds no imports
- * or dependencies pointing to client-only packages [3].
+ * outputs (depositions) [3]. Upgraded to serialize optional group and filter
+ * variable mappings safely [3].
  */
 public class ItemTransferComponent extends AbstractFlowComponent {
 	private final boolean isInput;
-	private int inventoryId = -1; // -1 represents "All Connected Inventories"
+	private int inventoryId = -1;
 	private boolean useAll = true;
-	private int targetSlot = -1; // -1 represents "Any slot"
-	private int itemCount = 64; // Default stack extraction amount
+	private int targetSlot = -1;
+	private int itemCount = 64;
 
-	/**
-	 * Re-bound MapCodec handling the deserialization of item input transactions
-	 * [3].
-	 */
+	// Optional bound variables [3]
+	private UUID boundGroupVariableId = null;
+	private UUID boundFilterVariableId = null;
+
 	public static final MapCodec<ItemTransferComponent> INPUT_CODEC = makeCodec(true);
-
-	/**
-	 * Re-bound MapCodec handling the deserialization of item output transactions
-	 * [3].
-	 */
 	public static final MapCodec<ItemTransferComponent> OUTPUT_CODEC = makeCodec(false);
 
-	/**
-	 * Parameterized codec factory defining distinct serialization profiles based on
-	 * component direction [3]. Hard-locks the isInput state inside DFU apply loops
-	 * to prevent logical state-clashes [3].
-	 *
-	 * @param isInput if true, registers as an input target; otherwise registers as
-	 *                an output target [3]
-	 * @return the mapped MapCodec [3]
-	 */
 	private static MapCodec<ItemTransferComponent> makeCodec(boolean isInput) {
 		return RecordCodecBuilder.mapCodec(instance -> instance
 				.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemTransferComponent::getBaseProperties),
 						Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemTransferComponent::getInventoryId),
 						Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
 						Codec.INT.optionalFieldOf("targetSlot", -1).forGetter(ItemTransferComponent::getTargetSlot),
-						Codec.INT.optionalFieldOf("itemCount", 64).forGetter(ItemTransferComponent::getItemCount))
-				.apply(instance, (baseProps, invId, useAllVal, slot, count) -> {
+						Codec.INT.optionalFieldOf("itemCount", 64).forGetter(ItemTransferComponent::getItemCount),
+						UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
+								.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
+						UUIDUtil.CODEC.optionalFieldOf("boundFilterVariableId")
+								.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())))
+				.apply(instance, (baseProps, invId, useAllVal, slot, count, groupVar, filterVar) -> {
 					ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
 					comp.setBaseProperties(baseProps);
 					comp.inventoryId = invId;
 					comp.useAll = useAllVal;
 					comp.targetSlot = slot;
 					comp.itemCount = count;
+					comp.boundGroupVariableId = groupVar.orElse(null);
+					comp.boundFilterVariableId = filterVar.orElse(null);
 					return comp;
 				}));
 	}
 
-	/**
-	 * Symmetrically instantiates an ItemTransferComponent [3]. Pre-populates
-	 * baseline visual extensions and configures single input/output terminals [3].
-	 *
-	 * @param uuid    unique component identifier [3]
-	 * @param isInput direction flag indicating whether this is an input node [3]
-	 */
 	public ItemTransferComponent(UUID uuid, boolean isInput) {
 		super(uuid);
 		this.isInput = isInput;
-		this.hasInputNodes = true; // Symmetric: both input and output variants expose top pins [3]
+		this.hasInputNodes = true;
 		this.numInputs = 1;
-		this.hasOutputNodes = true; // Symmetric: both variants expose bottom execution pins [3]
+		this.hasOutputNodes = true;
 		this.numOutputs = 1;
 	}
 
@@ -112,6 +100,22 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 		this.itemCount = itemCount;
 	}
 
+	public @Nullable UUID getBoundGroupVariableId() {
+		return boundGroupVariableId;
+	}
+
+	public void setBoundGroupVariableId(@Nullable UUID id) {
+		this.boundGroupVariableId = id;
+	}
+
+	public @Nullable UUID getBoundFilterVariableId() {
+		return boundFilterVariableId;
+	}
+
+	public void setBoundFilterVariableId(@Nullable UUID id) {
+		this.boundFilterVariableId = id;
+	}
+
 	@Override
 	public FlowComponentType getType() {
 		return isInput ? FlowComponentType.ITEM_INPUT.get() : FlowComponentType.ITEM_OUTPUT.get();
@@ -128,6 +132,8 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 					this.useAll = decoded.isUseAll();
 					this.targetSlot = decoded.getTargetSlot();
 					this.itemCount = decoded.getItemCount();
+					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
+					this.boundFilterVariableId = decoded.getBoundFilterVariableId();
 				});
 	}
 

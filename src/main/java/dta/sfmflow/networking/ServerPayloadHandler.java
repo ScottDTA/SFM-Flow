@@ -192,4 +192,34 @@ public class ServerPayloadHandler {
 		});
 	}
 
+	/**
+	 * Processes an incoming variable binding request on the server main thread.
+	 * Maps variables to target components and broadcasts setting changes [3].
+	 */
+	public static void handleBindVariable(final dta.sfmflow.networking.packets.serverbound.BindVariablePacket data,
+			final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
+				var component = manager.getFlowComponents().get(data.componentId());
+				if (component instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
+					if (data.isGroupVariable()) {
+						transfer.setBoundGroupVariableId(data.variableId());
+					} else {
+						transfer.setBoundFilterVariableId(data.variableId());
+					}
+					manager.setChanged();
+
+					// Broadcast setting updates cleanly to other observing menus
+					net.minecraft.nbt.CompoundTag settingsTag = new net.minecraft.nbt.CompoundTag();
+					transfer.saveData(settingsTag);
+					manager.broadcastDeltaUpdate(
+							new dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket(
+									manager.getBlockPos(), transfer.getId(),
+									dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket.DeltaType.SETTINGS,
+									settingsTag));
+				}
+			}
+		});
+	}
+
 }

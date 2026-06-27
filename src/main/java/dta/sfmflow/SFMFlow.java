@@ -11,6 +11,7 @@ import dta.sfmflow.networking.PacketHandlerManager;
 import dta.sfmflow.networking.ServerPayloadHandler;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
+import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
 import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
@@ -73,6 +74,8 @@ public class SFMFlow {
 				(payload, context) -> ServerPayloadHandler.handleCreateConnection(payload, context));
 		registrar.playToServer(RemoveConnectionPacket.TYPE, RemoveConnectionPacket.STREAM_CODEC,
 				(payload, context) -> ServerPayloadHandler.handleRemoveConnection(payload, context));
+		registrar.playToServer(BindVariablePacket.TYPE, BindVariablePacket.STREAM_CODEC,
+				(payload, context) -> ServerPayloadHandler.handleBindVariable(payload, context));
 
 		registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,
 				PacketHandlerManager::handleSyncConnections);
