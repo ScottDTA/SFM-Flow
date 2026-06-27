@@ -1,7 +1,11 @@
 package dta.sfmflow.block;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
@@ -11,6 +15,7 @@ import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.common.network.PhysicalNetwork;
 import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.common.network.NetworkMutationEngine;
+import dta.sfmflow.common.network.CableNetworkRegistry;
 import dta.sfmflow.registry.ModTags;
 import org.jetbrains.annotations.Nullable;
 
@@ -20,233 +25,217 @@ import java.util.Queue;
 import java.util.Set;
 
 /**
- * Physical network medium that routes inventory scans to adjacent capability providers [3].
- * Upgraded to support O(1) extension additions and in-memory split-testing micro-BFS unlinking [3].
+ * Physical network medium that routes inventory scans to adjacent capability
+ * providers [3]. Upgraded to support O(1) extension additions and in-memory
+ * split-testing micro-BFS unlinking [3]. Enforces the Single Controller
+ * Constraint to prevent bridging independent networks [3].
  */
-public class CableBlock extends Block
- {
-  public CableBlock(Properties properties)
-   {
-    super(properties);
-   }
+public class CableBlock extends Block {
+	public CableBlock(Properties properties) {
+		super(properties);
+	}
 
-  @Override
-  protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving)
-   {
-    super.onPlace(state, level, pos, oldState, isMoving);
-    if (!level.isClientSide())
-     {
-      ManagerBlockEntity manager = findConnectedManager(level, pos);
-      if (manager != null)
-       {
-        PhysicalNetwork network = manager.getPhysicalNetwork();
-        if (!network.isDirty())
-         {
-          // O(1) extension optimization path [3]
-          PhysicalNetworkMap map = network.getNetworkMap();
-          int newId = map.getOrAddNode(pos);
-          for (Direction dir : Direction.values())
-           {
-            BlockPos neighbor = pos.relative(dir);
-            int neighborId = map.getNodeId(neighbor);
-            if (neighborId != -1)
-             {
-              map.addEdge(newId, neighborId);
-             }
-           }
-          return; // Skip slow full dirty mark
-         }
-       }
-      markNearbyNetworksDirty(level, pos);
-     }
-   }
+	@Override
+	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
+		if (!level.isClientSide()) {
+			BlockPos firstController = null;
+			boolean collision = false;
 
-  @Override
-  protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving)
-   {
-    if (!state.is(newState.getBlock()))
-     {
-      super.onRemove(state, level, pos, newState, isMoving);
-      
-      if (!level.isClientSide())
-       {
-        ManagerBlockEntity manager = findConnectedManager(level, pos);
-        if (manager != null)
-         {
-          PhysicalNetwork network = manager.getPhysicalNetwork();
-          if (!network.isDirty())
-           {
-            PhysicalNetworkMap map = network.getNetworkMap();
-            int deletedId = map.getNodeId(pos);
-            if (deletedId != -1)
-             {
-              it.unimi.dsi.fastutil.ints.IntArrayList neighbors = map.getNeighbors(deletedId);
-              if (neighbors != null && neighbors.size() >= 2)
-               {
-                // Verify if graph remains connected pairwise [3]
-                boolean stillConnected = true;
-                int firstNeighbor = neighbors.getInt(0);
-                for (int i = 1; i < neighbors.size(); i++)
-                 {
-                  int otherNeighbor = neighbors.getInt(i);
-                  if (!NetworkMutationEngine.checkStillConnected(map, firstNeighbor, otherNeighbor))
-                   {
-                    stillConnected = false;
-                    break;
-                   }
-                 }
-                
-                if (stillConnected)
-                 {
-                  // Intact: remove target node quietly [3]
-                  map.removeNode(deletedId);
-                  return; // Skip slow full dirty mark
-                 }
-               }
-              else if (neighbors == null || neighbors.size() < 2)
-               {
-                // At most 1 neighbor: can never split [3]
-                map.removeNode(deletedId);
-                return; // Skip slow full dirty mark
-               }
-             }
-           }
-         }
-        markNearbyNetworksDirty(level, pos);
-       }
-     }
-   }
+			// 1. Verify adjacencies against the Single Controller Constraint [3]
+			for (Direction dir : Direction.values()) {
+				BlockPos adjacent = pos.relative(dir);
+				BlockPos controller = null;
 
-  @Override
-  protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston)
-   {
-    super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
-    if (!level.isClientSide())
-     {
-      ManagerBlockEntity manager = findConnectedManager(level, pos);
-      if (manager != null)
-       {
-        PhysicalNetwork network = manager.getPhysicalNetwork();
-        if (!network.isDirty())
-         {
-          PhysicalNetworkMap map = network.getNetworkMap();
-          int currentId = map.getNodeId(pos);
-          if (currentId != -1)
-           {
-            BlockState neighborState = level.getBlockState(neighborPos);
-            if (neighborState.is(ModTags.CABLES))
-             {
-              int neighborId = map.getOrAddNode(neighborPos);
-              map.addEdge(currentId, neighborId);
-              return; // Skip slow full dirty mark
-             }
-           }
-         }
-       }
-      markNearbyNetworksDirty(level, pos);
-     }
-   }
+				if (level.getBlockState(adjacent).is(ModBlocks.MANAGER_BLOCK.get())) {
+					controller = adjacent;
+				} else {
+					controller = CableNetworkRegistry.getController(level, adjacent);
+				}
 
-  /**
-   * Fast, safe BFS search tracing adjacent cable pathways to flag any connected Managers as dirty [3].
-   * Bounded to a conservative search depth to eliminate TPS stalls during neighbor cascades [3].
-   * Exposed as static to allow advanced network blocks to cleanly trigger topology invalidations [3].
-   *
-   * @param level level accessor instance [3]
-   * @param startPos block position to start tracing from [3]
-   */
-  public static void markNearbyNetworksDirty(LevelAccessor level, BlockPos startPos)
-   {
-    if (level.isClientSide())
-     {
-      return;
-     }
+				if (controller != null) {
+					if (firstController == null) {
+						firstController = controller;
+					} else if (!firstController.equals(controller)) {
+						collision = true;
+						break;
+					}
+				}
+			}
 
-    Set<BlockPos> visited = new HashSet<>();
-    Queue<BlockPos> queue = new ArrayDeque<>();
-    queue.add(startPos);
-    visited.add(startPos);
+			if (collision) {
+				// Cancel placement: set to Air, spawn dropped resource, and send warning [3]
+				level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+				Block.popResource(level, pos, new ItemStack(state.getBlock().asItem()));
 
-    int maxSearch = 64; // Bounded search limit to preserve server performance [3]
+				Player pPlayer = level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 8.0,
+						false);
+				if (pPlayer != null) {
+					pPlayer.sendSystemMessage(Component.translatable("gui.sfmflow.multi_controller_collision")
+							.withStyle(ChatFormatting.RED));
+				}
+				return;
+			}
 
-    while (!queue.isEmpty() && visited.size() < maxSearch)
-     {
-      BlockPos current = queue.poll();
+			ManagerBlockEntity manager = findConnectedManager(level, pos);
+			if (manager != null) {
+				PhysicalNetwork network = manager.getPhysicalNetwork();
+				if (!network.isDirty()) {
+					// O(1) extension optimization path [3]
+					PhysicalNetworkMap map = network.getNetworkMap();
+					int newId = map.getOrAddNode(pos);
+					for (Direction dir : Direction.values()) {
+						BlockPos neighbor = pos.relative(dir);
+						int neighborId = map.getNodeId(neighbor);
+						if (neighborId != -1) {
+							map.addEdge(newId, neighborId);
+						}
+					}
+					CableNetworkRegistry.registerCable(level, pos, manager.getBlockPos());
+					return;
+				}
+			}
+			markNearbyNetworksDirty(level, pos);
+		}
+		super.onPlace(state, level, pos, oldState, isMoving);
+	}
 
-      for (Direction dir : Direction.values())
-       {
-        BlockPos neighbor = current.relative(dir);
-        if (visited.contains(neighbor))
-         {
-          continue;
-         }
+	@Override
+	protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+		if (!state.is(newState.getBlock())) {
+			super.onRemove(state, level, pos, newState, isMoving);
 
-        BlockState state = level.getBlockState(neighbor);
+			if (!level.isClientSide()) {
+				ManagerBlockEntity manager = findConnectedManager(level, pos);
+				if (manager != null) {
+					PhysicalNetwork network = manager.getPhysicalNetwork();
+					if (!network.isDirty()) {
+						PhysicalNetworkMap map = network.getNetworkMap();
+						int deletedId = map.getNodeId(pos);
+						if (deletedId != -1) {
+							it.unimi.dsi.fastutil.ints.IntArrayList neighbors = map.getNeighbors(deletedId);
+							if (neighbors != null && neighbors.size() >= 2) {
+								boolean stillConnected = true;
+								int firstNeighbor = neighbors.getInt(0);
+								for (int i = 1; i < neighbors.size(); i++) {
+									int otherNeighbor = neighbors.getInt(i);
+									if (!NetworkMutationEngine.checkStillConnected(map, firstNeighbor, otherNeighbor)) {
+										stillConnected = false;
+										break;
+									}
+								}
 
-        if (state.is(ModBlocks.MANAGER_BLOCK.get()))
-         {
-          BlockEntity be = level.getBlockEntity(neighbor);
-          if (be instanceof ManagerBlockEntity manager)
-           {
-            manager.getPhysicalNetwork().markDirty();
-           }
-         }
-        else if (state.is(ModTags.CABLES))
-         {
-          visited.add(neighbor);
-          queue.add(neighbor);
-         }
-       }
-     }
-   }
+								if (stillConnected) {
+									map.removeNode(deletedId);
+									CableNetworkRegistry.unregisterCable(level, pos);
+									return;
+								}
+							} else if (neighbors == null || neighbors.size() < 2) {
+								map.removeNode(deletedId);
+								CableNetworkRegistry.unregisterCable(level, pos);
+								return;
+							}
+						}
+					}
+				}
+				CableNetworkRegistry.unregisterCable(level, pos);
+				markNearbyNetworksDirty(level, pos);
+			}
+		}
+	}
 
-  /**
-   * Traces adjacent cable pathways on the main server thread to locate the managing BlockEntity [3].
-   * Bounded to a conservative search depth of 64 nodes to protect tick-rates [3].
-   *
-   * @param level level accessor instance [3]
-   * @param startPos block position of the placed/broken cable [3]
-   * @return the connected ManagerBlockEntity, or null if unassociated [3]
-   */
-  @Nullable
-  public static ManagerBlockEntity findConnectedManager(LevelAccessor level, BlockPos startPos)
-   {
-    Set<BlockPos> visited = new HashSet<>();
-    Queue<BlockPos> queue = new ArrayDeque<>();
-    queue.add(startPos);
-    visited.add(startPos);
+	@Override
+	protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+			BlockPos neighborPos, boolean movedByPiston) {
+		super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
+		if (!level.isClientSide()) {
+			ManagerBlockEntity manager = findConnectedManager(level, pos);
+			if (manager != null) {
+				PhysicalNetwork network = manager.getPhysicalNetwork();
+				if (!network.isDirty()) {
+					PhysicalNetworkMap map = network.getNetworkMap();
+					int currentId = map.getNodeId(pos);
+					if (currentId != -1) {
+						BlockState neighborState = level.getBlockState(neighborPos);
+						if (neighborState.is(ModTags.CABLES)) {
+							int neighborId = map.getOrAddNode(neighborPos);
+							map.addEdge(currentId, neighborId);
+							CableNetworkRegistry.registerCable(level, neighborPos, manager.getBlockPos());
+							return;
+						}
+					}
+				}
+			}
+			markNearbyNetworksDirty(level, pos);
+		}
+	}
 
-    int maxSearch = 64;
+	public static void markNearbyNetworksDirty(LevelAccessor level, BlockPos startPos) {
+		if (level.isClientSide()) {
+			return;
+		}
 
-    while (!queue.isEmpty() && visited.size() < maxSearch)
-     {
-      BlockPos current = queue.poll();
+		Set<BlockPos> visited = new HashSet<>();
+		Queue<BlockPos> queue = new ArrayDeque<>();
+		queue.add(startPos);
+		visited.add(startPos);
 
-      for (Direction dir : Direction.values())
-       {
-        BlockPos neighbor = current.relative(dir);
-        if (visited.contains(neighbor))
-         {
-          continue;
-         }
+		int maxSearch = 64;
 
-        BlockState state = level.getBlockState(neighbor);
+		while (!queue.isEmpty() && visited.size() < maxSearch) {
+			BlockPos current = queue.poll();
 
-        if (state.is(ModBlocks.MANAGER_BLOCK.get()))
-         {
-          BlockEntity be = level.getBlockEntity(neighbor);
-          if (be instanceof ManagerBlockEntity manager)
-           {
-            return manager;
-           }
-         }
-        else if (state.is(ModTags.CABLES))
-         {
-          visited.add(neighbor);
-          queue.add(neighbor);
-         }
-       }
-     }
-    return null;
-   }
- }
+			for (Direction dir : Direction.values()) {
+				BlockPos neighbor = current.relative(dir);
+				if (visited.contains(neighbor)) {
+					continue;
+				}
+
+				BlockState state = level.getBlockState(neighbor);
+
+				if (state.is(ModBlocks.MANAGER_BLOCK.get())) {
+					BlockEntity be = level.getBlockEntity(neighbor);
+					if (be instanceof ManagerBlockEntity manager) {
+						manager.getPhysicalNetwork().markDirty();
+					}
+				} else if (state.is(ModTags.CABLES)) {
+					visited.add(neighbor);
+					queue.add(neighbor);
+				}
+			}
+		}
+	}
+
+	@Nullable
+	public static ManagerBlockEntity findConnectedManager(LevelAccessor level, BlockPos startPos) {
+		Set<BlockPos> visited = new HashSet<>();
+		Queue<BlockPos> queue = new ArrayDeque<>();
+		queue.add(startPos);
+		visited.add(startPos);
+
+		int maxSearch = 64;
+
+		while (!queue.isEmpty() && visited.size() < maxSearch) {
+			BlockPos current = queue.poll();
+
+			for (Direction dir : Direction.values()) {
+				BlockPos neighbor = current.relative(dir);
+				if (visited.contains(neighbor)) {
+					continue;
+				}
+
+				BlockState state = level.getBlockState(neighbor);
+
+				if (state.is(ModBlocks.MANAGER_BLOCK.get())) {
+					BlockEntity be = level.getBlockEntity(neighbor);
+					if (be instanceof ManagerBlockEntity manager) {
+						return manager;
+					}
+				} else if (state.is(ModTags.CABLES)) {
+					visited.add(neighbor);
+					queue.add(neighbor);
+				}
+			}
+		}
+		return null;
+	}
+}
