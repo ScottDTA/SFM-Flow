@@ -3,18 +3,15 @@ package dta.sfmflow.util;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Variable implements IContainerSelection
- {
-  private int id;
-  private List<Integer> containers;
-	
-  public Variable(int id)
-   {
-	this.id = id;
-	containers = new ArrayList<Integer>();
-   }
-	
-	
+public class Variable implements IContainerSelection {
+	private int id;
+	private List<Integer> containers;
+
+	public Variable(int id) {
+		this.id = id;
+		containers = new ArrayList<Integer>();
+	}
+
 	@Override
 	public int getId() {
 		// TODO Auto-generated method stub
@@ -39,4 +36,4 @@ public class Variable implements IContainerSelection
 		return null;
 	}
 
- }
+}

@@ -8,13 +8,12 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  *
  * @param <T> the packet payload type [3]
  */
-public interface IPacketHandler<T>
- {
-  /**
-   * Executes the handler callback on the designated payload [3].
-   *
-   * @param payload the received packet payload [3]
-   * @param context the packet execution context [3]
-   */
-  void handle(T payload, IPayloadContext context);
- }
+public interface IPacketHandler<T> {
+	/**
+	 * Executes the handler callback on the designated payload [3].
+	 *
+	 * @param payload the received packet payload [3]
+	 * @param context the packet execution context [3]
+	 */
+	void handle(T payload, IPayloadContext context);
+}

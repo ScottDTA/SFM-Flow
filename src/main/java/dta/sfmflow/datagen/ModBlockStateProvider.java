@@ -13,118 +13,128 @@ import net.neoforged.neoforge.common.data.ExistingFileHelper;
 /**
  * Automates the creation of blockstate json and block/item model files [3].
  */
-public class ModBlockStateProvider extends BlockStateProvider
- {
-  public ModBlockStateProvider(PackOutput output, ExistingFileHelper exFileHelper)
-   {
-	super(output, SFMFlow.MODID, exFileHelper);  
-   }	
-	
-  @Override
-  protected void registerStatesAndModels()
-   {
-	BlockModelBuilder managerModel = models().cubeBottomTop(ModBlocks.MANAGER_BLOCK.getRegisteredName(),
-                                                            modLoc("block/manager_side"),
-                                                            modLoc("block/manager_bot"),
-                                                            modLoc("block/manager_top")); 
-	simpleBlock(ModBlocks.MANAGER_BLOCK.get(), managerModel.texture("particle", "#top"));
-	simpleBlockItem(ModBlocks.MANAGER_BLOCK.get(), managerModel);
-	
-    simpleBlock(ModBlocks.CABLE_BLOCK.get());
-    simpleBlockItem(ModBlocks.CABLE_BLOCK.get(), models().cubeAll("cable_block", modLoc("block/cable_block")));
+public class ModBlockStateProvider extends BlockStateProvider {
+	public ModBlockStateProvider(PackOutput output, ExistingFileHelper exFileHelper) {
+		super(output, SFMFlow.MODID, exFileHelper);
+	}
 
-    simpleBlock(ModBlocks.HARDENED_CABLE_BLOCK.get());
-    simpleBlockItem(ModBlocks.HARDENED_CABLE_BLOCK.get(), models().cubeAll("hardened_cable_block", modLoc("block/hardened_cable_block")));
+	@Override
+	protected void registerStatesAndModels() {
+		BlockModelBuilder managerModel = models().cubeBottomTop(ModBlocks.MANAGER_BLOCK.getRegisteredName(),
+				modLoc("block/manager_side"), modLoc("block/manager_bot"), modLoc("block/manager_top"));
+		simpleBlock(ModBlocks.MANAGER_BLOCK.get(), managerModel.texture("particle", "#top"));
+		simpleBlockItem(ModBlocks.MANAGER_BLOCK.get(), managerModel);
 
-    simpleBlock(ModBlocks.REDSTONE_RECEIVER_BLOCK.get(), models().cubeAll("redstone_receiver_block", modLoc("block/redstone_receiver_block")));
-    simpleBlockItem(ModBlocks.REDSTONE_RECEIVER_BLOCK.get(), models().cubeAll("redstone_receiver_block", modLoc("block/redstone_receiver_block")));
+		simpleBlock(ModBlocks.CABLE_BLOCK.get());
+		simpleBlockItem(ModBlocks.CABLE_BLOCK.get(), models().cubeAll("cable_block", modLoc("block/cable_block")));
 
-    directionalBlock(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(), models().cubeAll("item_ejector_hatch_block", modLoc("block/item_ejector_hatch_block")));
-    simpleBlockItem(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(), models().cubeAll("item_ejector_hatch_block", modLoc("block/item_ejector_hatch_block")));
+		simpleBlock(ModBlocks.HARDENED_CABLE_BLOCK.get());
+		simpleBlockItem(ModBlocks.HARDENED_CABLE_BLOCK.get(),
+				models().cubeAll("hardened_cable_block", modLoc("block/hardened_cable_block")));
 
-    directionalBlock(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(), models().cubeAll("item_vacuum_hatch_block", modLoc("block/item_vacuum_hatch_block")));
-    simpleBlockItem(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(), models().cubeAll("item_vacuum_hatch_block", modLoc("block/item_vacuum_hatch_block")));
+		simpleBlock(ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
+				models().cubeAll("redstone_receiver_block", modLoc("block/redstone_receiver_block")));
+		simpleBlockItem(ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
+				models().cubeAll("redstone_receiver_block", modLoc("block/redstone_receiver_block")));
 
-    directionalBlock(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
-    simpleBlockItem(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
+		directionalBlock(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
+				models().cubeAll("item_ejector_hatch_block", modLoc("block/item_ejector_hatch_block")));
+		simpleBlockItem(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
+				models().cubeAll("item_ejector_hatch_block", modLoc("block/item_ejector_hatch_block")));
 
-    // Standard Cable Cluster [3]
-    simpleBlock(ModBlocks.CABLE_CLUSTER_BLOCK.get(), models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
-    simpleBlockItem(ModBlocks.CABLE_CLUSTER_BLOCK.get(), models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
+		directionalBlock(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
+				models().cubeAll("item_vacuum_hatch_block", modLoc("block/item_vacuum_hatch_block")));
+		simpleBlockItem(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
+				models().cubeAll("item_vacuum_hatch_block", modLoc("block/item_vacuum_hatch_block")));
 
-    // Advanced Cable Cluster [3]
-    simpleBlock(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(), models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
-    simpleBlockItem(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(), models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
+		directionalBlock(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
+				models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
+		simpleBlockItem(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
+				models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
 
-    BlockModelBuilder faceOffModel = models().withExistingParent("block/redstone_emitter_face_off", mcLoc("block/block"))
-        .texture("particle", modLoc("block/redstone_emitter_side_off"))
-        .texture("face", modLoc("block/redstone_emitter_face_off"));
-    faceOffModel.element()
-        .from(0, 0, 0)
-        .to(16, 16, 16)
-        .face(Direction.UP)
-            .uvs(0, 0, 16, 16)
-            .texture("#face")
-            .cullface(Direction.UP)
-        .end();
+		// Standard Cable Cluster [3]
+		simpleBlock(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
+				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
+		simpleBlockItem(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
+				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
 
-    BlockModelBuilder faceOnModel = models().withExistingParent("block/redstone_emitter_face_on", mcLoc("block/block"))
-        .texture("particle", modLoc("block/redstone_emitter_side_on"))
-        .texture("face", modLoc("block/redstone_emitter_face_on"));
-    faceOnModel.element()
-        .from(0, 0, 0)
-        .to(16, 16, 16)
-        .face(Direction.UP)
-            .uvs(0, 0, 16, 16)
-            .texture("#face")
-            .cullface(Direction.UP)
-        .end();
+		// Advanced Cable Cluster [3]
+		simpleBlock(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(),
+				models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
+		simpleBlockItem(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(),
+				models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
 
-    BlockModelBuilder inventoryModel = models().cubeAll("block/redstone_emitter_inventory", modLoc("block/redstone_emitter_side_off"));
-    simpleBlockItem(ModBlocks.REDSTONE_EMITTER_BLOCK.get(), inventoryModel);
+		BlockModelBuilder faceOffModel = models()
+				.withExistingParent("block/redstone_emitter_face_off", mcLoc("block/block"))
+				.texture("particle", modLoc("block/redstone_emitter_side_off"))
+				.texture("face", modLoc("block/redstone_emitter_face_off"));
+		faceOffModel.element().from(0, 0, 0).to(16, 16, 16).face(Direction.UP).uvs(0, 0, 16, 16).texture("#face")
+				.cullface(Direction.UP).end();
 
-    var emitterBuilder = getMultipartBuilder(ModBlocks.REDSTONE_EMITTER_BLOCK.get());
-    
-    emitterBuilder.part().modelFile(faceOffModel).rotationX(180).addModel().condition(BlockStateProperties.DOWN, false);
-    emitterBuilder.part().modelFile(faceOnModel).rotationX(180).addModel().condition(BlockStateProperties.DOWN, true);
-                  
-    emitterBuilder.part().modelFile(faceOffModel).addModel().condition(BlockStateProperties.UP, false);
-    emitterBuilder.part().modelFile(faceOnModel).addModel().condition(BlockStateProperties.UP, true);
-                  
-    emitterBuilder.part().modelFile(faceOffModel).rotationX(90).addModel().condition(BlockStateProperties.NORTH, false);
-    emitterBuilder.part().modelFile(faceOnModel).rotationX(90).addModel().condition(BlockStateProperties.NORTH, true);
-                  
-    emitterBuilder.part().modelFile(faceOffModel).rotationX(270).addModel().condition(BlockStateProperties.SOUTH, false);
-    emitterBuilder.part().modelFile(faceOnModel).rotationX(270).addModel().condition(BlockStateProperties.SOUTH, true);
-                  
-    emitterBuilder.part().modelFile(faceOffModel).rotationX(90).rotationY(270).addModel().condition(BlockStateProperties.WEST, false);
-    emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(270).addModel().condition(BlockStateProperties.WEST, true);
-                  
-    emitterBuilder.part().modelFile(faceOffModel).rotationX(90).rotationY(90).addModel().condition(BlockStateProperties.EAST, false);
-    emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(90).addModel().condition(BlockStateProperties.EAST, true);
+		BlockModelBuilder faceOnModel = models()
+				.withExistingParent("block/redstone_emitter_face_on", mcLoc("block/block"))
+				.texture("particle", modLoc("block/redstone_emitter_side_on"))
+				.texture("face", modLoc("block/redstone_emitter_face_on"));
+		faceOnModel.element().from(0, 0, 0).to(16, 16, 16).face(Direction.UP).uvs(0, 0, 16, 16).texture("#face")
+				.cullface(Direction.UP).end();
 
-    var observerModel = models().withExistingParent("block/observer_cable_block", mcLoc("block/observer"))
-            .texture("front", mcLoc("block/observer_front"))
-            .texture("back", modLoc("block/cable_block"))
-            .texture("side", modLoc("block/cable_block"))
-            .texture("top", modLoc("block/cable_block"))
-            .texture("bottom", modLoc("block/cable_block"));
+		BlockModelBuilder inventoryModel = models().cubeAll("block/redstone_emitter_inventory",
+				modLoc("block/redstone_emitter_side_off"));
+		simpleBlockItem(ModBlocks.REDSTONE_EMITTER_BLOCK.get(), inventoryModel);
 
-        getVariantBuilder(ModBlocks.OBSERVER_CABLE_BLOCK.get()).forAllStates(state -> {
-            Direction dir = state.getValue(BlockStateProperties.FACING);
-            int rotX = 0;
-            int rotY = 0;
-            switch (dir) {
-                case DOWN -> rotX = 90;
-                case UP -> rotX = 270;
-                case NORTH -> { rotX = 0; rotY = 0; }
-                case SOUTH -> rotY = 180;
-                case EAST -> rotY = 90;
-                case WEST -> rotY = 270;
-            }
-            return ConfiguredModel.builder().modelFile(observerModel).rotationX(rotX).rotationY(rotY).build();
-        });
+		var emitterBuilder = getMultipartBuilder(ModBlocks.REDSTONE_EMITTER_BLOCK.get());
 
-        simpleBlockItem(ModBlocks.OBSERVER_CABLE_BLOCK.get(), observerModel);
-   }
- }
+		emitterBuilder.part().modelFile(faceOffModel).rotationX(180).addModel().condition(BlockStateProperties.DOWN,
+				false);
+		emitterBuilder.part().modelFile(faceOnModel).rotationX(180).addModel().condition(BlockStateProperties.DOWN,
+				true);
+
+		emitterBuilder.part().modelFile(faceOffModel).addModel().condition(BlockStateProperties.UP, false);
+		emitterBuilder.part().modelFile(faceOnModel).addModel().condition(BlockStateProperties.UP, true);
+
+		emitterBuilder.part().modelFile(faceOffModel).rotationX(90).addModel().condition(BlockStateProperties.NORTH,
+				false);
+		emitterBuilder.part().modelFile(faceOnModel).rotationX(90).addModel().condition(BlockStateProperties.NORTH,
+				true);
+
+		emitterBuilder.part().modelFile(faceOffModel).rotationX(270).addModel().condition(BlockStateProperties.SOUTH,
+				false);
+		emitterBuilder.part().modelFile(faceOnModel).rotationX(270).addModel().condition(BlockStateProperties.SOUTH,
+				true);
+
+		emitterBuilder.part().modelFile(faceOffModel).rotationX(90).rotationY(270).addModel()
+				.condition(BlockStateProperties.WEST, false);
+		emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(270).addModel()
+				.condition(BlockStateProperties.WEST, true);
+
+		emitterBuilder.part().modelFile(faceOffModel).rotationX(90).rotationY(90).addModel()
+				.condition(BlockStateProperties.EAST, false);
+		emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(90).addModel()
+				.condition(BlockStateProperties.EAST, true);
+
+		var observerModel = models().withExistingParent("block/observer_cable_block", mcLoc("block/observer"))
+				.texture("front", mcLoc("block/observer_front")).texture("back", modLoc("block/cable_block"))
+				.texture("side", modLoc("block/cable_block")).texture("top", modLoc("block/cable_block"))
+				.texture("bottom", modLoc("block/cable_block"));
+
+		getVariantBuilder(ModBlocks.OBSERVER_CABLE_BLOCK.get()).forAllStates(state -> {
+			Direction dir = state.getValue(BlockStateProperties.FACING);
+			int rotX = 0;
+			int rotY = 0;
+			switch (dir) {
+			case DOWN -> rotX = 90;
+			case UP -> rotX = 270;
+			case NORTH -> {
+				rotX = 0;
+				rotY = 0;
+			}
+			case SOUTH -> rotY = 180;
+			case EAST -> rotY = 90;
+			case WEST -> rotY = 270;
+			}
+			return ConfiguredModel.builder().modelFile(observerModel).rotationX(rotX).rotationY(rotY).build();
+		});
+
+		simpleBlockItem(ModBlocks.OBSERVER_CABLE_BLOCK.get(), observerModel);
+	}
+}

@@ -20,80 +20,74 @@ import net.neoforged.api.distmarker.OnlyIn;
  */
 @OnlyIn(Dist.CLIENT)
 public class FlowWidgetBase extends AbstractFlowWidget {
-  private static final ResourceLocation COMPONENT_MIN_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/flowcomponents/component_min_bg.png");
-  
-  private final FlowWidgetContainer container;
-  private FlowWidgetMoveButton moveButton;
-  private FlowWidgetText titleText;
-	
-  public FlowWidgetBase(FlowWidgetContainer container, int x, int y, int width, int height, Component message) {
-	super(x, y, width, height, message);
-	this.container = container;
-	
-    AbstractFlowComponent comp = container.getComponent();
+	private static final ResourceLocation COMPONENT_MIN_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/component_min_bg.png");
 
-	this.moveButton = new FlowWidgetMoveButton(this, this.getX(), this.getY());
-	this.children.add(this.moveButton);
+	private final FlowWidgetContainer container;
+	private FlowWidgetMoveButton moveButton;
+	private FlowWidgetText titleText;
 
-	this.titleText = new FlowWidgetText(
-	    container.getParent().getFont(), 
-	    getX() + 4, 
-	    getY() + 8, 
-	    width - 12, 
-	    7, 
-	    message, 
-	    0.8F,
-	    false,
-	    () -> {
-	        Color mask = comp.getColorMask();
-	        return mask != null ? mask.getHexTextColor() : 4210752;
-	    }
-	);
-    this.children.add(this.titleText);
-    
-    // Purged: No FlowWidgetOpenCloseButton added here, keeping visual footprint locked [3]
-   }
+	public FlowWidgetBase(FlowWidgetContainer container, int x, int y, int width, int height, Component message) {
+		super(x, y, width, height, message);
+		this.container = container;
 
-  @Override
-  protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-	AbstractFlowComponent comp = container.getComponent();
-	
-    RenderSystem.setShader(GameRenderer::getPositionTexShader);
-    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		AbstractFlowComponent comp = container.getComponent();
 
-    org.joml.Matrix4f matrix = guiGraphics.pose().last().pose();
+		this.moveButton = new FlowWidgetMoveButton(this, this.getX(), this.getY());
+		this.children.add(this.moveButton);
 
-    // Symmetrical visual bounds: Render min background only [3]
-    GradientBlitUtil.blitWithGradient(matrix, COMPONENT_MIN_BG, getX(), getY(), 64, 20, 0.0F, 0.0F, 64, 20, 64, 20, comp.getColorMask());
-    
-	for (GuiEventListener child : children) {
-	  if (child instanceof AbstractFlowWidget widget) {
-		widget.visible = this.visible;
-        widget.active = this.active;
-		widget.render(guiGraphics, mouseX, mouseY, partialTick);
-	  }
+		this.titleText = new FlowWidgetText(container.getParent().getFont(), getX() + 4, getY() + 8, width - 12, 7,
+				message, 0.8F, false, () -> {
+					Color mask = comp.getColorMask();
+					return mask != null ? mask.getHexTextColor() : 4210752;
+				});
+		this.children.add(this.titleText);
+
+		// Purged: No FlowWidgetOpenCloseButton added here, keeping visual footprint
+		// locked [3]
 	}
-  }
-  
-  public FlowWidgetContainer getContainer() {
-	return container;  
-  }
-  
-  public FlowWidgetMoveButton getMoveButton() {
-    return moveButton;
-  }
 
-  @Override
-  public void setX(int x) {
-	int dif = this.getX() - x;
-	super.setX(x);
-	updateChildrenXPositions(dif);
-  }
-  
-  @Override
-  public void setY(int y) {
-	int dif = this.getY() - y;
-	super.setY(y);
-	updateChildrenYPositions(dif);
-  }
+	@Override
+	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		AbstractFlowComponent comp = container.getComponent();
+
+		RenderSystem.setShader(GameRenderer::getPositionTexShader);
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+		org.joml.Matrix4f matrix = guiGraphics.pose().last().pose();
+
+		// Symmetrical visual bounds: Render min background only [3]
+		GradientBlitUtil.blitWithGradient(matrix, COMPONENT_MIN_BG, getX(), getY(), 64, 20, 0.0F, 0.0F, 64, 20, 64, 20,
+				comp.getColorMask());
+
+		for (GuiEventListener child : children) {
+			if (child instanceof AbstractFlowWidget widget) {
+				widget.visible = this.visible;
+				widget.active = this.active;
+				widget.render(guiGraphics, mouseX, mouseY, partialTick);
+			}
+		}
+	}
+
+	public FlowWidgetContainer getContainer() {
+		return container;
+	}
+
+	public FlowWidgetMoveButton getMoveButton() {
+		return moveButton;
+	}
+
+	@Override
+	public void setX(int x) {
+		int dif = this.getX() - x;
+		super.setX(x);
+		updateChildrenXPositions(dif);
+	}
+
+	@Override
+	public void setY(int y) {
+		int dif = this.getY() - y;
+		super.setY(y);
+		updateChildrenYPositions(dif);
+	}
 }

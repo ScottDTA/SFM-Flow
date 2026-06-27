@@ -14,45 +14,41 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Handle button used to drag and move component containers across the canvas workspace [3].
+ * Handle button used to drag and move component containers across the canvas
+ * workspace [3].
  */
 @OnlyIn(Dist.CLIENT)
-public class FlowWidgetMoveButton extends AbstractFlowWidget
- {
-  private static final ResourceLocation MOVE_BUTTON = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/flowcomponents/move_button.png");
-  private final FlowWidgetBase parent;
-  
-  public FlowWidgetMoveButton(FlowWidgetBase parent, int x, int y)
-   {
-	super(x, y, 6, 6, Component.literal("FlowComponentMoveButton"));
-	this.parent = parent;
-   }
-  
-  @Override
-  protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick)
-   {
-    AbstractFlowComponent comp = parent.getContainer().getComponent();
-    Color mask = comp.getColorMask();
+public class FlowWidgetMoveButton extends AbstractFlowWidget {
+	private static final ResourceLocation MOVE_BUTTON = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/move_button.png");
+	private final FlowWidgetBase parent;
 
-    // 🔥 Gated check: Bypass tinting on BLACK mask to preserve visual handle contrast [3]
-    if (mask != null && mask != Color.BLACK)
-     {
-      float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
-      RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
-     }
-    else
-     {
-      RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-     }
+	public FlowWidgetMoveButton(FlowWidgetBase parent, int x, int y) {
+		super(x, y, 6, 6, Component.literal("FlowComponentMoveButton"));
+		this.parent = parent;
+	}
 
-    RenderSystem.setShader(GameRenderer::getPositionTexShader);
-	RenderSystem.setShaderTexture(0, MOVE_BUTTON);
-	guiGraphics.blit(MOVE_BUTTON, getX(), getY(), 0, 0, 6, 6, 6, 6);
-    RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // Reset shader color
-   }
-  
-  public FlowWidgetBase getParent()
-   {
-	return parent;  
-   }
- }
+	@Override
+	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		AbstractFlowComponent comp = parent.getContainer().getComponent();
+		Color mask = comp.getColorMask();
+
+		// 🔥 Gated check: Bypass tinting on BLACK mask to preserve visual handle
+		// contrast [3]
+		if (mask != null && mask != Color.BLACK) {
+			float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
+			RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
+		} else {
+			RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		}
+
+		RenderSystem.setShader(GameRenderer::getPositionTexShader);
+		RenderSystem.setShaderTexture(0, MOVE_BUTTON);
+		guiGraphics.blit(MOVE_BUTTON, getX(), getY(), 0, 0, 6, 6, 6, 6);
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F); // Reset shader color
+	}
+
+	public FlowWidgetBase getParent() {
+		return parent;
+	}
+}

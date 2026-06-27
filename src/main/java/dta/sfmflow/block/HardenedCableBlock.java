@@ -5,12 +5,12 @@ package dta.sfmflow.block;
  */
 public class HardenedCableBlock extends CableBlock {
 
-    /**
-     * Initializes a HardenedCableBlock instance [3].
-     *
-     * @param properties block behavior properties [3]
-     */
-    public HardenedCableBlock(Properties properties) {
-        super(properties);
-    }
+	/**
+	 * Initializes a HardenedCableBlock instance [3].
+	 *
+	 * @param properties block behavior properties [3]
+	 */
+	public HardenedCableBlock(Properties properties) {
+		super(properties);
+	}
 }

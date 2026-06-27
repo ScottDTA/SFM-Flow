@@ -45,452 +45,425 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Backing BlockEntity class for the Manager block [3].
- * Stores layout settings, flowchart canvas data, and delegates scans to standalone network models [3].
- * Updated to reflect the simplified, compact component layout and purged NBT properties [3].
- * Upgraded to serialize flat long arrays, perform first-tick validation sweeps, and run chunk-safety filters [3].
- * Upgraded to process lock-free circular ring buffer execution pipelines synchronously during ticks [3].
+ * Backing BlockEntity class for the Manager block [3]. Stores layout settings,
+ * flowchart canvas data, and delegates scans to standalone network models [3].
+ * Updated to reflect the simplified, compact component layout and purged NBT
+ * properties [3]. Upgraded to serialize flat long arrays, perform first-tick
+ * validation sweeps, and run chunk-safety filters [3]. Upgraded to process
+ * lock-free circular ring buffer execution pipelines synchronously during ticks
+ * [3].
  */
-public class ManagerBlockEntity extends BlockEntity implements MenuProvider
- {
-  private final Variable[] variables;
-  private Flowchart flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
-  protected final ContainerData data;
-  private int commandCount = 0;
-  private boolean needsRefresh = false;
-  private boolean isFirstTick = true;
+public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
+	private final Variable[] variables;
+	private Flowchart flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+	protected final ContainerData data;
+	private int commandCount = 0;
+	private boolean needsRefresh = false;
+	private boolean isFirstTick = true;
 
-  private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
+	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 
-  // High-performance ring buffer pre-allocated to hold up to 1024 transfer frames [3]
-  private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
+	// High-performance ring buffer pre-allocated to hold up to 1024 transfer frames
+	// [3]
+	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
 
-  /**
-   * Instantiates a new Manager block entity and binds synchronized container variables [3].
-   *
-   * @param pos block position coordinates [3]
-   * @param blockState block state properties [3]
-   */
-  public ManagerBlockEntity(BlockPos pos, BlockState blockState)
-   {
-	super(ModBlockEntities.MANAGER_BE.get(), pos, blockState);
+	/**
+	 * Instantiates a new Manager block entity and binds synchronized container
+	 * variables [3].
+	 *
+	 * @param pos        block position coordinates [3]
+	 * @param blockState block state properties [3]
+	 */
+	public ManagerBlockEntity(BlockPos pos, BlockState blockState) {
+		super(ModBlockEntities.MANAGER_BE.get(), pos, blockState);
 
-	variables = new Variable[VariableColor.values().length];
-	data = new ContainerData() {
-                                @Override
-		                        public int get(int index)
-                                 {
-			                      return ManagerBlockEntity.this.commandCount;
-		                         }
+		variables = new Variable[VariableColor.values().length];
+		data = new ContainerData() {
+			@Override
+			public int get(int index) {
+				return ManagerBlockEntity.this.commandCount;
+			}
 
-		                        @Override
-		                        public void set(int index, int value)
-		                         {
-			                      ManagerBlockEntity.this.commandCount = value;			
-		                         }
+			@Override
+			public void set(int index, int value) {
+				ManagerBlockEntity.this.commandCount = value;
+			}
 
-		                        @Override
-		                        public int getCount()
-		                         {
-			                      return 1;
-		                         }
-	                           };
-   }
+			@Override
+			public int getCount() {
+				return 1;
+			}
+		};
+	}
 
-  @Override
-  public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player)
-   {
-    return new ManagerMenu(containerId, playerInventory, this, this.data);
-   }
+	@Override
+	public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
+		return new ManagerMenu(containerId, playerInventory, this, this.data);
+	}
 
-  @Override
-  public Component getDisplayName()
-   {
-	return Component.translatable("block.sfmflow.manager_block");
-   }
+	@Override
+	public Component getDisplayName() {
+		return Component.translatable("block.sfmflow.manager_block");
+	}
 
-  /**
-   * Retrieves the pre-allocated circular ring buffer managing cross-thread execution transfers [3].
-   *
-   * @return circular ring buffer instance [3]
-   */
-  public ExecutionRingBuffer getExecutionBuffer() {
-      return this.executionBuffer;
-  }
+	/**
+	 * Retrieves the pre-allocated circular ring buffer managing cross-thread
+	 * execution transfers [3].
+	 *
+	 * @return circular ring buffer instance [3]
+	 */
+	public ExecutionRingBuffer getExecutionBuffer() {
+		return this.executionBuffer;
+	}
 
-  /**
-   * Ticking loop driving pathfinder scanning sweeps on the physical server level [3].
-   * Upgraded with an offline first-tick verification sweep to inspect graph sanity [3].
-   * Upgraded to poll, verify, and execute compiled connection frames from the ring buffer [3].
-   *
-   * @param pLevel world level instance [3]
-   * @param pBlockPos manager coordinates [3]
-   * @param pBlockState manager block state [3]
-   */
-  public void tick(Level pLevel, BlockPos pBlockPos, BlockState pBlockState)
-   {
-    if (pLevel != null && !pLevel.isClientSide())
-     {
-      if (this.isFirstTick) {
-          this.isFirstTick = false;
-          PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
-          boolean graphSane = true;
+	/**
+	 * Ticking loop driving pathfinder scanning sweeps on the physical server level
+	 * [3]. Upgraded with an offline first-tick verification sweep to inspect graph
+	 * sanity [3]. Upgraded to process lock-free circular ring buffer execution
+	 * pipelines synchronously during ticks [3]. Upgraded to periodically capture
+	 * and submit deep-copied planning snapshots off-thread [3].
+	 *
+	 * @param pLevel      world level instance [3]
+	 * @param pBlockPos   manager coordinates [3]
+	 * @param pBlockState manager block state [3]
+	 */
+	public void tick(Level pLevel, BlockPos pBlockPos, BlockState pBlockState) {
+		if (pLevel != null && !pLevel.isClientSide()) {
+			if (this.isFirstTick) {
+				this.isFirstTick = false;
+				PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
+				boolean graphSane = true;
 
-          for (BlockPos storedPos : map.getAllPositions()) {
-              if (!pLevel.getBlockState(storedPos).is(ModTags.CABLES)) {
-                  graphSane = false;
-                  break;
-              }
-          }
+				for (BlockPos storedPos : map.getAllPositions()) {
+					if (!pLevel.getBlockState(storedPos).is(ModTags.CABLES)) {
+						graphSane = false;
+						break;
+					}
+				}
 
-          if (!graphSane) {
-              map.clear();
-              this.physicalNetwork.markDirty();
-          }
-      }
+				if (!graphSane) {
+					map.clear();
+					this.physicalNetwork.markDirty();
+				}
+			}
 
-   // Synchronously poll and execute published tasks from the lock-free ring buffer [3]
-      this.executionBuffer.pollAndExecute(task -> {
-          var source = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, task.getSourcePos(), null);
-          var target = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, task.getTargetPos(), null);
-          
-          if (source != null && target != null) {
-              // Re-verify that requested item parameters match physical slot configurations [3]
-              ItemStack simExtracted = source.extractItem(task.getSourceSlot(), task.getCount(), true);
-              // Use standard 1.21.1 isSameItemSameComponents checks instead of old ItemHandlerHelper methods
-              if (ItemStack.isSameItemSameComponents(simExtracted, task.getItem())) {
-                  ItemStack targetRemaining = target.insertItem(task.getTargetSlot(), simExtracted, true);
-                  int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
-                  
-                  if (realTransferCount > 0) {
-                      ItemStack realExtracted = source.extractItem(task.getSourceSlot(), realTransferCount, false);
-                      target.insertItem(task.getTargetSlot(), realExtracted, false);
-                  }
-              }
-          }
-      });
-      this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
-     }
-   }    
-  
-  /**
-   * Triggers a cable-network rebuild during the next scanning cycle [3].
-   */
-  public void updateInventories()
-   {
-    this.physicalNetwork.markDirty();
-   }
+			// Synchronously poll and execute published tasks from the lock-free ring buffer
+			// [3]
+			this.executionBuffer.pollAndExecute(task -> {
+				// Query capabilities directly from the level instance [3]
+				var source = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+						task.getSourcePos(), null);
+				var target = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+						task.getTargetPos(), null);
 
-  /**
-   * Retrieves the physical network topology model [3].
-   *
-   * @return PhysicalNetwork coordinator [3]
-   */
-  public PhysicalNetwork getPhysicalNetwork()
-   {
-    return this.physicalNetwork;
-   }
+				if (source != null && target != null) {
+					// Re-verify that requested item parameters match physical slot configurations
+					// [3]
+					ItemStack simExtracted = source.extractItem(task.getSourceSlot(), task.getCount(), true);
+					if (ItemStack.isSameItemSameComponents(simExtracted, task.getItem())) {
+						ItemStack targetRemaining = target.insertItem(task.getTargetSlot(), simExtracted, true);
+						int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
 
-  /**
-   * Exposes active connection blocks cached on our standalone network model [3].
-   * Upgraded with a double-pass check querying graph sleep states and chunk loading bounds [3].
-   *
-   * @return a list of scanned targets [3]
-   */
-  public List<ConnectionBlock> getInventories()
-   {
-    List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
-    if (this.level != null) {
-        PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
-        for (ConnectionBlock block : scanned) {
-            int nodeId = map.getNodeId(block.getBlockPos());
-            if (nodeId != -1 && map.isNodeSleeping(nodeId)) {
-                block.setSleeping(true);
-            } else if (!this.level.hasChunkAt(block.getBlockPos())) {
-                block.setSleeping(true);
-            } else {
-                block.setSleeping(false);
-            }
-        }
-    }
-    return scanned;
-   }
-  
-  @Override
-  public void onLoad()
-   {
-	if (this.level != null && !this.level.isClientSide())
-	 {
-	  updateInventories();
-	 }
-   }
-  
-  @Override
-  protected void saveAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries)
-   {
-    Flowchart.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.flowchart)
-        .resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
-        .ifPresent(nbt -> pTag.put("flowchart", nbt));
+						if (realTransferCount > 0) {
+							ItemStack realExtracted = source.extractItem(task.getSourceSlot(), realTransferCount,
+									false);
+							target.insertItem(task.getTargetSlot(), realExtracted, false);
+						}
+					}
+				}
+			});
 
-    PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
-    java.util.Collection<BlockPos> positions = map.getAllPositions();
-    long[] flatPosArray = new long[positions.size()];
-    int idx = 0;
-    for (BlockPos mappedPos : positions) {
-        flatPosArray[idx++] = mappedPos.asLong();
-    }
-    pTag.putLongArray("ScannedCablePositions", flatPosArray);
-	  
-	super.saveAdditional(pTag, pRegistries);  
-   }
-  
-  @Override
-  protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries)
-   {
-	super.loadAdditional(pTag, pRegistries);
-	
-	if (pTag.contains("flowchart"))
-	 {
-      try {
-          this.flowchart = Flowchart.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("flowchart"))
-              .resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-              .orElseGet(() -> new Flowchart(new java.util.HashMap<>(), new ArrayList<>()));
-      } catch (Exception e) {
-          SFMFlow.LOGGER.error("CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!", e);
-          this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
-      }
-	 }
-	else
-	 {
-	  this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
-	 }
-    
-    if (pTag.contains("ScannedCablePositions")) {
-        long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
-        PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
-        map.clear();
-        for (long longVal : dirOrdinals(flatPosOrdinals(flatPosArray))) {
-            map.getOrAddNode(BlockPos.of(longVal));
-        }
-    }
-    
-    commandCount = flowchart.components().size();
-   }
+			// Submit background planning task dynamically every 10 server ticks [3]
+			if (pLevel.getGameTime() % 10 == 0) {
+				var snapshot = dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.create(this);
+				dta.sfmflow.kernel.FlowExecutionKernel.submitTask(this, snapshot);
+			}
 
-   private long[] getLongArrayHelper(CompoundTag tag) {
-       return tag.getLongArray("ScannedCablePositions");
-   }
+			this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
+		}
+	}
 
-  @Nullable
-  @Override
-  public Packet<ClientGamePacketListener> getUpdatePacket()
-   {	  
-	return ClientboundBlockEntityDataPacket.create(this);
-   }
-  
-  public void addFlowComponent(FlowComponentType type, Player player)
-   {
-	if (flowchart.components().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get())
-	 {
-	  UUID newUUID = UUID.randomUUID(); 
-	  AbstractFlowComponent newComponent = type.createComponent(newUUID);
-	  newComponent.setZ(flowchart.components().size() + 1);
-	  flowchart.components().put(newUUID, newComponent);
-	  this.setChanged();
-      commandCount = flowchart.components().size();
+	/**
+	 * Triggers a cable-network rebuild during the next scanning cycle [3].
+	 */
+	public void updateInventories() {
+		this.physicalNetwork.markDirty();
+	}
 
-      CompoundTag tag = new CompoundTag();
-      newComponent.saveData(tag);
-      broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, newUUID, SyncComponentDeltaPacket.DeltaType.ADD, tag));
-	 }
-   }
-  
-  public Map<UUID, AbstractFlowComponent> getFlowComponents()
-   {
-	return flowchart.components();  
-   }
-  
-  public List<FlowComponentConnections> getFlowConnections()
-   {
-	return flowchart.connections();  
-   }
+	/**
+	 * Retrieves the physical network topology model [3].
+	 *
+	 * @return PhysicalNetwork coordinator [3]
+	 */
+	public PhysicalNetwork getPhysicalNetwork() {
+		return this.physicalNetwork;
+	}
 
-  public void executeCanvasAction(CanvasAction action, UUID componentId)
-   {
-    switch (action)
-     {
-      case DELETE -> handleDelete(componentId);
-      case COPY -> handleCopy(componentId);
-      case TOGGLE_OPEN -> handleToggleOpen(componentId);
-     }
-   }
+	/**
+	 * Exposes active connection blocks cached on our standalone network model [3].
+	 * Upgraded with a double-pass check querying graph sleep states and chunk
+	 * loading bounds [3].
+	 *
+	 * @return a list of scanned targets [3]
+	 */
+	public List<ConnectionBlock> getInventories() {
+		List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
+		if (this.level != null) {
+			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
+			for (ConnectionBlock block : scanned) {
+				int nodeId = map.getNodeId(block.getBlockPos());
+				if (nodeId != -1 && map.isNodeSleeping(nodeId)) {
+					block.setSleeping(true);
+				} else if (!this.level.hasChunkAt(block.getBlockPos())) {
+					block.setSleeping(true);
+				} else {
+					block.setSleeping(false);
+				}
+			}
+		}
+		return scanned;
+	}
 
-  private void handleDelete(UUID componentId)
-   {
-    this.flowchart.components().remove(componentId);
-    this.flowchart.connections().removeIf(wire -> wire.getSourceComponentId().equals(componentId) || wire.getTargetComponentId().equals(componentId));
-    this.setChanged();
-    this.commandCount = this.flowchart.components().size();
+	@Override
+	public void onLoad() {
+		if (this.level != null && !this.level.isClientSide()) {
+			updateInventories();
+		}
+	}
 
-    broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, componentId, SyncComponentDeltaPacket.DeltaType.REMOVE, new CompoundTag()));
-   }
-  
-  private void handleCopy(UUID componentId)
-  {
-   AbstractFlowComponent original = this.flowchart.components().get(componentId);
-   if (original != null && this.flowchart.components().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get())
-    {
-     UUID newId = UUID.randomUUID();
-     AbstractFlowComponent copy = original.getType().createComponent(newId);
-     CompoundTag settings = new CompoundTag();
-     original.saveData(settings);
-     copy.loadData(settings);
-     
-     copy.setBaseProperties(new AbstractFlowComponent.BaseProperties(
-         newId, 
-         copy.getX(), 
-         copy.getY(), 
-         copy.getZ(), 
-         copy.getCustomName(),
-         copy.getColorMask()
-     ));
+	@Override
+	protected void saveAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
+		Flowchart.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.flowchart)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
+				.ifPresent(nbt -> pTag.put("flowchart", nbt));
 
-     int h = copy.getVisualHeight();
-     int nextX = original.getX() + 10;
-     int nextY = original.getY() + 10;
-     
-     if (nextX + copy.getVisualWidth() > AbstractFlowComponent.CANVAS_MAX_X)
-      {
-       nextX = original.getX() - 10;
-      }
-     nextX = Math.max(22, Math.min(nextX, AbstractFlowComponent.CANVAS_MAX_X - copy.getVisualWidth()));
+		PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
+		java.util.Collection<BlockPos> positions = map.getAllPositions();
+		long[] flatPosArray = new long[positions.size()];
+		int idx = 0;
+		for (BlockPos mappedPos : positions) {
+			flatPosArray[idx++] = mappedPos.asLong();
+		}
+		pTag.putLongArray("ScannedCablePositions", flatPosArray);
 
-     if (nextY + h > AbstractFlowComponent.CANVAS_MAX_Y)
-      {
-       nextY = original.getY() - 10;
-      }
-     
-     int minY = copy.hasInputNodes() ? 10 : 4;
-     nextY = Math.max(minY, Math.min(nextY, AbstractFlowComponent.CANVAS_MAX_Y - h));
-            
-     copy.setX(nextX);
-     copy.setY(nextY);
-     copy.setZ(original.getZ() + 1);
-     this.flowchart.components().put(newId, copy);
-     this.setChanged();
-     this.commandCount = this.flowchart.components().size();
+		super.saveAdditional(pTag, pRegistries);
+	}
 
-     CompoundTag tag = new CompoundTag();
-     copy.saveData(tag);
-     broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, newId, SyncComponentDeltaPacket.DeltaType.ADD, tag));
-    }
-  }
-  
-  private void handleToggleOpen(UUID componentId)
-   {
-   }
-  
-  public void componentMoved(ComponentMoved pData, IPayloadContext context)
-   {
-	for (ComponentMoved.Entry entry : pData.entries())
-	 {
-	  AbstractFlowComponent component = flowchart.components().get(entry.id());	
-	  if (component != null)
-	   {
-	    component.setX(entry.x());
-	    component.setY(entry.y());
-	    component.setZ(entry.z());	  
+	@Override
+	protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
+		super.loadAdditional(pTag, pRegistries);
 
-        CompoundTag dataTag = new CompoundTag();
-        dataTag.putInt("x", entry.x());
-        dataTag.putInt("y", entry.y());
-        dataTag.putInt("z", entry.z());
-        broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, entry.id(), SyncComponentDeltaPacket.DeltaType.MOVE, dataTag));
-	   }
-	 }
-   }
-  
-  @Override
-  public void setChanged()
-   {
-    super.setChanged();
+		if (pTag.contains("flowchart")) {
+			try {
+				this.flowchart = Flowchart.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("flowchart"))
+						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
+						.orElseGet(() -> new Flowchart(new java.util.HashMap<>(), new ArrayList<>()));
+			} catch (Exception e) {
+				SFMFlow.LOGGER.error(
+						"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
+						e);
+				this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+			}
+		} else {
+			this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+		}
 
-    if (this.level != null && !this.level.isClientSide())
-     {
-      BlockState state = this.getBlockState();
-      this.level.sendBlockUpdated(this.worldPosition, state, state, Block.UPDATE_ALL);
-     }
-   }
-  
-  @Override
-  public CompoundTag getUpdateTag(HolderLookup.Provider registries)
-   {
-    CompoundTag tag = super.getUpdateTag(registries);
-    this.saveAdditional(tag, registries);
-    return tag;
-   }
-  
-  @Override
-  public void onDataPacket(Connection connection, ClientboundBlockEntityDataPacket packet, HolderLookup.Provider registries)
-   {
-	super.onDataPacket(connection, packet, registries);
-    this.needsRefresh = true;
-   }
+		if (pTag.contains("ScannedCablePositions")) {
+			long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
+			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
+			map.clear();
+			for (long longVal : dirOrdinals(flatPosOrdinals(flatPosArray))) {
+				map.getOrAddNode(BlockPos.of(longVal));
+			}
+		}
 
-  public boolean pollNeedsRefresh()
-   {
-    boolean r = this.needsRefresh;
-    this.needsRefresh = false;
-    return r;
-   }
+		commandCount = flowchart.components().size();
+	}
 
-  public void markNeedsRefresh()
-   {
-    this.needsRefresh = true;
-   }
+	private long[] getLongArrayHelper(CompoundTag tag) {
+		return tag.getLongArray("ScannedCablePositions");
+	}
 
-  public void broadcastDeltaUpdate(SyncComponentDeltaPacket packet)
-   {
-    if (this.level == null || this.level.isClientSide())
-     {
-      return;
-     }
-    
-    this.level.players().stream()
-        .filter(player -> player.containerMenu instanceof ManagerMenu menu 
-                && menu.getManagerBlockEntity().getBlockPos().equals(this.worldPosition))
-        .forEach(player -> net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
-            (net.minecraft.server.level.ServerPlayer) player, 
-            packet
-        ));
-   }
+	@Nullable
+	@Override
+	public Packet<ClientGamePacketListener> getUpdatePacket() {
+		return ClientboundBlockEntityDataPacket.create(this);
+	}
 
-  /**
-   * Broadcasts connection update packets to all observing clients [3].
-   *
-   * @param packet the sync connection wire packet [3]
-   */
-  public void broadcastConnectionsUpdate(dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket packet)
-   {
-    if (this.level == null || this.level.isClientSide())
-     {
-      return;
-     }
-    
-    this.level.players().stream()
-        .filter(player -> player.containerMenu instanceof ManagerMenu menu 
-                && menu.getManagerBlockEntity().getBlockPos().equals(this.worldPosition))
-        .forEach(player -> net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
-            (net.minecraft.server.level.ServerPlayer) player, 
-            packet
-        ));
-   }
+	public void addFlowComponent(FlowComponentType type, Player player) {
+		if (flowchart.components().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get()) {
+			UUID newUUID = UUID.randomUUID();
+			AbstractFlowComponent newComponent = type.createComponent(newUUID);
+			newComponent.setZ(flowchart.components().size() + 1);
+			flowchart.components().put(newUUID, newComponent);
+			this.setChanged();
+			commandCount = flowchart.components().size();
 
-   private long[] flatPosOrdinals(long[] arr) {
-       return arr != null ? arr : new long[0];
-   }
+			CompoundTag tag = new CompoundTag();
+			newComponent.saveData(tag);
+			broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, newUUID,
+					SyncComponentDeltaPacket.DeltaType.ADD, tag));
+		}
+	}
 
-   private long[] dirOrdinals(long[] arr) {
-       return arr;
-   }
- }
+	public Map<UUID, AbstractFlowComponent> getFlowComponents() {
+		return flowchart.components();
+	}
+
+	public List<FlowComponentConnections> getFlowConnections() {
+		return flowchart.connections();
+	}
+
+	public void executeCanvasAction(CanvasAction action, UUID componentId) {
+		switch (action) {
+		case DELETE -> handleDelete(componentId);
+		case COPY -> handleCopy(componentId);
+		case TOGGLE_OPEN -> handleToggleOpen(componentId);
+		}
+	}
+
+	private void handleDelete(UUID componentId) {
+		this.flowchart.components().remove(componentId);
+		this.flowchart.connections().removeIf(wire -> wire.getSourceComponentId().equals(componentId)
+				|| wire.getTargetComponentId().equals(componentId));
+		this.setChanged();
+		this.commandCount = this.flowchart.components().size();
+
+		broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, componentId,
+				SyncComponentDeltaPacket.DeltaType.REMOVE, new CompoundTag()));
+	}
+
+	private void handleCopy(UUID componentId) {
+		AbstractFlowComponent original = this.flowchart.components().get(componentId);
+		if (original != null && this.flowchart.components().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get()) {
+			UUID newId = UUID.randomUUID();
+			AbstractFlowComponent copy = original.getType().createComponent(newId);
+			CompoundTag settings = new CompoundTag();
+			original.saveData(settings);
+			copy.loadData(settings);
+
+			copy.setBaseProperties(new AbstractFlowComponent.BaseProperties(newId, copy.getX(), copy.getY(),
+					copy.getZ(), copy.getCustomName(), copy.getColorMask()));
+
+			int h = copy.getVisualHeight();
+			int nextX = original.getX() + 10;
+			int nextY = original.getY() + 10;
+
+			if (nextX + copy.getVisualWidth() > AbstractFlowComponent.CANVAS_MAX_X) {
+				nextX = original.getX() - 10;
+			}
+			nextX = Math.max(22, Math.min(nextX, AbstractFlowComponent.CANVAS_MAX_X - copy.getVisualWidth()));
+
+			if (nextY + h > AbstractFlowComponent.CANVAS_MAX_Y) {
+				nextY = original.getY() - 10;
+			}
+
+			int minY = copy.hasInputNodes() ? 10 : 4;
+			nextY = Math.max(minY, Math.min(nextY, AbstractFlowComponent.CANVAS_MAX_Y - h));
+
+			copy.setX(nextX);
+			copy.setY(nextY);
+			copy.setZ(original.getZ() + 1);
+			this.flowchart.components().put(newId, copy);
+			this.setChanged();
+			this.commandCount = this.flowchart.components().size();
+
+			CompoundTag tag = new CompoundTag();
+			copy.saveData(tag);
+			broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, newId,
+					SyncComponentDeltaPacket.DeltaType.ADD, tag));
+		}
+	}
+
+	private void handleToggleOpen(UUID componentId) {
+	}
+
+	public void componentMoved(ComponentMoved pData, IPayloadContext context) {
+		for (ComponentMoved.Entry entry : pData.entries()) {
+			AbstractFlowComponent component = flowchart.components().get(entry.id());
+			if (component != null) {
+				component.setX(entry.x());
+				component.setY(entry.y());
+				component.setZ(entry.z());
+
+				CompoundTag dataTag = new CompoundTag();
+				dataTag.putInt("x", entry.x());
+				dataTag.putInt("y", entry.y());
+				dataTag.putInt("z", entry.z());
+				broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, entry.id(),
+						SyncComponentDeltaPacket.DeltaType.MOVE, dataTag));
+			}
+		}
+	}
+
+	@Override
+	public void setChanged() {
+		super.setChanged();
+
+		if (this.level != null && !this.level.isClientSide()) {
+			BlockState state = this.getBlockState();
+			this.level.sendBlockUpdated(this.worldPosition, state, state, Block.UPDATE_ALL);
+		}
+	}
+
+	@Override
+	public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+		CompoundTag tag = super.getUpdateTag(registries);
+		this.saveAdditional(tag, registries);
+		return tag;
+	}
+
+	@Override
+	public void onDataPacket(Connection connection, ClientboundBlockEntityDataPacket packet,
+			HolderLookup.Provider registries) {
+		super.onDataPacket(connection, packet, registries);
+		this.needsRefresh = true;
+	}
+
+	public boolean pollNeedsRefresh() {
+		boolean r = this.needsRefresh;
+		this.needsRefresh = false;
+		return r;
+	}
+
+	public void markNeedsRefresh() {
+		this.needsRefresh = true;
+	}
+
+	public void broadcastDeltaUpdate(SyncComponentDeltaPacket packet) {
+		if (this.level == null || this.level.isClientSide()) {
+			return;
+		}
+
+		this.level.players().stream()
+				.filter(player -> player.containerMenu instanceof ManagerMenu menu
+						&& menu.getManagerBlockEntity().getBlockPos().equals(this.worldPosition))
+				.forEach(player -> net.neoforged.neoforge.network.PacketDistributor
+						.sendToPlayer((net.minecraft.server.level.ServerPlayer) player, packet));
+	}
+
+	/**
+	 * Broadcasts connection update packets to all observing clients [3].
+	 *
+	 * @param packet the sync connection wire packet [3]
+	 */
+	public void broadcastConnectionsUpdate(dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket packet) {
+		if (this.level == null || this.level.isClientSide()) {
+			return;
+		}
+
+		this.level.players().stream()
+				.filter(player -> player.containerMenu instanceof ManagerMenu menu
+						&& menu.getManagerBlockEntity().getBlockPos().equals(this.worldPosition))
+				.forEach(player -> net.neoforged.neoforge.network.PacketDistributor
+						.sendToPlayer((net.minecraft.server.level.ServerPlayer) player, packet));
+	}
+
+	private long[] flatPosOrdinals(long[] arr) {
+		return arr != null ? arr : new long[0];
+	}
+
+	private long[] dirOrdinals(long[] arr) {
+		return arr;
+	}
+}

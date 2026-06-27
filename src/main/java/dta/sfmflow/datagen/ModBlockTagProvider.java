@@ -14,47 +14,28 @@ import net.neoforged.neoforge.common.data.ExistingFileHelper;
 /**
  * Automates mining and cable topology tag compilation [3].
  */
-public class ModBlockTagProvider extends BlockTagsProvider
- {
-  public ModBlockTagProvider(PackOutput output, CompletableFuture<Provider> lookupProvider, @Nullable ExistingFileHelper existingFileHelper)
-   {
-	super(output, lookupProvider, SFMFlow.MODID, existingFileHelper);
-   }
+public class ModBlockTagProvider extends BlockTagsProvider {
+	public ModBlockTagProvider(PackOutput output, CompletableFuture<Provider> lookupProvider,
+			@Nullable ExistingFileHelper existingFileHelper) {
+		super(output, lookupProvider, SFMFlow.MODID, existingFileHelper);
+	}
 
-  @Override
-  protected void addTags(Provider provider)
-   {
-	  tag(BlockTags.MINEABLE_WITH_PICKAXE).add(
-		        ModBlocks.MANAGER_BLOCK.get(), 
-		        ModBlocks.CABLE_BLOCK.get(),
-		        ModBlocks.HARDENED_CABLE_BLOCK.get(),
-		        ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
-		        ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
-		        ModBlocks.OBSERVER_CABLE_BLOCK.get(),
-		        ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
-		        ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
-		        ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
-		        ModBlocks.CABLE_CLUSTER_BLOCK.get(),
-		        ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get()
-		    );
+	@Override
+	protected void addTags(Provider provider) {
+		tag(BlockTags.MINEABLE_WITH_PICKAXE).add(ModBlocks.MANAGER_BLOCK.get(), ModBlocks.CABLE_BLOCK.get(),
+				ModBlocks.HARDENED_CABLE_BLOCK.get(), ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
+				ModBlocks.REDSTONE_RECEIVER_BLOCK.get(), ModBlocks.OBSERVER_CABLE_BLOCK.get(),
+				ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(), ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
+				ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), ModBlocks.CABLE_CLUSTER_BLOCK.get(),
+				ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
 
-		    tag(ModTags.CABLES).add(
-		        ModBlocks.CABLE_BLOCK.get(),
-		        ModBlocks.HARDENED_CABLE_BLOCK.get(),
-		        ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
-		        ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
-		        ModBlocks.OBSERVER_CABLE_BLOCK.get(),
-		        ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
-		        ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
-		        ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
-		        ModBlocks.CABLE_CLUSTER_BLOCK.get(),
-		        ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get()
-		    );
+		tag(ModTags.CABLES).add(ModBlocks.CABLE_BLOCK.get(), ModBlocks.HARDENED_CABLE_BLOCK.get(),
+				ModBlocks.REDSTONE_EMITTER_BLOCK.get(), ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
+				ModBlocks.OBSERVER_CABLE_BLOCK.get(), ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
+				ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(), ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
+				ModBlocks.CABLE_CLUSTER_BLOCK.get(), ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
 
-    tag(ModTags.REDSTONE_CABLES).add(
-        ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
-        ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
-        ModBlocks.OBSERVER_CABLE_BLOCK.get()
-    );
-   }  
- }
+		tag(ModTags.REDSTONE_CABLES).add(ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
+				ModBlocks.REDSTONE_RECEIVER_BLOCK.get(), ModBlocks.OBSERVER_CABLE_BLOCK.get());
+	}
+}

@@ -25,102 +25,89 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.BlockHitResult;
 
-public class ManagerBlock extends BaseEntityBlock
- {
-  public static final MapCodec<ManagerBlock> CODEC = simpleCodec(ManagerBlock::new);	
-	
-  public ManagerBlock(Properties properties)
-   {
-	super(properties);
-   }
+public class ManagerBlock extends BaseEntityBlock {
+	public static final MapCodec<ManagerBlock> CODEC = simpleCodec(ManagerBlock::new);
 
-  @Override
-  protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) 
-   {
-	super.onPlace(state, level, pos, oldState, movedByPiston);  
-	
-	updateInventories(level, pos);
-   }
-  
-  @Override
-  protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) 
-   {
-	super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston); 
-	
-	updateInventories(level, pos);
-   }
-  
-  private void updateInventories(Level level, BlockPos pos)
-   {
-  	BlockEntity blockEntity = level.getBlockEntity(pos);
-  	if (blockEntity != null && blockEntity instanceof ManagerBlockEntity managerBlockEntity)
-  	 {
-  	  managerBlockEntity.updateInventories();
-  	 }
-   }
+	public ManagerBlock(Properties properties) {
+		super(properties);
+	}
 
-  @Nullable
-  @Override
-  public BlockEntity newBlockEntity(BlockPos pos, BlockState state)
-   {
-	return new ManagerBlockEntity(pos, state);
-   }
-  
-  @Override
-  public PushReaction getPistonPushReaction(BlockState state)
-   {
-    return PushReaction.BLOCK;
-   }
-  
-  @Override
-  protected RenderShape getRenderShape(BlockState state)
-   {
-	return RenderShape.MODEL;  
-   }
+	@Override
+	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+		super.onPlace(state, level, pos, oldState, movedByPiston);
 
-  @Override
-  protected MapCodec<? extends BaseEntityBlock> codec()
-   {
-	return CODEC;
-   }
-  
-  @Override
-  public void onRemove(BlockState pState, Level pLevel, BlockPos pPos, BlockState pNewState, boolean pIsMoving)
-   {
-	super.onRemove(pState, pLevel, pPos, pNewState, pIsMoving);
-	
-	updateInventories(pLevel, pPos);
-   }
-  
-  @Override
-  protected ItemInteractionResult useItemOn(ItemStack pStack, BlockState pState, Level pLevel, BlockPos pPos, Player pPlayer, InteractionHand pHand, BlockHitResult pHitResult)
-   {	
-	if (!pLevel.isClientSide())
-	 {
-	  BlockEntity bEntity = pLevel.getBlockEntity(pPos);
-	  if (bEntity instanceof ManagerBlockEntity managerBlockEntity)
-	   {
-		((ServerPlayer) pPlayer).openMenu(new SimpleMenuProvider(managerBlockEntity, Component.literal("Manager")), pPos);
-		return ItemInteractionResult.SUCCESS;
-	   }
-	  else
-	   {
-		return ItemInteractionResult.FAIL;
-	   }
-	 }
-	  
-	return ItemInteractionResult.sidedSuccess(pLevel.isClientSide());
-   }
-  
-  @Nullable
-  @Override
-  public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level pLevel, BlockState pState, BlockEntityType<T> pBlockEntityType)
-   {
-	if (pLevel.isClientSide())
-	 {
-      return null;		
-	 }	
-	return createTickerHelper(pBlockEntityType, ModBlockEntities.MANAGER_BE.get(), (level, blockPos, blockState, blockEntity) -> blockEntity.tick(level, blockPos, blockState));
-   }
-  
- }
+		updateInventories(level, pos);
+	}
+
+	@Override
+	protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+			BlockPos neighborPos, boolean movedByPiston) {
+		super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
+
+		updateInventories(level, pos);
+	}
+
+	private void updateInventories(Level level, BlockPos pos) {
+		BlockEntity blockEntity = level.getBlockEntity(pos);
+		if (blockEntity != null && blockEntity instanceof ManagerBlockEntity managerBlockEntity) {
+			managerBlockEntity.updateInventories();
+		}
+	}
+
+	@Nullable
+	@Override
+	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+		return new ManagerBlockEntity(pos, state);
+	}
+
+	@Override
+	public PushReaction getPistonPushReaction(BlockState state) {
+		return PushReaction.BLOCK;
+	}
+
+	@Override
+	protected RenderShape getRenderShape(BlockState state) {
+		return RenderShape.MODEL;
+	}
+
+	@Override
+	protected MapCodec<? extends BaseEntityBlock> codec() {
+		return CODEC;
+	}
+
+	@Override
+	public void onRemove(BlockState pState, Level pLevel, BlockPos pPos, BlockState pNewState, boolean pIsMoving) {
+		super.onRemove(pState, pLevel, pPos, pNewState, pIsMoving);
+
+		updateInventories(pLevel, pPos);
+	}
+
+	@Override
+	protected ItemInteractionResult useItemOn(ItemStack pStack, BlockState pState, Level pLevel, BlockPos pPos,
+			Player pPlayer, InteractionHand pHand, BlockHitResult pHitResult) {
+		if (!pLevel.isClientSide()) {
+			BlockEntity bEntity = pLevel.getBlockEntity(pPos);
+			if (bEntity instanceof ManagerBlockEntity managerBlockEntity) {
+				((ServerPlayer) pPlayer)
+						.openMenu(new SimpleMenuProvider(managerBlockEntity, Component.literal("Manager")), pPos);
+				return ItemInteractionResult.SUCCESS;
+			} else {
+				return ItemInteractionResult.FAIL;
+			}
+		}
+
+		return ItemInteractionResult.sidedSuccess(pLevel.isClientSide());
+	}
+
+	@Nullable
+	@Override
+	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level pLevel, BlockState pState,
+			BlockEntityType<T> pBlockEntityType) {
+		if (pLevel.isClientSide()) {
+			return null;
+		}
+		return createTickerHelper(pBlockEntityType, ModBlockEntities.MANAGER_BE.get(),
+				(level, blockPos, blockState, blockEntity) -> blockEntity.tick(level, blockPos, blockState));
+	}
+
+}
