@@ -58,6 +58,8 @@
   "sfmflow.configuration.cyan.tooltip": "Custom color overrides for the cyan mask.",
   "sfmflow.configuration.enableDebugLogging": "Enable Pathfinder Debug Logging",
   "sfmflow.configuration.enableDebugLogging.tooltip": "Enables verbose diagnostic logging of physical network BFS scans inside the server console.",
+  "sfmflow.configuration.forceGuiScale": "Force GUI Scale",
+  "sfmflow.configuration.forceGuiScale.tooltip": "Force a specific GUI scale when opening the Machine Inventory Manager screen. Set to 0 to use standard adaptive auto-scaling.",
   "sfmflow.configuration.gray": "Gray",
   "sfmflow.configuration.gray.button": "Gray Settings",
   "sfmflow.configuration.gray.tooltip": "Custom color overrides for the gray mask.",
