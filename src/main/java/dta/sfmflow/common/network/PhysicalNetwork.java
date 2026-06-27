@@ -18,17 +18,37 @@ import java.util.*;
 /**
  * Manages topological scanning and target inventory indices [3].
  * Extracted to cleanly separate physical networks from logical operations [3].
+ * Upgraded to use primitive-dense graph map structures and BitSet visited masks [3].
  */
 public class PhysicalNetwork
  {
   private final Set<BlockPos> scannedCables = new HashSet<>();
   private final List<ConnectionBlock> scannedInventories = new ArrayList<>();
+  private final PhysicalNetworkMap networkMap = new PhysicalNetworkMap();
   private long lastScanTime = 0L;
   private boolean isDirty = true;
 
   public PhysicalNetwork()
    {
    }
+
+  /**
+   * Retrieves the backing graph map converting coordinates to primitive ID sequences [3].
+   *
+   * @return graph map reference [3]
+   */
+  public PhysicalNetworkMap getNetworkMap() {
+      return this.networkMap;
+  }
+
+  /**
+   * Checks if the active topological cache is currently flagged as dirty [3].
+   *
+   * @return true if marked dirty [3]
+   */
+  public boolean isDirty() {
+      return this.isDirty;
+  }
 
   /**
    * Throttled ticking loop protecting server performance [3].
@@ -46,7 +66,7 @@ public class PhysicalNetwork
 
     if (level.getGameTime() - lastScanTime < ServerConfig.NETWORK_SCAN_COOLDOWN.get())
      {
-      return; // Under cooldown restrictions [3]
+      return;
      }
 
     if (isDirty)
@@ -71,6 +91,7 @@ public class PhysicalNetwork
   /**
    * Core non-blocking BFS pathfinder [3].
    * Maps valid capability-providing targets without storing memory-leaking handler references [3].
+   * Leverages fastutil primitive mapping layers and BitSet visited masks [3].
    */
   private void performScan(Level level, BlockPos startPos)
    {
@@ -78,22 +99,27 @@ public class PhysicalNetwork
 
     this.scannedCables.clear();
     this.scannedInventories.clear();
+    this.networkMap.clear(); // Clear graph map first [3]
 
-    Set<BlockPos> visited = new HashSet<>();
+    java.util.BitSet visited = new java.util.BitSet();
     Queue<ScanNode> queue = new ArrayDeque<>();
 
+    int startId = this.networkMap.getOrAddNode(startPos);
+    visited.set(startId);
+
     // Seed BFS queue with starting neighbors
-    visited.add(startPos);
     for (Direction dir : Direction.values())
      {
       BlockPos adjacent = startPos.relative(dir);
       BlockState state = level.getBlockState(adjacent);
       if (state.is(ModTags.CABLES))
        {
-        visited.add(adjacent);
+        int adjacentId = this.networkMap.getOrAddNode(adjacent);
+        visited.set(adjacentId);
+        this.networkMap.addEdge(startId, adjacentId);
+
         queue.add(new ScanNode(adjacent, 1));
 
-        // Evaluate starting cables if they are tagged as custom redstone/sensor targets [3]
         if (state.is(ModTags.REDSTONE_CABLES))
          {
           evaluateAndAddInventory(level, adjacent, state, 1, visited, true);
@@ -112,17 +138,21 @@ public class PhysicalNetwork
      {
       ScanNode current = queue.poll();
       this.scannedCables.add(current.pos());
+      int currentId = this.networkMap.getNodeId(current.pos());
 
       if (current.depth() >= maxDepth)
        {
-        continue; // Depth limit reached [3]
+        continue;
        }
 
       for (Direction dir : Direction.values())
        {
         BlockPos neighbor = current.pos().relative(dir);
-        if (visited.contains(neighbor))
+        int neighborId = this.networkMap.getNodeId(neighbor);
+
+        if (neighborId != -1 && visited.get(neighborId))
          {
+          this.networkMap.addEdge(currentId, neighborId);
           continue;
          }
 
@@ -130,10 +160,12 @@ public class PhysicalNetwork
 
         if (state.is(ModTags.CABLES))
          {
-          visited.add(neighbor);
+          int newNeighborId = this.networkMap.getOrAddNode(neighbor);
+          visited.set(newNeighborId);
+          this.networkMap.addEdge(currentId, newNeighborId);
+
           queue.add(new ScanNode(neighbor, current.depth() + 1));
 
-          // Evaluate cable-based redstone blocks as targets without stopping BFS search propagation [3]
           if (state.is(ModTags.REDSTONE_CABLES))
            {
             evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, true);
@@ -159,12 +191,20 @@ public class PhysicalNetwork
   /**
    * Evaluates if a target pos is a capability provider or specialized redstone block and creates a ConnectionBlock [3].
    * Bypasses further pathfinding traversal beyond the target boundary if it is a standard terminal node [3].
+   *
+   * @param level level context [3]
+   * @param pos coordinate positions [3]
+   * @param state block behavior parameters [3]
+   * @param depth search depth [3]
+   * @param visited node ID visited index [3]
+   * @param isCableComponent if true, registers as part of the cable graph [3]
    */
-  private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth, Set<BlockPos> visited, boolean isCableComponent)
+  private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth, java.util.BitSet visited, boolean isCableComponent)
    {
     if (!isCableComponent)
      {
-      visited.add(pos); // Mark target as visited to block traversal beyond standard boundaries [3]
+      int posId = this.networkMap.getOrAddNode(pos);
+      visited.set(posId); // Mark target as visited to block traversal beyond standard boundaries [3]
      }
 
     BlockEntity be = level.getBlockEntity(pos);
@@ -178,7 +218,6 @@ public class PhysicalNetwork
        }
      }
 
-    // Explicitly add redstone classification for tags representing emitters, receivers, or custom signal cables [3]
     if (state.is(ModTags.REDSTONE_CABLES))
      {
       discoveredTypes.add(ConnectionBlockType.REDSTONE);
@@ -189,7 +228,6 @@ public class PhysicalNetwork
       ConnectionBlock connection = new ConnectionBlock(pos, depth);
       connection.setTypes(discoveredTypes);
       
-      // Connection ID offset [3]
       int variablesOffset = VariableColor.values().length;
       connection.setId(variablesOffset + this.scannedInventories.size());
 
