@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "sfmflow:block/advanced_cable_cluster_block"
+    }
+  }
+}

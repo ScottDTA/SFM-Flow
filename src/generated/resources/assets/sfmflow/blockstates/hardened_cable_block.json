@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "sfmflow:block/hardened_cable_block"
+    }
+  }
+}

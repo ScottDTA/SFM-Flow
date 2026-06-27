@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "bottom": "sfmflow:block/manager_bot",
+    "particle": "#top",
+    "side": "sfmflow:block/manager_side",
+    "top": "sfmflow:block/manager_top"
+  }
+}

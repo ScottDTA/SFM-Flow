@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "sfmflow:cable_block"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "K": {
+      "item": "minecraft:chest"
+    }
+  },
+  "pattern": [
+    "ICI",
+    "CKC",
+    "ICI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "sfmflow:cable_cluster_block"
+  }
+}

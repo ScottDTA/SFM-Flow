@@ -1,0 +1,7 @@
+{
+  "values": [
+    "sfmflow:redstone_emitter_block",
+    "sfmflow:redstone_receiver_block",
+    "sfmflow:observer_cable_block"
+  ]
+}

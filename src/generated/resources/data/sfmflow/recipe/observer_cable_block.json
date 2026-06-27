@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "sfmflow:cable_block"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "O": {
+      "item": "minecraft:observer"
+    }
+  },
+  "pattern": [
+    "IOI",
+    "CCC",
+    "III"
+  ],
+  "result": {
+    "count": 1,
+    "id": "sfmflow:observer_cable_block"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "variants": {
+    "facing=down,mode=eject": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 180
+    },
+    "facing=down,mode=vacuum": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 180
+    },
+    "facing=east,mode=eject": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90,
+      "y": 90
+    },
+    "facing=east,mode=vacuum": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90,
+      "y": 90
+    },
+    "facing=north,mode=eject": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90
+    },
+    "facing=north,mode=vacuum": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90
+    },
+    "facing=south,mode=eject": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90,
+      "y": 180
+    },
+    "facing=south,mode=vacuum": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90,
+      "y": 180
+    },
+    "facing=up,mode=eject": {
+      "model": "sfmflow:block/fluid_hatch_cable_block"
+    },
+    "facing=up,mode=vacuum": {
+      "model": "sfmflow:block/fluid_hatch_cable_block"
+    },
+    "facing=west,mode=eject": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90,
+      "y": 270
+    },
+    "facing=west,mode=vacuum": {
+      "model": "sfmflow:block/fluid_hatch_cable_block",
+      "x": 90,
+      "y": 270
+    }
+  }
+}
