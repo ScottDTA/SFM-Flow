@@ -14,6 +14,7 @@
   "container.sfmflow.cable_cluster": "Card Cluster",
   "gui.sfmflow.commands": "Commands: %1$s",
   "gui.sfmflow.error.empty_whitelist": "Active whitelist cannot be completely empty!",
+  "gui.sfmflow.error.no_active_sides": "At least one active inventory side must be selected!",
   "gui.sfmflow.errors": "Errors: %1$s",
   "gui.sfmflow.interval_trigger": "Interval Trigger",
   "gui.sfmflow.item_input": "Item Input",

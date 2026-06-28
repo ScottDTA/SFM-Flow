@@ -5,6 +5,9 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.component.IFilterable;
+import dta.sfmflow.api.component.IInventoryTarget;
+import dta.sfmflow.api.component.ISideConfigurable;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
@@ -21,7 +24,7 @@ import java.util.List;
  * outputs (depositions) [3]. Upgraded to serialize optional group, filter
  * variables, and a bitmask representing active directions [3].
  */
-public class ItemTransferComponent extends AbstractFlowComponent {
+public class ItemTransferComponent extends AbstractFlowComponent implements IFilterable, IInventoryTarget, ISideConfigurable {
 	private final boolean isInput;
 	private int inventoryId = -1;
 	private boolean useAll = true;

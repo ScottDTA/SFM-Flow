@@ -97,11 +97,6 @@ public class ModLanguageProvider extends LanguageProvider {
 		// Under Redstone/Capabilities translations inside ModLanguageProvider.java
 		add("gui.sfmflow.type_redstone", "Redstone");
 
-		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");
-		add("gui.sfmflow.error.no_active_sides", "At least one active inventory side must be selected!");
-		add("gui.sfmflow.errors", "Errors: %1$s");
-		
-		
 		// --- Dynamic Client Configuration Translations [3] ---
 		add("sfmflow.configuration.section.sfmflow.client.toml", "SFM-Flow Client Configurations");
 		add("sfmflow.configuration.section.sfmflow.client.toml.title", "SFM-Flow Client Configurations");
@@ -148,6 +143,7 @@ public class ModLanguageProvider extends LanguageProvider {
 				"Force a specific GUI scale when opening the Machine Inventory Manager screen. Set to 0 to use standard adaptive auto-scaling.");
 
 		// --- Symmetrical Variables Drawers and Error translation keys [3] ---
+		add("gui.sfmflow.error.no_active_sides", "At least one active inventory side must be selected!");
 		add("gui.sfmflow.errors", "Errors: %1$s");
 	}
 }

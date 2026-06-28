@@ -117,6 +117,7 @@ public class ManagerMouseHandler {
 
 			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
 				overlay.mouseClicked(mouseX, mouseY, button);
+				screen.setDragging(true); // Force top-level screen dragging to true [3]
 				return true;
 			} else {
 				return false; // Fall through: lets players click container items cleanly [3]
@@ -216,7 +217,7 @@ public class ManagerMouseHandler {
 					screen.getRenderables().add(clickedContainer);
 
 					int maxZ = 0;
-					for (Renderable r : screen.getRenderables()) {
+					for (net.minecraft.client.gui.components.Renderable r : screen.getRenderables()) {
 						if (r instanceof FlowWidgetContainer other) {
 							if (other.getComponent().getZ() > maxZ) {
 								maxZ = other.getComponent().getZ();
@@ -241,59 +242,14 @@ public class ManagerMouseHandler {
 		return false;
 	}
 
-	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-		if (screen.getActiveSettingsOverlay() != null) {
-			var overlay = screen.getActiveSettingsOverlay();
-			int ox = overlay.getX();
-			int oy = overlay.getY();
-			int ow = overlay.getWidth();
-			int oh = overlay.getHeight();
-			// Checks overlay coordinate bounds cleanly [3]
-			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
-				overlay.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-				return true;
-			}
-			return false;
-		}
-
-		if (screen.getActiveModalPopup() != null) {
-			screen.getActiveModalPopup().mouseDragged(mouseX, mouseY, button, dragX, dragY);
-			return true;
-		}
-
-		if (this.activeWiringSource != null) {
-			this.wiringCurrentMouseX = mouseX;
-			this.wiringCurrentMouseY = mouseY;
-			return true;
-		}
-
-		if (this.activeDraggedVariableId != null) {
-			return true;
-		}
-
-		if (this.activeDragged != null) {
-			int newX = clampCoordinate((int) (mouseX - this.dragStartX), false, activeDragged);
-			int newY = clampCoordinate((int) (mouseY - this.dragStartY), true, activeDragged);
-			activeDragged.setX(newX);
-			activeDragged.setY(newY);
-			return true;
-		}
-		return false;
-	}
-
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+		screen.setDragging(false); // Reset top-level screen dragging state [3]
+
 		if (screen.getActiveSettingsOverlay() != null) {
+			// Delegate release updates directly to the active settings overlay, allowing release out-of-bounds [3]
 			var overlay = screen.getActiveSettingsOverlay();
-			int ox = overlay.getX();
-			int oy = overlay.getY();
-			int ow = overlay.getWidth();
-			int oh = overlay.getHeight();
-			// Checks overlay coordinate bounds cleanly [3]
-			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
-				overlay.mouseReleased(mouseX, mouseY, button);
-				return true;
-			}
-			return false;
+			overlay.mouseReleased(mouseX, mouseY, button);
+			return true;
 		}
 
 		if (screen.getActiveModalPopup() != null) {
@@ -365,6 +321,40 @@ public class ManagerMouseHandler {
 		}
 		activeDragged = null;
 		screen.setLastClickedContainer(null);
+		return false;
+	}
+
+	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+		if (screen.getActiveSettingsOverlay() != null) {
+			// Delegate drag updates directly to the active settings overlay, allowing drag
+			// out-of-bounds [3]
+			var overlay = screen.getActiveSettingsOverlay();
+			overlay.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+			return true;
+		}
+
+		if (screen.getActiveModalPopup() != null) {
+			screen.getActiveModalPopup().mouseDragged(mouseX, mouseY, button, dragX, dragY);
+			return true;
+		}
+
+		if (this.activeWiringSource != null) {
+			this.wiringCurrentMouseX = mouseX;
+			this.wiringCurrentMouseY = mouseY;
+			return true;
+		}
+
+		if (this.activeDraggedVariableId != null) {
+			return true;
+		}
+
+		if (this.activeDragged != null) {
+			int newX = clampCoordinate((int) (mouseX - this.dragStartX), false, activeDragged);
+			int newY = clampCoordinate((int) (mouseY - this.dragStartY), true, activeDragged);
+			activeDragged.setX(newX);
+			activeDragged.setY(newY);
+			return true;
+		}
 		return false;
 	}
 

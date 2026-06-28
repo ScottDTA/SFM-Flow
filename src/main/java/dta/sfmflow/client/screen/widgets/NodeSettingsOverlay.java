@@ -100,18 +100,11 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
             if (child.mouseClicked(mouseX, mouseY, button)) {
                 this.focusedChild = child;
                 this.setFocused(child); // Align container-focus mapping cleanly [3]
+                this.setDragging(true);  // Force active dragging state [3]
                 return true;
             }
         }
         return false;
-    }
-
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (this.focusedChild != null) {
-            return this.focusedChild.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-        }
-        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override
@@ -121,7 +114,16 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
             handled = this.focusedChild.mouseReleased(mouseX, mouseY, button);
             this.focusedChild = null; // Clear focused widget candidate [3]
         }
+        this.setDragging(false); // Reset dragging state [3]
         return handled || super.mouseReleased(mouseX, mouseY, button);
+    }
+    
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (this.focusedChild != null) {
+            return this.focusedChild.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
     @Override

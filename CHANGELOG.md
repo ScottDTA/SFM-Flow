@@ -1,4 +1,15 @@
+6-28-2026
 
+### [Added]
+* Added an upgraded in-world highlight system that renders the precise 3D block shape of targeted chests and machines instead of generic wireframe boxes.
+* Added a fully interactive, draggable 3D block preview component to the Item Input and Output settings screens.
+
+### [Changed]
+* Rebuilt the Item Input and Item Output configuration panels into modular, responsive layout elements to improve readability.
+* Integrated public API interfaces (`IFilterable`, `IInventoryTarget`, `ISideConfigurable`) allowing third-party addon developers to reuse standard search, filter, and side configuration widgets.
+
+### [Fixed]
+* Fixed mouse dragging and scroll conflicts when adjusting settings inside the node configuration overlays.
 
 
 

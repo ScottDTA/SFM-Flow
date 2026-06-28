@@ -1,11 +1,19 @@
 package dta.sfmflow.client.render;
 
 import dta.sfmflow.SFMFlow;
+import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.OutlineBufferSource;
+import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.client.renderer.RenderType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -15,15 +23,25 @@ import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.lwjgl.glfw.GLFW;
+
+import com.mojang.blaze3d.platform.InputConstants;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 
 import static net.minecraft.commands.Commands.literal;
 
 /**
  * Client-only visual highlighting manager outlining targeted inventories
- * in-world [3]. Outlines bypass depth buffers to be clearly visible through
- * solid terrain walls [3].
+ * in-world. Outlines bypass depth buffers to be clearly visible through solid
+ * terrain walls.
  */
 @OnlyIn(Dist.CLIENT)
 @EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.GAME)
@@ -31,9 +49,21 @@ public final class HighlightManager {
 	private static final Set<BlockPos> ACTIVE_HIGHLIGHTS = ConcurrentHashMap.newKeySet();
 
 	public static final KeyMapping CLEAR_HIGHLIGHTS_KEY = new KeyMapping("key.sfmflow.clear_highlights",
-			com.mojang.blaze3d.platform.InputConstants.Type.KEYSYM, org.lwjgl.glfw.GLFW.GLFW_KEY_H, // Default key bind
-																									// is H [3]
+			InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_H, // Default key bind is H [3]
 			"key.categories.sfmflow");
+
+	/**
+	 * Custom RenderType built explicitly to disable depth testing. This forces
+	 * Minecraft's rendering pipeline to draw our wireframe lines on top of all
+	 * solid geometry.
+	 */
+	private static final RenderType THRU_WALLS_LINES = RenderType.create("thru_walls_lines",
+			DefaultVertexFormat.POSITION_COLOR_NORMAL, VertexFormat.Mode.LINES, 256, false, false,
+			RenderType.CompositeState.builder()
+					.setShaderState(new RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeLinesShader))
+					.setLineState(new RenderStateShard.LineStateShard(OptionalDouble.of(2.5D)))
+					.setDepthTestState(new RenderStateShard.DepthTestStateShard("always", 519))
+					.setCullState(new RenderStateShard.CullStateShard(false)).createCompositeState(false));
 
 	private HighlightManager() {
 	}
@@ -59,7 +89,7 @@ public final class HighlightManager {
 	}
 
 	/**
-	 * Listens to client setup on the mod bus to register our custom keybind [3].
+	 * Listens to client setup on the mod bus to register our custom keybind.
 	 */
 	public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
 		event.register(CLEAR_HIGHLIGHTS_KEY);
@@ -67,7 +97,6 @@ public final class HighlightManager {
 
 	/**
 	 * Listens to client ticks on the game event bus to detect keypress clear events
-	 * [3].
 	 */
 	@SubscribeEvent
 	public static void onClientTick(ClientTickEvent.Post event) {
@@ -82,7 +111,7 @@ public final class HighlightManager {
 
 	/**
 	 * Registers client-side slash commands allowing players to disable active
-	 * outlines [3].
+	 * outlines.
 	 */
 	@SubscribeEvent
 	public static void registerClientCommands(RegisterClientCommandsEvent event) {
@@ -100,7 +129,7 @@ public final class HighlightManager {
 
 	/**
 	 * Intercepts in-world level rendering stages to draw wireframe outlines through
-	 * terrain [3].
+	 * terrain.
 	 */
 	@SubscribeEvent
 	public static void onRenderLevelStage(RenderLevelStageEvent event) {
@@ -109,37 +138,49 @@ public final class HighlightManager {
 				return;
 			}
 
-			com.mojang.blaze3d.vertex.PoseStack poseStack = event.getPoseStack();
-			net.minecraft.client.renderer.MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance()
-					.renderBuffers().bufferSource();
-			com.mojang.blaze3d.vertex.VertexConsumer buffer = bufferSource
-					.getBuffer(net.minecraft.client.renderer.RenderType.lines());
+			Minecraft mc = Minecraft.getInstance();
+			if (mc.level == null) {
+				return;
+			}
 
-			net.minecraft.client.Camera camera = event.getCamera();
+			PoseStack poseStack = event.getPoseStack();
+
+			OutlineBufferSource outlineBuffer = mc.renderBuffers().outlineBufferSource();
+
+			outlineBuffer.setColor(216, 175, 55, 255);
+
+			Camera camera = event.getCamera();
 			Vec3 camPos = camera.getPosition();
 
-			com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
-			com.mojang.blaze3d.systems.RenderSystem.depthMask(false);
-			com.mojang.blaze3d.systems.RenderSystem.lineWidth(2.5F);
+			RenderSystem.depthMask(false);
 
 			for (BlockPos pos : ACTIVE_HIGHLIGHTS) {
-				poseStack.pushPose();
-				poseStack.translate(pos.getX() - camPos.x, pos.getY() - camPos.y, pos.getZ() - camPos.z);
+				BlockState state = mc.level.getBlockState(pos);
+				if (state.isAir()) {
+					continue;
+				}
 
-				// Draw a gold wireframe outline centered over the block position [3]
-				net.minecraft.client.renderer.LevelRenderer.renderLineBox(poseStack, buffer, 0.0, 0.0, 0.0, 1.002,
-						1.002, 1.002, 0.85F, 0.7F, 0.2F, 1.0F);
+				VoxelShape shape = state.getShape(mc.level, pos);
+				if (shape.isEmpty()) {
+					continue;
+				}
+
+				poseStack.pushPose();
+
+				VertexConsumer buffer = outlineBuffer.getBuffer(THRU_WALLS_LINES);
+
+				double dx = (double) pos.getX() - camPos.x;
+				double dy = (double) pos.getY() - camPos.y;
+				double dz = (double) pos.getZ() - camPos.z;
+
+				LevelRenderer.renderVoxelShape(poseStack, buffer, shape, dx, dy, dz, 0.85F, 0.7F, 0.2F, 1.0F, false);
 
 				poseStack.popPose();
 			}
 
-			// Immediately flush the specific line renderer batch while depth test is
-			// disabled [3]
-			bufferSource.endBatch(net.minecraft.client.renderer.RenderType.lines());
+			outlineBuffer.endOutlineBatch();
 
-			com.mojang.blaze3d.systems.RenderSystem.enableDepthTest();
-			com.mojang.blaze3d.systems.RenderSystem.depthMask(true);
-			com.mojang.blaze3d.systems.RenderSystem.lineWidth(1.0F);
+			RenderSystem.depthMask(true);
 		}
 	}
 }
