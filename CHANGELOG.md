@@ -1,3 +1,15 @@
+6-28-2026 Round 2
+
+### [Added]
+* Added authentic, high-fidelity slot layout screens for vanilla Furnaces, Smokers, Blast Furnaces, Brewing Stands, Crafters, Droppers, Dispensers, and Hoppers that replicate their original inventory styles.
+* Added support for custom JSON-driven slot layouts, allowing pack makers and developers to define custom background textures and slot alignments for any block.
+* Added warning tooltips on slot layout screens to indicate exactly why a slot is inaccessible from a specific block face (e.g., trying to access a furnace output from the top).
+* Added specialized visual fallbacks in the 3D block preview scene to render Chests, Trapped Chests, and Ender Chests cleanly without missing textures or model glitches.
+
+### [Changed]
+* Relocated core slot layout systems to the public API, enabling third-party integration mods to register their own visual inventory screens programmatically.
+
+
 6-28-2026
 
 ### [Added]

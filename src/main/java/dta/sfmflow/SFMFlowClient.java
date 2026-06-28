@@ -12,28 +12,26 @@ import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.screen.CableClusterScreen;
+import dta.sfmflow.client.screen.helper.SlotLayoutManager;
 import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsWidget;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.screen.ModMenuTypes;
 import dta.sfmflow.util.Color;
-import dta.sfmflow.screen.CableClusterMenu;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.inventory.MenuType;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.registries.DeferredHolder;
-
 import java.util.function.Supplier;
 
 /**
@@ -41,7 +39,7 @@ import java.util.function.Supplier;
  * servers entirely ignore this class, ensuring 100% side-safe operations [3].
  */
 @Mod(value = SFMFlow.MODID, dist = Dist.CLIENT)
-@EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT)
+@EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
 public class SFMFlowClient {
 	public SFMFlowClient(ModContainer container) {
 		container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -51,6 +49,11 @@ public class SFMFlowClient {
 	public static void registerScreens(RegisterMenuScreensEvent event) {
 		event.register(ModMenuTypes.MANAGER_MENU.get(), ManagerScreen::new);
 		event.register(ModMenuTypes.CABLE_CLUSTER_MENU.get(), CableClusterScreen::new);
+	}
+
+	@SubscribeEvent
+	public static void registerClientReloadListeners(RegisterClientReloadListenersEvent event) {
+		event.registerReloadListener(new SlotLayoutManager());
 	}
 
 	/**

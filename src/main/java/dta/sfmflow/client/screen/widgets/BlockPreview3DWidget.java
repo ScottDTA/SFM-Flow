@@ -5,6 +5,7 @@ import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.registry.ModTags;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Checkbox;
@@ -16,6 +17,8 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -383,7 +386,36 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		BlockState centerState = level.getBlockState(centerPos);
 		if (!centerState.isAir()) {
 			poseStack.pushPose();
-			blockRenderer.renderSingleBlock(centerState, poseStack, bufferSource, 15728880, OverlayTexture.NO_OVERLAY);
+			// Symmetrical override: render blocks matching the special tag using 3D static
+			// item fallback [3]
+			if (centerState.is(ModTags.SPECIAL_3D_RENDERS)) {
+				ItemStack itemStack = new ItemStack(centerState.getBlock().asItem());
+				if (!itemStack.isEmpty()) {
+					poseStack.translate(0.5F, 0.5F, 0.5F);
+					// Rotate the model based on its HORIZONTAL_FACING or FACING properties, adding
+					// +180.0F to offset item frame rotation [3]
+					if (centerState.hasProperty(
+							net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)) {
+						float yRot = centerState.getValue(
+								net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)
+								.toYRot();
+						poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
+					} else if (centerState.hasProperty(
+							net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING)) {
+						float yRot = centerState
+								.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING)
+								.toYRot();
+						poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
+					}
+					poseStack.scale(2.0F, 2.0F, 2.0F);
+					Minecraft.getInstance().getItemRenderer().renderStatic(itemStack,
+							net.minecraft.world.item.ItemDisplayContext.FIXED, 15728880, OverlayTexture.NO_OVERLAY,
+							poseStack, bufferSource, level, 0);
+				}
+			} else {
+				blockRenderer.renderSingleBlock(centerState, poseStack, bufferSource, 15728880,
+						OverlayTexture.NO_OVERLAY);
+			}
 			poseStack.popPose();
 
 			poseStack.pushPose();
@@ -399,7 +431,12 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		bufferSource.endBatch();
 
 		com.mojang.blaze3d.systems.RenderSystem.depthMask(false);
+		// GhostBufferSource intercepts standard blocks [3]
 		GhostBufferSource ghostSource = new GhostBufferSource(bufferSource, 0.3F);
+
+		// GhostEntityBufferSource intercepts entity blocks specifically to enforce 30%
+		// alpha translucency [3]
+		GhostEntityBufferSource ghostEntitySource = new GhostEntityBufferSource(bufferSource, 0.3F);
 
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dy = -1; dy <= 1; dy++) {
@@ -416,15 +453,73 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 
 					poseStack.pushPose();
 					poseStack.translate(dx, dy, dz);
-					blockRenderer.renderSingleBlock(state, poseStack, ghostSource, 15728880, OverlayTexture.NO_OVERLAY);
+					// Symmetrical override: render adjacent blocks matching the special tag using
+					// 3D static item fallback [3]
+					// Renders using the solid bufferSource with custom shader colors to enforce
+					// alpha transparency and map textures perfectly [3]
+					if (state.is(ModTags.SPECIAL_3D_RENDERS)) {
+						ItemStack itemStack = new ItemStack(state.getBlock().asItem());
+						if (!itemStack.isEmpty()) {
+							poseStack.translate(0.5F, 0.5F, 0.5F);
+							// Rotate the model based on its HORIZONTAL_FACING or FACING properties, adding
+							// +180.0F to offset item frame rotation [3]
+							if (state.hasProperty(
+									net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)) {
+								float yRot = state.getValue(
+										net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING)
+										.toYRot();
+								poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
+							} else if (state.hasProperty(
+									net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING)) {
+								float yRot = state.getValue(
+										net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING)
+										.toYRot();
+								poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
+							}
+							poseStack.scale(2.0F, 2.0F, 2.0F);
+
+							com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+							// Temporarily enable depth writing so the chest lid and body sort correctly
+							// against each other [3]
+							com.mojang.blaze3d.systems.RenderSystem.depthMask(true);
+							com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 0.3F);
+
+							ResourceLocation texture = getChestTexture(state);
+							RenderType actualType = RenderType.entityTranslucentCull(texture);
+
+							Minecraft.getInstance().getItemRenderer().renderStatic(itemStack,
+									net.minecraft.world.item.ItemDisplayContext.FIXED, 15728880,
+									OverlayTexture.NO_OVERLAY, poseStack, ghostEntitySource, // Use our
+																								// ghostEntitySource to
+																								// pull chests atlas and
+																								// entityTranslucent [3]
+									level, 0);
+
+							// Selective Flush: Match the exact RenderType used inside
+							// GhostEntityBufferSource to flush only the chest cleanly [3]
+							bufferSource.endBatch(actualType);
+
+							com.mojang.blaze3d.systems.RenderSystem.depthMask(false);
+							com.mojang.blaze3d.systems.RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+						}
+					} else {
+						blockRenderer.renderSingleBlock(state, poseStack, ghostSource, 15728880,
+								OverlayTexture.NO_OVERLAY);
+					}
 					poseStack.popPose();
 				}
 			}
 		}
 
+		// Symmetrical Selective Flush Priority: temporarily enable depth mask *only*
+		// for the final flush [3]
+		// This flushes standard block translucency queues with correct alpha blend
+		// sorting [3]
+		com.mojang.blaze3d.systems.RenderSystem.depthMask(false); // FIXED: Keep depthMask at false during standard
+																	// block translucent flush to prevent marker
+																	// clipping [3]
 		bufferSource.endBatch();
 
-		com.mojang.blaze3d.systems.RenderSystem.depthMask(true);
 		com.mojang.blaze3d.systems.RenderSystem.disableDepthTest();
 		com.mojang.blaze3d.platform.Lighting.setupForFlatItems();
 
@@ -467,6 +562,60 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		}
 	}
 
+	private static ResourceLocation getChestTexture(BlockState state) {
+		if (state.is(net.minecraft.world.level.block.Blocks.TRAPPED_CHEST)) {
+			return ResourceLocation.withDefaultNamespace("textures/entity/chest/trapped.png");
+		}
+		if (state.is(net.minecraft.world.level.block.Blocks.ENDER_CHEST)) {
+			return ResourceLocation.withDefaultNamespace("textures/entity/chest/ender.png");
+		}
+		return ResourceLocation.withDefaultNamespace("textures/entity/chest/normal.png");
+	}
+
+	@OnlyIn(Dist.CLIENT)
+	private static class GhostEntityBufferSource implements net.minecraft.client.renderer.MultiBufferSource {
+		private final net.minecraft.client.renderer.MultiBufferSource delegate;
+		private final float alpha;
+
+		public GhostEntityBufferSource(net.minecraft.client.renderer.MultiBufferSource delegate, float alpha) {
+			this.delegate = delegate;
+			this.alpha = alpha;
+		}
+
+		@Override
+		public com.mojang.blaze3d.vertex.VertexConsumer getBuffer(net.minecraft.client.renderer.RenderType renderType) {
+			net.minecraft.client.renderer.RenderType actualType = renderType;
+			// Parse texture cleanly from toString to preserve chest skin atlas bindings [3]
+			String str = renderType.toString();
+			ResourceLocation texture = null;
+			int startIdx = str.indexOf("texture[");
+			if (startIdx != -1) {
+				int endIdx = str.indexOf("]", startIdx);
+				if (endIdx != -1) {
+					String sub = str.substring(startIdx + 8, endIdx);
+					if (sub.startsWith("Optional[")) {
+						sub = sub.substring(9, sub.length() - 1);
+					}
+					if (!sub.startsWith("Optional.empty")) {
+						texture = ResourceLocation.tryParse(sub);
+					}
+				}
+			}
+
+			if (texture != null) {
+				String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
+				// Intercept solid/cutout entity passes and map them to their translucent
+				// counterparts to enable ghosting [3]
+				if (name.contains("entity_solid") || name.contains("entity_cutout")
+						|| name.contains("entity_cutout_no_mips")) {
+					actualType = net.minecraft.client.renderer.RenderType
+							.entityTranslucentCull(net.minecraft.client.renderer.Sheets.CHEST_SHEET);
+				}
+			}
+			return new GhostVertexConsumer(delegate.getBuffer(actualType), alpha);
+		}
+	}
+
 	@OnlyIn(Dist.CLIENT)
 	private static class GhostBufferSource implements net.minecraft.client.renderer.MultiBufferSource {
 		private final net.minecraft.client.renderer.MultiBufferSource delegate;
@@ -479,6 +628,10 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 
 		@Override
 		public com.mojang.blaze3d.vertex.VertexConsumer getBuffer(net.minecraft.client.renderer.RenderType renderType) {
+			// Symmetrical Revert: Force translucent for all render types in the ghost
+			// buffer pass [3]
+			// This restores correct alpha blending and sorting for standard blocks (such as
+			// glass and the brewing stand) [3]
 			return new GhostVertexConsumer(delegate.getBuffer(net.minecraft.client.renderer.RenderType.translucent()),
 					alpha);
 		}
@@ -551,6 +704,12 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		@Override
 		public com.mojang.blaze3d.vertex.VertexConsumer setLight(int light) {
 			delegate.setLight(light);
+			return this;
+		}
+
+		@Override
+		public com.mojang.blaze3d.vertex.VertexConsumer setOverlay(int overlay) {
+			delegate.setOverlay(overlay);
 			return this;
 		}
 	}

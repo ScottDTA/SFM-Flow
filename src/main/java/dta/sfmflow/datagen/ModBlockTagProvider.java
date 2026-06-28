@@ -8,6 +8,7 @@ import dta.sfmflow.registry.ModTags;
 import net.minecraft.core.HolderLookup.Provider;
 import net.minecraft.data.PackOutput;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.common.data.BlockTagsProvider;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
@@ -37,5 +38,12 @@ public class ModBlockTagProvider extends BlockTagsProvider {
 
 		tag(ModTags.REDSTONE_CABLES).add(ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
 				ModBlocks.REDSTONE_RECEIVER_BLOCK.get(), ModBlocks.OBSERVER_CABLE_BLOCK.get());
+
+		// Populate 3D special render blocks tag to handle containers programmatically [3]
+		tag(ModTags.SPECIAL_3D_RENDERS).add(
+				Blocks.CHEST,
+				Blocks.TRAPPED_CHEST,
+				Blocks.ENDER_CHEST
+		);
 	}
 }

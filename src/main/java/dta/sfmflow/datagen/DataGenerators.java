@@ -21,7 +21,7 @@ import net.neoforged.neoforge.common.data.BlockTagsProvider;
  * the datagen pipeline to generate block state models, recipe schemas, loot
  * tables, tag configurations, item models, and localization asset packages [3].
  */
-@EventBusSubscriber(modid = SFMFlow.MODID)
+@EventBusSubscriber(modid = SFMFlow.MODID, bus = EventBusSubscriber.Bus.MOD)
 public class DataGenerators {
 	private DataGenerators() {
 	}
@@ -54,5 +54,6 @@ public class DataGenerators {
 		generator.addProvider(event.includeClient(), new ModItemModelProvider(packOutput, existingFileHelper));
 		generator.addProvider(event.includeClient(), new ModBlockStateProvider(packOutput, existingFileHelper));
 		generator.addProvider(event.includeClient(), new ModLanguageProvider(packOutput, "en_us"));
+		generator.addProvider(event.includeClient(), new SlotLayoutProvider(packOutput));
 	}
 }

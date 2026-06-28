@@ -6,7 +6,6 @@ import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.util.ConnectionBlock;
 import dta.sfmflow.util.ConnectionBlockType;
-import dta.sfmflow.util.VariableColor;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -23,17 +22,15 @@ import java.util.*;
  * Extracted to cleanly separate physical networks from logical operations [3].
  * Upgraded to index capability nodes and cache BlockCapabilityCache handlers safely [3].
  */
-public class PhysicalNetwork
- {
+public class PhysicalNetwork {
   private final Set<BlockPos> scannedCables = new HashSet<>();
   private final List<ConnectionBlock> scannedInventories = new ArrayList<>();
   private final PhysicalNetworkMap networkMap = new PhysicalNetworkMap();
   private long lastScanTime = 0L;
   private boolean isDirty = true;
 
-  public PhysicalNetwork()
-   {
-   }
+  public PhysicalNetwork() {
+  }
 
   public PhysicalNetworkMap getNetworkMap() {
       return this.networkMap;
@@ -66,38 +63,31 @@ public class PhysicalNetwork
    * @param startPos starting block position [3]
    * @return true if a full network rescan was executed [3]
    */
-  public boolean tickCheckAndScan(Level level, BlockPos startPos)
-   {
-    if (level.isClientSide())
-     {
+  public boolean tickCheckAndScan(Level level, BlockPos startPos) {
+    if (level.isClientSide()) {
       return false;
-     }
+    }
 
-    if (level.getGameTime() - lastScanTime < ServerConfig.NETWORK_SCAN_COOLDOWN.get())
-     {
+    if (level.getGameTime() - lastScanTime < ServerConfig.NETWORK_SCAN_COOLDOWN.get()) {
       return false;
-     }
+    }
 
-    if (isDirty)
-     {
+    if (isDirty) {
       performScan(level, startPos);
       return true; // Return true to notify manager block of completed scans [3]
      }
     return false;
    }
 
-  public void markDirty()
-   {
+  public void markDirty() {
     this.isDirty = true;
    }
 
-  public List<ConnectionBlock> getScannedInventories()
-   {
+  public List<ConnectionBlock> getScannedInventories() {
     return scannedInventories;
    }
 
-  private void performScan(Level level, BlockPos startPos)
-   {
+  private void performScan(Level level, BlockPos startPos) {
     long startTime = System.nanoTime();
 
     // Cleanly unregister previously scanned cables to prevent stale dangling pointer leaks [3]
@@ -115,12 +105,10 @@ public class PhysicalNetwork
     visited.set(startId);
 
     // Seed BFS queue with starting neighbors
-    for (Direction dir : Direction.values())
-     {
+    for (Direction dir : Direction.values()) {
       BlockPos adjacent = startPos.relative(dir);
       BlockState state = level.getBlockState(adjacent);
-      if (state.is(ModTags.CABLES))
-       {
+      if (state.is(ModTags.CABLES)) {
         int adjacentId = this.networkMap.getOrAddNode(adjacent);
         visited.set(adjacentId);
         this.networkMap.addEdge(startId, adjacentId);
@@ -128,13 +116,10 @@ public class PhysicalNetwork
 
         queue.add(new ScanNode(adjacent, 1));
 
-        if (state.is(ModTags.REDSTONE_CABLES))
-         {
+        if (state.is(ModTags.REDSTONE_CABLES)) {
           evaluateAndAddInventory(level, adjacent, state, 1, visited, true);
          }
-       }
-      else if (!state.is(ModBlocks.MANAGER_BLOCK.get()))
-       {
+       } else if (!state.is(ModBlocks.MANAGER_BLOCK.get())) {
         evaluateAndAddInventory(level, adjacent, state, 1, visited, false);
        }
      }
@@ -142,46 +127,38 @@ public class PhysicalNetwork
     int maxDepth = ServerConfig.MAX_CABLE_LENGTH.get();
     int maxInventories = ServerConfig.MAX_CONNECTED_INVENTORIES.get();
 
-    while (!queue.isEmpty())
-     {
+    while (!queue.isEmpty()) {
       ScanNode current = queue.poll();
       this.scannedCables.add(current.pos());
       int currentId = this.networkMap.getNodeId(current.pos());
       dta.sfmflow.common.network.CableNetworkRegistry.registerCable(level, current.pos(), startPos);
 
-      if (current.depth() >= maxDepth)
-       {
+      if (current.depth() >= maxDepth) {
         continue;
        }
 
-      for (Direction dir : Direction.values())
-       {
+      for (Direction dir : Direction.values()) {
         BlockPos neighbor = current.pos().relative(dir);
         int neighborId = this.networkMap.getNodeId(neighbor);
 
-        if (neighborId != -1 && visited.get(neighborId))
-         {
+        if (neighborId != -1 && visited.get(neighborId)) {
           this.networkMap.addEdge(currentId, neighborId);
           continue;
          }
 
         BlockState state = level.getBlockState(neighbor);
 
-        if (state.is(ModTags.CABLES))
-         {
+        if (state.is(ModTags.CABLES)) {
           int newNeighborId = this.networkMap.getOrAddNode(neighbor);
           visited.set(newNeighborId);
           this.networkMap.addEdge(currentId, newNeighborId);
 
           queue.add(new ScanNode(neighbor, current.depth() + 1));
 
-          if (state.is(ModTags.REDSTONE_CABLES))
-           {
+          if (state.is(ModTags.REDSTONE_CABLES)) {
             evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, true);
            }
-         }
-        else if (this.scannedInventories.size() < maxInventories && !state.is(ModBlocks.MANAGER_BLOCK.get()))
-         {
+         } else if (this.scannedInventories.size() < maxInventories && !state.is(ModBlocks.MANAGER_BLOCK.get())) {
           evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, false);
          }
        }
@@ -197,35 +174,29 @@ public class PhysicalNetwork
                           durationMs, this.scannedCables.size(), this.scannedInventories.size());
    }
 
-  private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth, java.util.BitSet visited, boolean isCableComponent)
-   {
+  private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth, java.util.BitSet visited, boolean isCableComponent) {
     int posId = this.networkMap.getOrAddNode(pos);
 
-    if (!isCableComponent)
-     {
+    if (!isCableComponent) {
       visited.set(posId);
      }
 
     BlockEntity be = level.getBlockEntity(pos);
     EnumSet<ConnectionBlockType> discoveredTypes = EnumSet.noneOf(ConnectionBlockType.class);
 
-    for (ConnectionBlockType type : ConnectionBlockType.values())
-     {
-      if (type.isPresentAnywhere(level, pos, state, be))
-       {
+    for (ConnectionBlockType type : ConnectionBlockType.values()) {
+      if (type.isPresentAnywhere(level, pos, state, be)) {
         discoveredTypes.add(type);
         this.networkMap.indexCapability(type, posId);
        }
      }
 
-    if (state.is(ModTags.REDSTONE_CABLES))
-     {
+    if (state.is(ModTags.REDSTONE_CABLES)) {
       discoveredTypes.add(ConnectionBlockType.REDSTONE);
       this.networkMap.indexCapability(ConnectionBlockType.REDSTONE, posId);
      }
 
-    if (!discoveredTypes.isEmpty())
-     {
+    if (!discoveredTypes.isEmpty()) {
       ConnectionBlock connection = new ConnectionBlock(pos, depth);
       connection.setTypes(discoveredTypes);
       
@@ -234,10 +205,10 @@ public class PhysicalNetwork
           connection.setFluidCache(BlockCapabilityCache.create(Capabilities.FluidHandler.BLOCK, serverLevel, pos, Direction.UP));
       }
 
-      int variablesOffset = VariableColor.values().length;
-      connection.setId(variablesOffset + this.scannedInventories.size());
+      // Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent binding drift [3]
+      connection.setId(pos.hashCode());
 
       this.scannedInventories.add(connection);
      }
    }
- }
+}

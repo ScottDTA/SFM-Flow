@@ -36,4 +36,11 @@ public final class ModTags {
 	 */
 	public static final TagKey<Item> CLUSTER_COMPATIBLE = TagKey.create(Registries.ITEM,
 			ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "cluster_compatible"));
+
+	/**
+	 * Block tag identifying blocks that require specialized 3D item rendering
+	 * fallback to prevent model/texture bugs in the UI scene [3].
+	 */
+	public static final TagKey<Block> SPECIAL_3D_RENDERS = TagKey.create(Registries.BLOCK,
+			ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "special_3d_renders"));
 }
