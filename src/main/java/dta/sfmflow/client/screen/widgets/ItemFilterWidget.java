@@ -8,15 +8,20 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Reusable UI widget managing Whitelist/Blacklist filtering and a 1x12 ghost slot item grid [3].
+ * Upgraded to render dynamic empty/filled slot states using custom 18x36 textures [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class ItemFilterWidget extends AbstractFlowWidget {
+	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+			dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
+
 	private final IFilterable model;
 	private final ManagerScreen parentScreen;
 	private final Button toggleWhitelistBtn;
@@ -98,11 +103,20 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			int slotY = gridStartY;
 			boolean hovered = mouseX >= slotX && mouseX < slotX + 18 && mouseY >= slotY && mouseY < slotY + 18;
 
-			guiGraphics.fill(slotX, slotY, slotX + 18, slotY + 18, hovered ? 0xFF353535 : 0xFF151515);
-			guiGraphics.renderOutline(slotX, slotY, 18, 18, hovered ? 0xFF8B8B8B : 0xFF434343);
-
 			ItemStack stack = model.getFilterItems().get(c);
-			if (stack != null && !stack.isEmpty()) {
+			boolean hasItem = stack != null && !stack.isEmpty();
+			int vOffset = hasItem ? 18 : 0;
+
+			// Blit the custom slot background texture (V=0 for empty/question mark, V=18 for filled)
+			guiGraphics.blit(FILTER_SLOT_TEXTURE, slotX, slotY, 0, vOffset, 18, 18, 18, 36);
+
+			// Draw a gold highlight border if hovered [3]
+			if (hovered) {
+				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFFD4AF37);
+			}
+
+			if (hasItem) {
+				// Symmetrical +1px padding shifts the item stack inside standard 16x16 bounds
 				guiGraphics.renderItem(stack, slotX + 1, slotY + 1);
 			}
 		}

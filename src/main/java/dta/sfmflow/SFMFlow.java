@@ -11,6 +11,7 @@ import dta.sfmflow.networking.PacketHandlerManager;
 import dta.sfmflow.networking.ServerPayloadHandler;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
 import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
@@ -19,6 +20,7 @@ import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SyncClusterSlotDirectionPacket;
+import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import dta.sfmflow.screen.ModMenuTypes;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -76,14 +78,17 @@ public class SFMFlow {
 				(payload, context) -> ServerPayloadHandler.handleRemoveConnection(payload, context));
 		registrar.playToServer(BindVariablePacket.TYPE, BindVariablePacket.STREAM_CODEC,
 				(payload, context) -> ServerPayloadHandler.handleBindVariable(payload, context));
+		registrar.playToServer(RequestInventorySlotsPacket.TYPE, RequestInventorySlotsPacket.STREAM_CODEC,
+				(payload, context) -> ServerPayloadHandler.handleRequestInventorySlots(payload, context));
 
 		registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,
 				PacketHandlerManager::handleSyncConnections);
 		registrar.playToClient(SyncComponentDeltaPacket.TYPE, SyncComponentDeltaPacket.STREAM_CODEC,
 				PacketHandlerManager::handleSyncComponentDelta);
+		registrar.playToClient(SyncInventorySlotsPacket.TYPE, SyncInventorySlotsPacket.STREAM_CODEC,
+				PacketHandlerManager::handleSyncInventorySlots);
 	}
 
-	private void commonSetup(FMLCommonSetupEvent event) {
+	private void commonSetup(final FMLCommonSetupEvent event) {
 	}
-
 }

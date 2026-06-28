@@ -3,14 +3,12 @@ package dta.sfmflow.client.render;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
+import dta.sfmflow.client.screen.widgets.FlowWidgetOutputNode;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
-import dta.sfmflow.util.NodeCount;
 import net.minecraft.client.gui.GuiGraphics;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-
-import javax.annotation.Nullable;
-import java.util.UUID;
 
 /**
  * Client-only graphic rendering utility class that draws smooth, orthogonal cubic Bezier
@@ -45,8 +43,8 @@ public final class VectorWireRenderer {
                     continue;
                 }
 
-                FlowWidgetContainer srcContainer = findContainer(screen, conn.getSourceComponentId());
-                FlowWidgetContainer tgtContainer = findContainer(screen, conn.getTargetComponentId());
+                FlowWidgetContainer srcContainer = FlowLayoutHelper.findContainer(screen, conn.getSourceComponentId());
+                FlowWidgetContainer tgtContainer = FlowLayoutHelper.findContainer(screen, conn.getTargetComponentId());
 
                 if (srcContainer == null || tgtContainer == null) {
                     continue;
@@ -55,10 +53,10 @@ public final class VectorWireRenderer {
                 AbstractFlowComponent src = srcContainer.getComponent();
                 AbstractFlowComponent tgt = tgtContainer.getComponent();
 
-                int srcPinX = srcContainer.getX() + getOutputOffset(src, conn.getOutputNodeIndex()) + 3;
+                int srcPinX = srcContainer.getX() + FlowLayoutHelper.getOutputOffset(src, conn.getOutputNodeIndex()) + 3;
                 int srcPinY = srcContainer.getY() + 23;
 
-                int tgtPinX = tgtContainer.getX() + getInputOffset(tgt, conn.getInputNodeIndex()) + 3;
+                int tgtPinX = tgtContainer.getX() + FlowLayoutHelper.getInputOffset(tgt, conn.getInputNodeIndex()) + 3;
                 int tgtPinY = tgtContainer.getY() - 3;
 
                 int srcColor = src.getColorMask().getHexColor();
@@ -112,7 +110,7 @@ public final class VectorWireRenderer {
 
         var mouseHandler = screen.getMouseHandler();
         if (mouseHandler.isWiring()) {
-            var srcNode = mouseHandler.getActiveWiringSource();
+            FlowWidgetOutputNode srcNode = mouseHandler.getActiveWiringSource();
             AbstractFlowComponent src = srcNode.getContainer().getComponent();
             int srcPinX = srcNode.getX() + 3;
             int srcPinY = srcNode.getY() + 3;
@@ -160,41 +158,5 @@ public final class VectorWireRenderer {
 
             guiGraphics.pose().popPose();
         }
-    }
-
-    @Nullable
-    private static FlowWidgetContainer findContainer(ManagerScreen screen, UUID id) {
-        for (var renderable : screen.getRenderables()) {
-            if (renderable instanceof FlowWidgetContainer container) {
-                if (container.getComponent().getId().equals(id)) {
-                    return container;
-                }
-            }
-        }
-        return null;
-    }
-
-    private static int getOutputOffset(AbstractFlowComponent component, int index) {
-        if (!component.hasOutputNodes() || index < 0 || index >= component.getNumOutputs()) {
-            return 29;
-        }
-        NodeCount nodeCount = NodeCount.getForCount(component.getNumOutputs());
-        int[] spacing = nodeCount.getOffsets(false);
-        if (index < spacing.length) {
-            return spacing[index];
-        }
-        return 29;
-    }
-
-    private static int getInputOffset(AbstractFlowComponent component, int index) {
-        if (!component.hasInputNodes() || index < 0 || index >= component.getNumInputs()) {
-            return 29;
-        }
-        NodeCount nodeCount = NodeCount.getForCount(component.getNumInputs());
-        int[] spacing = nodeCount.getOffsets(false);
-        if (index < spacing.length) {
-            return spacing[index];
-        }
-        return 29;
     }
 }

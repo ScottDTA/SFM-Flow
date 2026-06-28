@@ -6,14 +6,23 @@ import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SyncClusterSlotDirectionPacket;
+import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Handles custom serverbound packet payloads, enqueuing coordinate updates,
@@ -87,6 +96,7 @@ public class ServerPayloadHandler {
 
 	/**
 	 * Processes a client settings update payload on the main server thread [3].
+	 * Returns any cursor-carried item stack safely back to the player inventory on completion [3].
 	 */
 	public static void handleSaveComponentSettings(final SaveComponentSettings data, final IPayloadContext context) {
 		context.enqueueWork(() -> {
@@ -96,6 +106,15 @@ public class ServerPayloadHandler {
 				if (component != null) {
 					component.loadData(data.settings());
 					manager.setChanged();
+
+					// Symmetrical carried item snap-back: safely return any held item to the inventory slots [3]
+					ServerPlayer player = (ServerPlayer) context.player();
+					ItemStack carried = player.containerMenu.getCarried();
+					if (carried != null && !carried.isEmpty()) {
+						player.getInventory().placeItemBackInInventory(carried);
+						player.containerMenu.setCarried(ItemStack.EMPTY);
+						player.containerMenu.broadcastChanges(); // Synchronize changes immediately to the client
+					}
 
 					manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), data.componentId(),
 							SyncComponentDeltaPacket.DeltaType.SETTINGS, data.settings()));
@@ -222,4 +241,33 @@ public class ServerPayloadHandler {
 		});
 	}
 
+	/**
+	 * Processes an incoming slot item layout sync request on the server thread [3].
+	 */
+	public static void handleRequestInventorySlots(final RequestInventorySlotsPacket data, final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			ServerPlayer player = (ServerPlayer) context.player();
+			net.minecraft.world.level.Level level = player.level();
+			if (level.hasChunkAt(data.pos())) {
+				IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
+				if (handler != null) {
+					CompoundTag dataTag = new CompoundTag();
+					ListTag list = new ListTag();
+					for (int i = 0; i < handler.getSlots(); i++) {
+						ItemStack stack = handler.getStackInSlot(i);
+						if (!stack.isEmpty()) {
+							CompoundTag slotTag = new CompoundTag();
+							slotTag.putInt("slot", i);
+							slotTag.put("item", stack.save(level.registryAccess()));
+							list.add(slotTag);
+						}
+					}
+					dataTag.put("items", list);
+					dataTag.putInt("totalSlots", handler.getSlots());
+
+					PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), dataTag));
+				}
+			}
+		});
+	}
 }

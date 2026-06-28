@@ -32,7 +32,8 @@ import java.util.function.Supplier;
 /**
  * Reusable 3D block preview widget rendering a central targeted block and its
  * adjacent neighbors [3]. Supports right-click mouse dragging to orbit,
- * left-click face toggles, and integrated highlighting [3].
+ * left-click face toggles, shift-left-click slot configuration, and integrated
+ * highlighting [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class BlockPreview3DWidget extends AbstractFlowWidget {
@@ -182,12 +183,16 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 				double dy = mouseY - proj.y;
 				if (dx * dx + dy * dy <= 36.0) { // 6px hit detection radius [3]
 					if (sideSupportChecker.test(face)) {
-						sideModel.toggleSide(face);
-						this.onChanged.run();
+						if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+							openSlotLayoutGui(face);
+						} else {
+							sideModel.toggleSide(face);
+							this.onChanged.run();
 
-						Minecraft.getInstance().getSoundManager().play(
-								net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-										net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+							Minecraft.getInstance().getSoundManager()
+									.play(net.minecraft.client.resources.sounds.SimpleSoundInstance
+											.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+						}
 						return true;
 					}
 				}
@@ -195,6 +200,12 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		}
 
 		return false;
+	}
+
+	private void openSlotLayoutGui(Direction face) {
+		SlotLayoutModalPopup popup = new SlotLayoutModalPopup(this.parentScreen, this.sideModel, face,
+				this.posSupplier.get(), this.onChanged);
+		this.parentScreen.setActiveModalPopup(popup);
 	}
 
 	@Override
@@ -540,12 +551,6 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		@Override
 		public com.mojang.blaze3d.vertex.VertexConsumer setLight(int light) {
 			delegate.setLight(light);
-			return this;
-		}
-
-		@Override
-		public com.mojang.blaze3d.vertex.VertexConsumer setOverlay(int overlay) {
-			delegate.setOverlay(overlay);
 			return this;
 		}
 	}

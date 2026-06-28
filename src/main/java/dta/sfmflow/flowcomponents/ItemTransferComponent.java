@@ -22,16 +22,24 @@ import java.util.List;
 /**
  * Unified logic component handling both item inputs (extractions) and item
  * outputs (depositions) [3]. Upgraded to serialize optional group, filter
- * variables, and a bitmask representing active directions [3].
+ * variables, and a bitmask representing active directions [3]. Additionally
+ * supports saving per-side enabled slot bitmasks [3].
  */
-public class ItemTransferComponent extends AbstractFlowComponent implements IFilterable, IInventoryTarget, ISideConfigurable {
+public class ItemTransferComponent extends AbstractFlowComponent
+		implements IFilterable, IInventoryTarget, ISideConfigurable {
 	private final boolean isInput;
 	private int inventoryId = -1;
 	private boolean useAll = true;
 	private int targetSlot = -1;
 
-	// Bitmask representing active directions (all 6 active by default: 111111 binary = 63) [3]
+	// Bitmask representing active directions (all 6 active by default: 111111
+	// binary = 63) [3]
 	private int activeSidesMask = 63;
+
+	// Slot bitmasks tracking enabled states per face direction (Default: -1L
+	// meaning all slots enabled) [3]
+	private final List<Long> enabledSlotsMasks = new java.util.ArrayList<>(
+			java.util.List.of(-1L, -1L, -1L, -1L, -1L, -1L));
 
 	private UUID boundGroupVariableId = null;
 	private UUID boundFilterVariableId = null;
@@ -44,27 +52,40 @@ public class ItemTransferComponent extends AbstractFlowComponent implements IFil
 	public static final MapCodec<ItemTransferComponent> OUTPUT_CODEC = makeCodec(false);
 
 	private static MapCodec<ItemTransferComponent> makeCodec(boolean isInput) {
-		return RecordCodecBuilder.mapCodec(instance -> instance
-				.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemTransferComponent::getBaseProperties),
-						Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemTransferComponent::getInventoryId),
-						Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
-						Codec.INT.optionalFieldOf("targetSlot", -1).forGetter(ItemTransferComponent::getTargetSlot),
-						Codec.INT.optionalFieldOf("activeSidesMask", 63).forGetter(ItemTransferComponent::getActiveSidesMask),
-						UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
-								.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
-						UUIDUtil.CODEC.optionalFieldOf("boundFilterVariableId")
-								.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())),
-						Codec.BOOL.optionalFieldOf("whitelist", true).forGetter(ItemTransferComponent::isWhitelist),
-						ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
-								.forGetter(ItemTransferComponent::getFilterItems))
-				.apply(instance,
-						(baseProps, invId, useAllVal, slot, sidesMask, groupVar, filterVar, whitelistVal, filtersList) -> {
+		return RecordCodecBuilder
+				.mapCodec(instance -> instance
+						.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemTransferComponent::getBaseProperties),
+								Codec.INT
+										.optionalFieldOf("inventoryId", -1)
+										.forGetter(ItemTransferComponent::getInventoryId),
+								Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
+								Codec.INT.optionalFieldOf("targetSlot", -1)
+										.forGetter(ItemTransferComponent::getTargetSlot),
+								Codec.INT.optionalFieldOf("activeSidesMask", 63)
+										.forGetter(ItemTransferComponent::getActiveSidesMask),
+								Codec.LONG.listOf()
+										.optionalFieldOf("enabledSlotsMasks",
+												java.util.List.of(-1L, -1L, -1L, -1L, -1L, -1L))
+										.forGetter(ItemTransferComponent::getEnabledSlotsMasks),
+								UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
+										.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
+								UUIDUtil.CODEC
+										.optionalFieldOf("boundFilterVariableId")
+										.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())),
+								Codec.BOOL.optionalFieldOf("whitelist", true)
+										.forGetter(ItemTransferComponent::isWhitelist),
+								ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
+										.forGetter(ItemTransferComponent::getFilterItems))
+						.apply(instance, (baseProps, invId, useAllVal, slot, sidesMask, masksList, groupVar, filterVar,
+								whitelistVal, filtersList) -> {
 							ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
 							comp.setBaseProperties(baseProps);
 							comp.inventoryId = invId;
 							comp.useAll = useAllVal;
 							comp.targetSlot = slot;
 							comp.activeSidesMask = sidesMask;
+							comp.enabledSlotsMasks.clear();
+							comp.enabledSlotsMasks.addAll(masksList);
 							comp.boundGroupVariableId = groupVar.orElse(null);
 							comp.boundFilterVariableId = filterVar.orElse(null);
 							comp.whitelist = whitelistVal;
@@ -87,6 +108,54 @@ public class ItemTransferComponent extends AbstractFlowComponent implements IFil
 		for (int i = 0; i < 12; i++) {
 			this.filterItems.add(ItemStack.EMPTY);
 		}
+	}
+
+	@Override
+	public FlowComponentType getType() {
+		return isInput ? FlowComponentType.ITEM_INPUT.get() : FlowComponentType.ITEM_OUTPUT.get();
+	}
+
+	public List<Long> getEnabledSlotsMasks() {
+		return this.enabledSlotsMasks;
+	}
+
+	public long getEnabledSlotsMask(Direction dir) {
+		if (dir == null)
+			return -1L;
+		int idx = dir.ordinal();
+		if (idx >= 0 && idx < enabledSlotsMasks.size()) {
+			return enabledSlotsMasks.get(idx);
+		}
+		return -1L;
+	}
+
+	public void setEnabledSlotsMask(Direction dir, long mask) {
+		if (dir == null)
+			return;
+		int idx = dir.ordinal();
+		while (enabledSlotsMasks.size() <= idx) {
+			enabledSlotsMasks.add(-1L);
+		}
+		enabledSlotsMasks.set(idx, mask);
+	}
+
+	public boolean isSlotEnabled(Direction dir, int slot) {
+		if (dir == null)
+			return true;
+		if (slot < 0 || slot >= 64)
+			return true;
+		long mask = getEnabledSlotsMask(dir);
+		return (mask & (1L << slot)) != 0;
+	}
+
+	public void toggleSlot(Direction dir, int slot) {
+		if (dir == null)
+			return;
+		if (slot < 0 || slot >= 64)
+			return;
+		long mask = getEnabledSlotsMask(dir);
+		mask ^= (1L << slot);
+		setEnabledSlotsMask(dir, mask);
 	}
 
 	public boolean isInput() {
@@ -170,11 +239,6 @@ public class ItemTransferComponent extends AbstractFlowComponent implements IFil
 	}
 
 	@Override
-	public FlowComponentType getType() {
-		return isInput ? FlowComponentType.ITEM_INPUT.get() : FlowComponentType.ITEM_OUTPUT.get();
-	}
-
-	@Override
 	public void loadData(net.minecraft.nbt.CompoundTag compoundTag) {
 		var codec = isInput ? ItemTransferComponent.INPUT_CODEC : ItemTransferComponent.OUTPUT_CODEC;
 		codec.codec().parse(net.minecraft.nbt.NbtOps.INSTANCE, compoundTag).resultOrPartial(
@@ -185,6 +249,8 @@ public class ItemTransferComponent extends AbstractFlowComponent implements IFil
 					this.useAll = decoded.isUseAll();
 					this.targetSlot = decoded.getTargetSlot();
 					this.activeSidesMask = decoded.getActiveSidesMask();
+					this.enabledSlotsMasks.clear();
+					this.enabledSlotsMasks.addAll(decoded.getEnabledSlotsMasks());
 					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
 					this.boundFilterVariableId = decoded.getBoundFilterVariableId();
 					this.whitelist = decoded.isWhitelist();

@@ -5,12 +5,15 @@ import java.util.Comparator;
 import java.util.List;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
+import dta.sfmflow.client.screen.helper.WorkspaceValidator;
+import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
+import dta.sfmflow.client.screen.helper.GuiScaleManager;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.client.Minecraft;
@@ -65,167 +68,14 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		this.mouseHandler = new ManagerMouseHandler(this);
 	}
 
-	/**
-	 * Evaluates if a given component has an unbound connected inventory error [3].
-	 * Upgraded to verify that the selected inventory ID actually exists on the
-	 * network [3].
-	 *
-	 * @param screen    active screen manager [3]
-	 * @param component flow component query [3]
-	 * @return true if the component has an unbound inventory error [3]
-	 */
-	public static boolean hasUnboundInventoryError(ManagerScreen screen, AbstractFlowComponent component) {
-		if (component instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
-			// 1. Check if bound inventory is actively connected to the network [3]
-			boolean foundBoundInventory = false;
-			if (transfer.getInventoryId() != -1) {
-				for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
-					if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
-						foundBoundInventory = true;
-						break;
-					}
-				}
-			}
-
-			// Flag error if unassigned or if the bound chest is disconnected [3]
-			if (transfer.getInventoryId() == -1 || !foundBoundInventory) {
-				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-				for (var conn : connections) {
-					if (conn.getSourceComponentId().equals(transfer.getId())
-							|| conn.getTargetComponentId().equals(transfer.getId())) {
-						return true;
-					}
-				}
-			}
-
-			// 2. Empty Whitelist validation check [3]
-			if (transfer.isWhitelist()) {
-				boolean empty = true;
-				for (ItemStack stack : transfer.getFilterItems()) {
-					if (stack != null && !stack.isEmpty()) {
-						empty = false;
-						break;
-					}
-				}
-				if (empty) {
-					var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-					for (var conn : connections) {
-						if (conn.getSourceComponentId().equals(transfer.getId())
-								|| conn.getTargetComponentId().equals(transfer.getId())) {
-							return true;
-						}
-					}
-				}
-			}
-
-			// 3. No active sides error check [3]
-			if (transfer.getActiveSidesMask() == 0) {
-				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-				for (var conn : connections) {
-					if (conn.getSourceComponentId().equals(transfer.getId())
-							|| conn.getTargetComponentId().equals(transfer.getId())) {
-						return true;
-					}
-				}
-			}
-		}
-		return false;
-	}
-	
-	/**
-	 * Modifies a slot's coordinate mapping at runtime using Java Reflection to bypass final access constraints [3].
-	 *
-	 * @param slot the container slot instance to update [3]
-	 * @param x    new target X coordinate [3]
-	 * @param y    new target Y coordinate [3]
-	 */
-	private void setSlotPosition(net.minecraft.world.inventory.Slot slot, int x, int y) {
-		try {
-			java.lang.reflect.Field xField = net.minecraft.world.inventory.Slot.class.getDeclaredField("x");
-			java.lang.reflect.Field yField = net.minecraft.world.inventory.Slot.class.getDeclaredField("y");
-			xField.setAccessible(true);
-			yField.setAccessible(true);
-			xField.setInt(slot, x);
-			yField.setInt(slot, y);
-		} catch (NoSuchFieldException e) {
-			try {
-				// Fallback search by type mapping if mappings differ [3]
-				java.util.List<java.lang.reflect.Field> intFields = new java.util.ArrayList<>();
-				for (java.lang.reflect.Field field : net.minecraft.world.inventory.Slot.class.getDeclaredFields()) {
-					if (field.getType() == int.class) {
-						intFields.add(field);
-					}
-				}
-				java.lang.reflect.Field xField = intFields.get(1);
-				java.lang.reflect.Field yField = intFields.get(2);
-				xField.setAccessible(true);
-				yField.setAccessible(true);
-				xField.setInt(slot, x);
-				yField.setInt(slot, y);
-			} catch (Exception ex) {
-				SFMFlow.LOGGER.error("Failed to resolve dynamic Slot fields", ex);
-			}
-		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to dynamically reposition container slot", e);
-		}
-	}
-
 	@Override
 	protected void init() {
 		super.init();
 
-		int requiredWidth = 512;
-		int requiredHeight = 352;
-		int rawWidth = this.mc.getWindow().getWidth();
-		int rawHeight = this.mc.getWindow().getHeight();
-		int currentScale = this.mc.options.guiScale().get();
-
-		boolean scaleApplied = false;
-
-		int forcedScale = dta.sfmflow.ClientConfig.FORCE_GUI_SCALE.get();
-		if (forcedScale > 0) {
-			int testWidth = rawWidth / forcedScale;
-			int testHeight = rawHeight / forcedScale;
-
-			if (testWidth >= requiredWidth && testHeight >= requiredHeight) {
-				if (currentScale != forcedScale) {
-					this.mc.options.guiScale().set(forcedScale);
-					this.mc.resizeDisplay();
-					return;
-				}
-				scaleApplied = true;
-			}
-		}
-
-		if (!scaleApplied) {
-			int actualScale = (int) this.mc.getWindow().getGuiScale();
-
-			if ((this.width < requiredWidth || this.height < requiredHeight) && actualScale > 1) {
-				int targetScale = (currentScale == 0) ? (actualScale - 1) : (currentScale - 1);
-				if (currentScale != targetScale) {
-					this.mc.options.guiScale().set(targetScale);
-					this.mc.resizeDisplay();
-					return;
-				}
-			}
-
-			int maxPossibleScale = Math.max(1, Math.min(rawWidth / 320, rawHeight / 240));
-			int maxScaleLimit = (this.originalGuiScale == 0) ? maxPossibleScale : this.originalGuiScale;
-
-			if (currentScale > 0 && currentScale < maxScaleLimit) {
-				int nextScale = currentScale + 1;
-				int testWidth = rawWidth / nextScale;
-				int testHeight = rawHeight / nextScale;
-
-				if (testWidth >= requiredWidth && testHeight >= requiredHeight) {
-					int targetScale = (nextScale == maxScaleLimit && this.originalGuiScale == 0) ? 0 : nextScale;
-					if (currentScale != targetScale) {
-						this.mc.options.guiScale().set(targetScale);
-						this.mc.resizeDisplay();
-						return;
-					}
-				}
-			}
+		// Delegate display scaling checking and override configurations to the GuiScaleManager helper [3]
+		boolean resized = GuiScaleManager.applyOverrides(this.mc, this.width, this.height, this.originalGuiScale, 512, 352);
+		if (resized) {
+			return;
 		}
 
 		int x = (width - imageWidth) / 2;
@@ -254,7 +104,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				int slotIndex = r * 9 + c;
 				if (slotIndex < this.menu.slots.size()) {
 					net.minecraft.world.inventory.Slot slot = this.menu.slots.get(slotIndex);
-					setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 8 + r * 18 + textureY - this.topPos);
+					MenuSlotRepositioner.setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 8 + r * 18 + textureY - this.topPos);
 				}
 			}
 		}
@@ -264,7 +114,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			int slotIndex = 27 + c;
 			if (slotIndex < this.menu.slots.size()) {
 				net.minecraft.world.inventory.Slot slot = this.menu.slots.get(slotIndex);
-				setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 66 + textureY - this.topPos);
+				MenuSlotRepositioner.setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 66 + textureY - this.topPos);
 			}
 		}
 
@@ -434,36 +284,59 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 		float baseZ = (maxZ * 2.0F) + 5.0F;
 
+		// Clear depth buffer to cleanly isolate overlays from background widget passes [3]
+		RenderSystem.clear(256, Minecraft.ON_OSX);
+
+		// Sequential elevated Z-translations to render on top of 150.0F 3D projections [3]
 		if (this.activeSubmenu != null) {
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 300.0F);
 			this.activeSubmenu.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
 		}
 
 		if (this.openedDropdown != null) {
+			RenderSystem.clear(256, Minecraft.ON_OSX);
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 2.0F);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 400.0F);
 			this.openedDropdown.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
 		}
 
 		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
+			RenderSystem.clear(256, Minecraft.ON_OSX);
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 10.0F);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 500.0F);
 			this.activeSettingsOverlay.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
 		}
 
 		if (this.activeModalPopup != null && this.activeModalPopup.visible) {
+			RenderSystem.clear(256, Minecraft.ON_OSX);
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 20.0F);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 600.0F);
 			this.activeModalPopup.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
+		}
+
+		// Symmetrical override: Draw cursor carried item on top of overlays if active [3]
+		boolean hasActiveOverlay = (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible)
+				|| (this.activeModalPopup != null && this.activeModalPopup.visible)
+				|| (this.openedDropdown != null);
+
+		if (hasActiveOverlay) {
+			ItemStack carried = this.menu.getCarried();
+			if (!carried.isEmpty()) {
+				guiGraphics.pose().pushPose();
+				guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
+				guiGraphics.renderItem(carried, mouseX - 8, mouseY - 8);
+				guiGraphics.renderItemDecorations(this.font, carried, mouseX - 8, mouseY - 8);
+				guiGraphics.pose().popPose();
+			}
 		}
 
 		this.renderTooltip(guiGraphics, mouseX, mouseY);
@@ -492,8 +365,10 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		for (Renderable r : this.renderables) {
 			if (r instanceof FlowWidgetContainer container) {
 				for (GuiEventListener child : container.children()) {
-					if (child instanceof FlowWidgetBase base && base.children().contains(element)) {
-						return base;
+					if (child instanceof FlowWidgetBase base) {
+						if (FlowLayoutHelper.isAncestorOf(base, element)) {
+							return base;
+						}
 					}
 				}
 			}
@@ -599,12 +474,13 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (keyCode == 256) {
-			if (this.activeSettingsOverlay != null) {
-				this.activeSettingsOverlay.closeAndSave();
-				return true;
-			}
+			// Symmetrical ESC close precedence: Dismiss topmost active modals before secondary overlays [3]
 			if (this.activeModalPopup != null) {
 				this.activeModalPopup.close();
+				return true;
+			}
+			if (this.activeSettingsOverlay != null) {
+				this.activeSettingsOverlay.closeAndSave();
 				return true;
 			}
 			if (this.openedDropdown != null) {
@@ -613,13 +489,14 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		if (this.activeSettingsOverlay != null) {
-			this.activeSettingsOverlay.keyPressed(keyCode, scanCode, modifiers);
+		// Prioritize bubbling keys to the topmost active modal layer first [3]
+		if (this.activeModalPopup != null) {
+			this.activeModalPopup.keyPressed(keyCode, scanCode, modifiers);
 			return true;
 		}
 
-		if (this.activeModalPopup != null) {
-			this.activeModalPopup.keyPressed(keyCode, scanCode, modifiers);
+		if (this.activeSettingsOverlay != null) {
+			this.activeSettingsOverlay.keyPressed(keyCode, scanCode, modifiers);
 			return true;
 		}
 
@@ -633,13 +510,14 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 	@Override
 	public boolean charTyped(char codePoint, int modifiers) {
-		if (this.activeSettingsOverlay != null) {
-			this.activeSettingsOverlay.charTyped(codePoint, modifiers);
+		// Prioritize bubbling unicode characters to the topmost active modal layer first [3]
+		if (this.activeModalPopup != null) {
+			this.activeModalPopup.charTyped(codePoint, modifiers);
 			return true;
 		}
 
-		if (this.activeModalPopup != null) {
-			this.activeModalPopup.charTyped(codePoint, modifiers);
+		if (this.activeSettingsOverlay != null) {
+			this.activeSettingsOverlay.charTyped(codePoint, modifiers);
 			return true;
 		}
 
@@ -697,7 +575,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		int errorCount = 0;
 		for (var comp : getMenu().getManagerBlockEntity().getFlowComponents().values()) {
-			if (hasUnboundInventoryError(this, comp)) {
+			if (WorkspaceValidator.hasUnboundInventoryError(this, comp)) {
 				errorCount++;
 			}
 		}
@@ -718,64 +596,5 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 	public ManagerMouseHandler getMouseHandler() {
 		return this.mouseHandler;
-	}
-
-	@Override
-	protected void containerTick() {
-		super.containerTick();
-		if (this.refreshCooldown > 0) {
-			this.refreshCooldown--;
-		}
-		if (!this.mouseHandler.isDragging() && this.refreshCooldown == 0
-				&& this.getMenu().getManagerBlockEntity().pollNeedsRefresh()) {
-			refreshWidgetLayout();
-		}
-	}
-
-	public void handleDeltaUpdate(SyncComponentDeltaPacket packet) {
-		AbstractFlowComponent localComponent = this.getMenu().getManagerBlockEntity().getFlowComponents()
-				.get(packet.componentId());
-
-		switch (packet.deltaType()) {
-		case MOVE -> {
-			if (localComponent != null) {
-				localComponent.setX(packet.data().getInt("x"));
-				localComponent.setY(packet.data().getInt("y"));
-				localComponent.setZ(packet.data().getInt("z"));
-
-				for (Renderable r : this.renderables) {
-					if (r instanceof FlowWidgetContainer container
-							&& container.getComponent().getId().equals(packet.componentId())) {
-						int screenX = (width - imageWidth) / 2 + localComponent.getX();
-						int screenY = (height - imageHeight) / 2 + localComponent.getY();
-						container.setX(screenX);
-						container.setY(screenY);
-						break;
-					}
-				}
-			}
-		}
-		case SETTINGS -> {
-			if (localComponent != null) {
-				localComponent.loadData(packet.data());
-				refreshWidgetLayout();
-			}
-		}
-		case ADD -> {
-			AbstractFlowComponent.CODEC.parse(NbtOps.INSTANCE, packet.data())
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse added delta component: {}", err))
-					.ifPresent(decoded -> {
-						this.getMenu().getManagerBlockEntity().getFlowComponents().put(packet.componentId(), decoded);
-						refreshWidgetLayout();
-					});
-		}
-		case REMOVE -> {
-			this.getMenu().getManagerBlockEntity().getFlowComponents().remove(packet.componentId());
-			this.getMenu().getManagerBlockEntity().getFlowConnections()
-					.removeIf(wire -> wire.getSourceComponentId().equals(packet.componentId())
-							|| wire.getTargetComponentId().equals(packet.componentId()));
-			refreshWidgetLayout();
-		}
-		}
 	}
 }

@@ -6,7 +6,7 @@ import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.GradientBlitUtil;
-import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.WorkspaceValidator;
 import dta.sfmflow.util.Color;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -59,7 +59,7 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 		org.joml.Matrix4f matrix = guiGraphics.pose().last().pose();
 
 		// Check error state dynamically [3]
-		boolean hasError = ManagerScreen.hasUnboundInventoryError(container.getParent(), comp);
+		boolean hasError = WorkspaceValidator.hasUnboundInventoryError(container.getParent(), comp);
 
 		// Adjust title text position depending on error state [3]
 		if (hasError) {
@@ -92,26 +92,26 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 		}
 
 		// Render tooltip directly if indicator is hovered [3]
-		  if (hasError && mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
-		        Component errorMsg = Component.translatable("gui.sfmflow.error.unbound_inventory");
-		        if (comp instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
-		            if (transfer.getActiveSidesMask() == 0) {
-		                errorMsg = Component.translatable("gui.sfmflow.error.no_active_sides");
-		            } else if (transfer.getInventoryId() != -1 && transfer.isWhitelist()) {
-		                boolean empty = true;
-		                for (ItemStack stack : transfer.getFilterItems()) {
-		                    if (stack != null && !stack.isEmpty()) {
-		                        empty = false;
-		                        break;
-		                    }
-		                }
-		                if (empty) {
-		                    errorMsg = Component.translatable("gui.sfmflow.error.empty_whitelist");
-		                }
-		            }
-		        }
-		        guiGraphics.renderTooltip(container.getParent().getFont(), errorMsg, mouseX, mouseY);
-		    }
+		if (hasError && mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
+			Component errorMsg = Component.translatable("gui.sfmflow.error.unbound_inventory");
+			if (comp instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
+				if (transfer.getActiveSidesMask() == 0) {
+					errorMsg = Component.translatable("gui.sfmflow.error.no_active_sides");
+				} else if (transfer.getInventoryId() != -1 && transfer.isWhitelist()) {
+					boolean empty = true;
+					for (ItemStack stack : transfer.getFilterItems()) {
+						if (stack != null && !stack.isEmpty()) {
+							empty = false;
+							break;
+						}
+					}
+					if (empty) {
+						errorMsg = Component.translatable("gui.sfmflow.error.empty_whitelist");
+					}
+				}
+			}
+			guiGraphics.renderTooltip(container.getParent().getFont(), errorMsg, mouseX, mouseY);
+		}
 	}
 
 	public FlowWidgetContainer getContainer() {

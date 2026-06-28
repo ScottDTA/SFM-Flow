@@ -18,11 +18,11 @@ import java.util.Map;
  * Immutable thread-safe snapshot container holding deep copies of target
  * inventory slot configurations [3]. Instantiated strictly on the main server
  * thread to prevent concurrency collisions during evaluation runs [3]. Upgraded
- * to support side-specific capability indexing [3].
+ * to support side-specific capability indexing and main slot mapping [3].
  */
 public final class ThreadSafeInventorySnapshot {
 
-	public record SlotSnapshot(ItemStack stack, int slotLimit) {
+	public record SlotSnapshot(ItemStack stack, int slotLimit, int mainSlotIndex) {
 		public SlotSnapshot {
 			stack = stack.copy(); // Ensure a deep copy of the ItemStack [3]
 		}
@@ -57,16 +57,17 @@ public final class ThreadSafeInventorySnapshot {
 			for (ConnectionBlock block : manager.getInventories()) {
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
+					net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
 					// Index the block's non-directional state [3]
 					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
 					if (nullHandler != null) {
-						map.put(new SnapshotKey(pos, null), createInventorySnapshot(nullHandler));
+						map.put(new SnapshotKey(pos, null), createInventorySnapshot(nullHandler, be, null));
 					}
 					// Index all 6 active directions independently [3]
 					for (Direction dir : Direction.values()) {
 						IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
 						if (handler != null) {
-							map.put(new SnapshotKey(pos, dir), createInventorySnapshot(handler));
+							map.put(new SnapshotKey(pos, dir), createInventorySnapshot(handler, be, dir));
 						}
 					}
 				}
@@ -75,12 +76,23 @@ public final class ThreadSafeInventorySnapshot {
 		return new ThreadSafeInventorySnapshot(map);
 	}
 
-	private static InventorySnapshot createInventorySnapshot(IItemHandler handler) {
+	private static InventorySnapshot createInventorySnapshot(IItemHandler handler, @Nullable net.minecraft.world.level.block.entity.BlockEntity be, @Nullable Direction side) {
 		Map<Integer, SlotSnapshot> slots = new HashMap<>();
 		int count = handler.getSlots();
+		int[] faceSlots = null;
+
+		// Resolve WorldlyContainer accessible slot indexes for side-specific mapping
+		if (be instanceof net.minecraft.world.WorldlyContainer worldly && side != null) {
+			faceSlots = worldly.getSlotsForFace(side);
+		}
+
 		for (int i = 0; i < count; i++) {
 			ItemStack stack = handler.getStackInSlot(i);
-			slots.put(i, new SlotSnapshot(stack, handler.getSlotLimit(i)));
+			int mainSlotIndex = i;
+			if (faceSlots != null && i >= 0 && i < faceSlots.length) {
+				mainSlotIndex = faceSlots[i];
+			}
+			slots.put(i, new SlotSnapshot(stack, handler.getSlotLimit(i), mainSlotIndex));
 		}
 		return new InventorySnapshot(slots);
 	}

@@ -3,7 +3,6 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.api.client.event.RegisterDropdownLinksEvent;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.client.screen.widgets.helper.FlowTextLink;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;

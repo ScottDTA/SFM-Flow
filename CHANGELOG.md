@@ -1,16 +1,22 @@
 6-28-2026
 
 ### [Added]
+* Added a new slot layout configuration screen, accessible by shift-clicking any side of the 3D block preview, allowing you to toggle exactly which inventory slots are active for automated transfers.
+* Added full slot-mapping support for worldly containers (such as Furnaces, Brewing Stands, and Smelters) to respect face-locked slot layouts.
+* Added live item previews inside slot layout screens to show which items currently reside in each slot of a connected container.
 * Added an upgraded in-world highlight system that renders the precise 3D block shape of targeted chests and machines instead of generic wireframe boxes.
 * Added a fully interactive, draggable 3D block preview component to the Item Input and Output settings screens.
 
 ### [Changed]
+* Rebuilt the item filter slots with a custom texture design showing distinct empty and filled visual states.
+* Optimized screen drawing layers to prevent overlay menus and dropdowns from clipping or rendering behind the 3D block preview.
 * Rebuilt the Item Input and Item Output configuration panels into modular, responsive layout elements to improve readability.
 * Integrated public API interfaces (`IFilterable`, `IInventoryTarget`, `ISideConfigurable`) allowing third-party addon developers to reuse standard search, filter, and side configuration widgets.
 
 ### [Fixed]
+* Fixed an issue where items held on the cursor would be lost when clicking "Save & Close" inside configuration screens; held items are now safely returned to your inventory.
+* Consolidated internal interface layouts to improve overall user interface stability and menu loading times.
 * Fixed mouse dragging and scroll conflicts when adjusting settings inside the node configuration overlays.
-
 
 
 6-27-2026

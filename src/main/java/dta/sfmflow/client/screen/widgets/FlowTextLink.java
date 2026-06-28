@@ -1,4 +1,4 @@
-package dta.sfmflow.client.screen.widgets.helper;
+package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import net.minecraft.client.Minecraft;

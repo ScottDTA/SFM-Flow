@@ -7,6 +7,7 @@ import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
@@ -108,6 +109,28 @@ public class ManagerMouseHandler {
 	}
 
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		// 1. Short-circuit check: Clicking the settings overlay's Save/Close button always closes both modal and settings [3]
+		if (screen.getActiveSettingsOverlay() != null && button == 0) {
+			var overlay = screen.getActiveSettingsOverlay();
+			int btnX = overlay.getX() + (overlay.getWidth() - 80) / 2;
+			int btnY = overlay.getY() + overlay.getHeight() - 22;
+
+			if (mouseX >= btnX && mouseX < btnX + 80 && mouseY >= btnY && mouseY < btnY + 14) {
+				if (screen.getActiveModalPopup() != null) {
+					screen.setActiveModalPopup(null); // Force close slots UI [3]
+				}
+				overlay.saveAndClose();
+				return true;
+			}
+		}
+
+		// 2. Normal priority modal popup intercept [3]
+		if (screen.getActiveModalPopup() != null) {
+			screen.getActiveModalPopup().mouseClicked(mouseX, mouseY, button);
+			return true;
+		}
+
+		// 3. Settings overlays checked next if no topmost modals are active [3]
 		if (screen.getActiveSettingsOverlay() != null) {
 			var overlay = screen.getActiveSettingsOverlay();
 			int ox = overlay.getX();
@@ -116,17 +139,18 @@ public class ManagerMouseHandler {
 			int oh = overlay.getHeight();
 
 			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
-				overlay.mouseClicked(mouseX, mouseY, button);
-				screen.setDragging(true); // Force top-level screen dragging to true [3]
-				return true;
-			} else {
-				return false; // Fall through: lets players click container items cleanly [3]
-			}
-		}
+				boolean handled = overlay.mouseClicked(mouseX, mouseY, button);
+				if (handled) {
+					screen.setDragging(true); // Force top-level screen dragging to true [3]
+					return true;
+				}
 
-		if (screen.getActiveModalPopup() != null) {
-			screen.getActiveModalPopup().mouseClicked(mouseX, mouseY, button);
-			return true;
+				// Block clicks on the settings overlay's empty space *only* within the canvas region (Y < topPos + 256) [3]
+				// This prevents dragging or clicking background canvas cards while letting player slots pass through [3]
+				if (mouseY < screen.getTopPos() + 256) {
+					return true;
+				}
+			}
 		}
 
 		if (screen.getOpenedDropdown() != null) {
@@ -245,15 +269,15 @@ public class ManagerMouseHandler {
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
 		screen.setDragging(false); // Reset top-level screen dragging state [3]
 
+		if (screen.getActiveModalPopup() != null) {
+			screen.getActiveModalPopup().mouseReleased(mouseX, mouseY, button);
+			return true;
+		}
+
 		if (screen.getActiveSettingsOverlay() != null) {
 			// Delegate release updates directly to the active settings overlay, allowing release out-of-bounds [3]
 			var overlay = screen.getActiveSettingsOverlay();
 			overlay.mouseReleased(mouseX, mouseY, button);
-			return true;
-		}
-
-		if (screen.getActiveModalPopup() != null) {
-			screen.getActiveModalPopup().mouseReleased(mouseX, mouseY, button);
 			return true;
 		}
 
@@ -325,16 +349,16 @@ public class ManagerMouseHandler {
 	}
 
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+		if (screen.getActiveModalPopup() != null) {
+			screen.getActiveModalPopup().mouseDragged(mouseX, mouseY, button, dragX, dragY);
+			return true;
+		}
+
 		if (screen.getActiveSettingsOverlay() != null) {
 			// Delegate drag updates directly to the active settings overlay, allowing drag
 			// out-of-bounds [3]
 			var overlay = screen.getActiveSettingsOverlay();
 			overlay.mouseDragged(mouseX, mouseY, button, dragX, dragY);
-			return true;
-		}
-
-		if (screen.getActiveModalPopup() != null) {
-			screen.getActiveModalPopup().mouseDragged(mouseX, mouseY, button, dragX, dragY);
 			return true;
 		}
 
@@ -359,13 +383,13 @@ public class ManagerMouseHandler {
 	}
 
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-		if (screen.getActiveSettingsOverlay() != null) {
-			screen.getActiveSettingsOverlay().mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+		if (screen.getActiveModalPopup() != null) {
+			screen.getActiveModalPopup().mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 			return true;
 		}
 
-		if (screen.getActiveModalPopup() != null) {
-			screen.getActiveModalPopup().mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+		if (screen.getActiveSettingsOverlay() != null) {
+			screen.getActiveSettingsOverlay().mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 			return true;
 		}
 
@@ -483,7 +507,7 @@ public class ManagerMouseHandler {
 		}
 		for (Renderable renderable : screen.getRenderables()) {
 			if (renderable instanceof FlowWidgetContainer container) {
-				if (isAncestorOf(container, element)) {
+				if (FlowLayoutHelper.isAncestorOf(container, element)) {
 					return container;
 				}
 			}
@@ -499,7 +523,7 @@ public class ManagerMouseHandler {
 			if (renderable instanceof FlowWidgetContainer container) {
 				for (GuiEventListener child : container.children()) {
 					if (child instanceof FlowWidgetBase base) {
-						if (isAncestorOf(base, element)) {
+						if (FlowLayoutHelper.isAncestorOf(base, element)) {
 							return base;
 						}
 					}
@@ -509,25 +533,11 @@ public class ManagerMouseHandler {
 		return null;
 	}
 
-	private boolean isAncestorOf(GuiEventListener parent, GuiEventListener target) {
-		if (parent == target) {
-			return true;
-		}
-		if (parent instanceof AbstractFlowWidget flowWidget) {
-			for (GuiEventListener child : flowWidget.children()) {
-				if (isAncestorOf(child, target)) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
 	public boolean isElementHoverable(GuiEventListener element) {
 		if (this.topHoveredElement == null) {
 			return false;
 		}
-		return isAncestorOf(element, this.topHoveredElement);
+		return FlowLayoutHelper.isAncestorOf(element, this.topHoveredElement);
 	}
 
 	private boolean isMouseOverDeleteButton(double mouseX, double mouseY) {
@@ -592,8 +602,8 @@ public class ManagerMouseHandler {
 		}
 
 		for (var conn : connections) {
-			FlowWidgetContainer srcContainer = findContainer(screen, conn.getSourceComponentId());
-			FlowWidgetContainer tgtContainer = findContainer(screen, conn.getTargetComponentId());
+			FlowWidgetContainer srcContainer = FlowLayoutHelper.findContainer(screen, conn.getSourceComponentId());
+			FlowWidgetContainer tgtContainer = FlowLayoutHelper.findContainer(screen, conn.getTargetComponentId());
 
 			if (srcContainer == null || tgtContainer == null) {
 				continue;
@@ -602,10 +612,10 @@ public class ManagerMouseHandler {
 			AbstractFlowComponent src = srcContainer.getComponent();
 			AbstractFlowComponent tgt = tgtContainer.getComponent();
 
-			int srcPinX = srcContainer.getX() + getOutputOffset(src, conn.getOutputNodeIndex()) + 3;
+			int srcPinX = srcContainer.getX() + FlowLayoutHelper.getOutputOffset(src, conn.getOutputNodeIndex()) + 3;
 			int srcPinY = srcContainer.getY() + 23;
 
-			int tgtPinX = tgtContainer.getX() + getInputOffset(tgt, conn.getInputNodeIndex()) + 3;
+			int tgtPinX = tgtContainer.getX() + FlowLayoutHelper.getInputOffset(tgt, conn.getInputNodeIndex()) + 3;
 			int tgtPinY = tgtContainer.getY() - 3;
 
 			float dx = (float) (tgtPinX - srcPinX);
@@ -637,41 +647,5 @@ public class ManagerMouseHandler {
 			}
 		}
 		return false;
-	}
-
-	@javax.annotation.Nullable
-	private static FlowWidgetContainer findContainer(ManagerScreen screen, UUID id) {
-		for (var renderable : screen.getRenderables()) {
-			if (renderable instanceof FlowWidgetContainer container) {
-				if (container.getComponent().getId().equals(id)) {
-					return container;
-				}
-			}
-		}
-		return null;
-	}
-
-	private static int getOutputOffset(AbstractFlowComponent component, int index) {
-		if (!component.hasOutputNodes() || index < 0 || index >= component.getNumOutputs()) {
-			return 29;
-		}
-		dta.sfmflow.util.NodeCount nodeCount = dta.sfmflow.util.NodeCount.getForCount(component.getNumOutputs());
-		int[] spacing = nodeCount.getOffsets(false);
-		if (index < spacing.length) {
-			return spacing[index];
-		}
-		return 29;
-	}
-
-	private static int getInputOffset(AbstractFlowComponent component, int index) {
-		if (!component.hasInputNodes() || index < 0 || index >= component.getNumInputs()) {
-			return 29;
-		}
-		dta.sfmflow.util.NodeCount nodeCount = dta.sfmflow.util.NodeCount.getForCount(component.getNumInputs());
-		int[] spacing = nodeCount.getOffsets(false);
-		if (index < spacing.length) {
-			return spacing[index];
-		}
-		return 29;
 	}
 }
