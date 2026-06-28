@@ -2,6 +2,9 @@
 
 
 #### [Added]
+* **Item Transfer Configuration Panel:** Added a fully featured settings overlay for Item Input and Item Output nodes. Players can now search connected inventories, select targets via a scrollable inventory bar, toggle between Whitelist and Blacklist modes, specify target slots, and configure a 12-slot ghost item filter grid.
+* **Workspace Error Detection:** Canvas cards will now display a red outline and a warning indicator if they are connected to disconnected/invalid inventories or if they feature empty Whitelists. Hovering over the warning icon displays a descriptive tooltip of the issue.
+* **Detailed Container Tooltips:** Hovering over connected inventories in the search list now displays the block type along with its exact coordinates in the world.
 * **Bottom Variables Panel:** Expanded the Machine Inventory Manager interface with a bottom panel drawer showcasing reusable Inventory Groups on the left and Item Filters on the right.
 * **Drag-and-Drop Variables:** Reusable inventory and item selection variables can now be dragged directly from the bottom lists and dropped onto flowchart cards to instantly bind settings.
 * **Variable Serialization:** Integrated robust serialization protocols to save active group and filter variable configurations across level reloads.
@@ -16,6 +19,9 @@
 * Added a chunk-safety filter for scanned containers. Inventories situated in unloaded chunks are put to "sleep" automatically to prevent machinery operations from causing game crashes.
 
 #### [Changed]
+* **Precise Interval Tick Scheduling:** Network planning runs are now strictly dispatched per-node only when their corresponding timer interval has elapsed, rather than on a flat global interval.
+* **Enhanced Visual Sorting:** Connection wires are now drawn directly on the background canvas, placing them behind interactive card bodies to prevent overlaps with buttons and terminals.
+* **Vanilla Double-Chest Compatibility:** Upgraded capability scanners to search with vertical side-contexts, enabling standard double-chests and vanilla containers to resolve properly.
 * **Expanded Interface Layout:** Increased the Manager console interface height from 256px to 352px to neatly integrate the variables drawers.
 * **Centered Player Inventory:** Re-aligned the player inventory and hotbar slots inside the Manager block screen to sit centrally within the new bottom panel layout, eliminating overlapping lists.
 * **Synchronized Task Submissions:** Layout planning tasks are now throttled to dispatch every 10 ticks (twice a second) to balance execution responsiveness and CPU performance.
@@ -25,5 +31,8 @@
 * Rebuilt the backend network scanning engine with primitive-level memory structures, significantly reducing server CPU overhead when mapping complex factory networks.
 
 #### [Fixed]
+* **Hot Reload Safety:** Fixed potential thread-pool hangs on world reloads by lazily re-initializing the asynchronous daemon executor pool.
+* **Item Mutation Isolation:** Planned transfer frames now copy item stacks before processing, isolating multithreaded simulations from in-flight inventory changes.
+* **Memory Leak Protection:** Stale network cable registries are now cleanly purged upon network path recalculations.
 * **Connection ID Indexing:** Fixed an internal coordinate reference bug where scanned target blocks returned a duplicate ID value of 0, resolving selection mapping issues.
 * Added an automatic first-tick sanity check on world load to clear out any stale or broken cable references from the saved network cache.

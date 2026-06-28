@@ -14,7 +14,8 @@ import java.util.*;
 /**
  * Cooperative state-machine planning task executing flowchart logic off-thread
  * [3]. Implements a 1000-node traversal limit to prevent stack overflows and
- * cyclic loop lockups [3].
+ * cyclic loop lockups [3]. Upgraded with sorted slot indices and
+ * copy-before-shrink safety validations [3].
  */
 public class FlowchartPlanningTask {
 	private final ManagerBlockEntity manager;
@@ -27,21 +28,24 @@ public class FlowchartPlanningTask {
 	private boolean completed = false;
 
 	/**
-	 * Initializes the planning task and seeds the starting trigger nodes [3].
+	 * Initializes the planning task and seeds only the currently elapsed triggers
+	 * [3].
 	 *
-	 * @param manager  the managing block entity [3]
-	 * @param snapshot the immutable deep-copied inventory snapshot [3]
+	 * @param manager        the managing block entity [3]
+	 * @param snapshot       the immutable deep-copied inventory snapshot [3]
+	 * @param activeTriggers list of UUIDs representing elapsed interval triggers
+	 *                       [3]
 	 */
-	public FlowchartPlanningTask(ManagerBlockEntity manager, ThreadSafeInventorySnapshot snapshot) {
+	public FlowchartPlanningTask(ManagerBlockEntity manager, ThreadSafeInventorySnapshot snapshot,
+			List<UUID> activeTriggers) {
 		this.manager = manager;
 		this.snapshot = snapshot;
 		this.connections = new ArrayList<>(manager.getFlowConnections());
 		this.components = new HashMap<>(manager.getFlowComponents());
 
-		// Seed trigger components
-		for (AbstractFlowComponent component : this.components.values()) {
-			if (component instanceof IntervalTriggerComponent) {
-				evaluationQueue.add(component.getId());
+		for (UUID id : activeTriggers) {
+			if (this.components.containsKey(id)) {
+				this.evaluationQueue.add(id);
 			}
 		}
 	}
@@ -63,7 +67,7 @@ public class FlowchartPlanningTask {
 
 		while (!evaluationQueue.isEmpty()) {
 			if (System.nanoTime() - startTime >= timeBudgetNs) {
-				return false; // Yield and wait for next planning cycle [3]
+				return false; // Yield
 			}
 
 			if (nodesTraversed >= 1000) {
@@ -77,11 +81,10 @@ public class FlowchartPlanningTask {
 			AbstractFlowComponent current = components.get(currentId);
 			if (current != null) {
 				nodesTraversed++;
-				evaluateNode(current);
+				this.evaluateNode(current);
 			}
 		}
-
-		completed = true;
+		this.completed = true;
 		return true;
 	}
 
@@ -115,16 +118,41 @@ public class FlowchartPlanningTask {
 		return list;
 	}
 
+	private boolean matchesFilter(ItemTransferComponent component, ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+
+		boolean found = false;
+		for (ItemStack filter : component.getFilterItems()) {
+			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
+				found = true;
+				break;
+			}
+		}
+
+		if (component.isWhitelist()) {
+			return found;
+		} else {
+			return !found;
+		}
+	}
+
+	/**
+	 * Executes multi-slot transaction planning, updating virtual snapshot states in
+	 * real-time [3]. Upgraded to sort keys sequentially and copy stacks before
+	 * shrinking them [3].
+	 */
 	private void planItemTransfer(ItemTransferComponent source, ItemTransferComponent target) {
 		var inventories = manager.getInventories();
 		BlockPos srcInventoryPos = null;
 		BlockPos tgtInventoryPos = null;
 
 		for (var block : inventories) {
-			if (block.getId() == source.getInventoryId() || source.isUseAll()) {
+			if (block.getId() == source.getInventoryId()) {
 				srcInventoryPos = block.getBlockPos();
 			}
-			if (block.getId() == target.getInventoryId() || target.isUseAll()) {
+			if (block.getId() == target.getInventoryId()) {
 				tgtInventoryPos = block.getBlockPos();
 			}
 		}
@@ -140,9 +168,16 @@ public class FlowchartPlanningTask {
 			return;
 		}
 
-		for (Map.Entry<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> srcEntry : srcInv.slots().entrySet()) {
-			int srcSlot = srcEntry.getKey();
-			ItemStack srcStack = srcEntry.getValue().stack();
+		// Sort slot keys sequentially from 0 to N to guarantee orderly evaluations [3]
+		List<Integer> sortedSrcSlots = new ArrayList<>(srcInv.slots().keySet());
+		Collections.sort(sortedSrcSlots);
+
+		List<Integer> sortedTgtSlots = new ArrayList<>(tgtInv.slots().keySet());
+		Collections.sort(sortedTgtSlots);
+
+		for (int srcSlot : sortedSrcSlots) {
+			ThreadSafeInventorySnapshot.SlotSnapshot srcEntry = srcInv.slots().get(srcSlot);
+			ItemStack srcStack = srcEntry.stack();
 			if (srcStack.isEmpty()) {
 				continue;
 			}
@@ -151,28 +186,65 @@ public class FlowchartPlanningTask {
 				continue;
 			}
 
-			for (Map.Entry<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> tgtEntry : tgtInv.slots().entrySet()) {
-				int tgtSlot = tgtEntry.getKey();
-				ItemStack tgtStack = tgtEntry.getValue().stack();
+			if (!matchesFilter(source, srcStack)) {
+				continue;
+			}
+
+			// Track remaining count to transfer for this specific source slot's stack
+			int srcRemaining = srcStack.getCount();
+
+			for (int tgtSlot : sortedTgtSlots) {
+				if (srcRemaining <= 0) {
+					break;
+				}
+
+				ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
+				ItemStack tgtStack = tgtEntry.stack();
 
 				if (target.getTargetSlot() != -1 && target.getTargetSlot() != tgtSlot) {
 					continue;
 				}
 
+				if (!matchesFilter(target, srcStack)) {
+					continue;
+				}
+
 				boolean canInsert = false;
+				int maxInsertable = 0;
+
+				// Resolve the item's maximum stack size limit for the target slot capability
+				// wrapper
+				int actualLimit = Math.min(tgtEntry.slotLimit(), srcStack.getMaxStackSize());
+
 				if (tgtStack.isEmpty()) {
 					canInsert = true;
+					maxInsertable = actualLimit;
 				} else if (ItemStack.isSameItemSameComponents(srcStack, tgtStack)) {
-					canInsert = tgtStack.getCount() < tgtEntry.getValue().slotLimit();
+					int remainingSpace = actualLimit - tgtStack.getCount();
+					if (remainingSpace > 0) {
+						canInsert = true;
+						maxInsertable = remainingSpace;
+					}
 				}
 
 				if (canInsert) {
-					int amountToTransfer = Math.min(srcStack.getCount(), source.getItemCount());
+					int amountToTransfer = Math.min(srcRemaining, maxInsertable);
 					if (amountToTransfer > 0) {
-						// Symmetrically write to the main-thread execution ring buffer [3]
-						manager.getExecutionBuffer().tryWrite(srcInventoryPos, srcSlot, tgtInventoryPos, tgtSlot,
-								srcStack, amountToTransfer);
-						return;
+						boolean success = manager.getExecutionBuffer().tryWrite(srcInventoryPos, srcSlot,
+								tgtInventoryPos, tgtSlot, srcStack, amountToTransfer);
+						if (success) {
+							// Copy FIRST before shrinking to preserve type and components completely [3]
+							if (tgtStack.isEmpty()) {
+								ItemStack newTgt = srcStack.copy();
+								newTgt.setCount(amountToTransfer);
+								tgtInv.slots().put(tgtSlot,
+										new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt, tgtEntry.slotLimit()));
+							} else {
+								tgtStack.grow(amountToTransfer);
+							}
+							srcStack.shrink(amountToTransfer);
+							srcRemaining -= amountToTransfer;
+						}
 					}
 				}
 			}

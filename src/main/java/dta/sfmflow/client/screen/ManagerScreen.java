@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.List;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
+import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
@@ -22,12 +23,14 @@ import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Main visual workspace representing ManagerBlock configurations [3]. Upgraded
- * with bottom drawer panels and scissor-locked scrolling lists [3].
+ * Main visual workspace representing ManagerBlock configurations [3]. Delegates
+ * mouse interactions directly to a clean helper handler class [3]. Upgraded to
+ * draw wires directly inside renderBg under the Painter's Algorithm [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
@@ -52,10 +55,66 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			Component title) {
 		super(menu, playerInventory, title);
 		this.imageWidth = 512;
-		this.imageHeight = 352; // Increased to accommodate bottom drawer panels [3]
+		this.imageHeight = 352;
 		this.mc = Minecraft.getInstance();
 		this.originalGuiScale = this.mc.options.guiScale().get();
 		this.mouseHandler = new ManagerMouseHandler(this);
+	}
+
+	/**
+	 * Evaluates if a given component has an unbound connected inventory error [3].
+	 * Upgraded to verify that the selected inventory ID actually exists on the
+	 * network [3].
+	 *
+	 * @param screen    active screen manager [3]
+	 * @param component flow component query [3]
+	 * @return true if the component has an unbound inventory error [3]
+	 */
+	public static boolean hasUnboundInventoryError(ManagerScreen screen, AbstractFlowComponent component) {
+		if (component instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
+			// 1. Check if bound inventory is actively connected to the network [3]
+			boolean foundBoundInventory = false;
+			if (transfer.getInventoryId() != -1) {
+				for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
+					if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
+						foundBoundInventory = true;
+						break;
+					}
+				}
+			}
+
+			// Flag error if unassigned or if the bound chest is disconnected [3]
+			if (transfer.getInventoryId() == -1 || !foundBoundInventory) {
+				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
+				for (var conn : connections) {
+					if (conn.getSourceComponentId().equals(transfer.getId())
+							|| conn.getTargetComponentId().equals(transfer.getId())) {
+						return true;
+					}
+				}
+			}
+
+			// 2. Empty Whitelist validation check [3]
+			if (transfer.isWhitelist()) {
+				boolean empty = true;
+				for (ItemStack stack : transfer.getFilterItems()) {
+					if (stack != null && !stack.isEmpty()) {
+						empty = false;
+						break;
+					}
+				}
+				if (empty) {
+					var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
+					for (var conn : connections) {
+						if (conn.getSourceComponentId().equals(transfer.getId())
+								|| conn.getTargetComponentId().equals(transfer.getId())) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -83,9 +142,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				}
 				scaleApplied = true;
 			} else {
-				SFMFlow.LOGGER.warn(
-						"[SFM-Flow] Window size is too small for configured FORCE_GUI_SCALE ({}). Falling back to adaptive scaling.",
-						forcedScale);
+				if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+					//SFMFlow.LOGGER.warn(
+					//		"[SFM-Flow] Window size is too small for configured FORCE_GUI_SCALE ({}). Falling back to adaptive scaling.",
+					//		forcedScale);
+				}
 			}
 		}
 
@@ -182,20 +243,16 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		int x = (width - imageWidth) / 2;
 		int y = (height - imageHeight) / 2;
 
-		// Draw top canvas (0-256)
 		guiGraphics.blit(GUI_BG1, x, y, 0, 0, 256, 256);
-		RenderSystem.setShaderTexture(1, GUI_BG2);
+		RenderSystem.setShaderTexture(0, GUI_BG2); // Standard unit 0 mapping [3]
 		guiGraphics.blit(GUI_BG2, x + 256, y, 0, 0, 256, 256);
 
-		// Draw bottom drawers panel (256-352) [3]
 		guiGraphics.fill(x, y + 256, x + 512, y + 352, 0xFF2B2B2B);
 		guiGraphics.renderOutline(x, y + 256, 512, 96, 0xFFD4AF37);
 
-		// Divider boundaries
 		guiGraphics.fill(x + 170, y + 256, x + 172, y + 352, 0xFF151515);
 		guiGraphics.fill(x + 342, y + 256, x + 344, y + 352, 0xFF151515);
 
-		// Player slots recess outlines
 		for (int r = 0; r < 3; r++) {
 			for (int c = 0; c < 9; c++) {
 				int slotX = x + 174 + c * 18;
@@ -210,6 +267,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			guiGraphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF151515);
 			guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF434343);
 		}
+
+		// 🔥 PAINTER'S ALGORITHM: Draw connection wires directly inside renderBg [3]
+		// Drawn on top of standard background panels, but beneath card widgets and
+		// overlays [3]
+		dta.sfmflow.client.render.VectorWireRenderer.renderWires(guiGraphics, this, mouseX, mouseY, partialTick);
 	}
 
 	@Override
@@ -223,17 +285,18 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		this.mouseHandler.updateTopHoveredElement(mouseX, mouseY);
 		this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
-		RenderSystem.enableDepthTest();
+		// Call standard render directly. Depth tests disabled to prevent projection
+		// clipping [3]
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
-
-		dta.sfmflow.client.render.VectorWireRenderer.renderWires(guiGraphics, this, mouseX, mouseY, partialTick);
-
-		RenderSystem.disableDepthTest();
 
 		int x = this.leftPos;
 		int y = this.topPos;
 
-		// Draw Left Column Variables (Inventory Groups) [3]
+		// Canvas boundary dimming: Symmetrically dims only the top canvas [3]
+		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
+			guiGraphics.fill(0, 0, this.width, y + 256, 0xD0000000);
+		}
+
 		guiGraphics.enableScissor(x + 4, y + 256, x + 166, y + 352);
 		var groupVars = getMenu().getManagerBlockEntity().getGroupVariables();
 		for (int i = 0; i < groupVars.size(); i++) {
@@ -248,7 +311,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 		guiGraphics.disableScissor();
 
-		// Draw Right Column Variables (Item Filters) [3]
 		guiGraphics.enableScissor(x + 346, y + 256, x + 508, y + 352);
 		var filterVars = getMenu().getManagerBlockEntity().getFilterVariables();
 		for (int i = 0; i < filterVars.size(); i++) {
@@ -263,12 +325,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 		guiGraphics.disableScissor();
 
-		// Render Translucent Dragging Variable [3]
 		if (this.mouseHandler.isDraggingVariable()) {
 			int drawX = mouseX - 40;
 			int drawY = mouseY - 7;
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, 700.0F); // Draw on top of panels
+			guiGraphics.pose().translate(0.0F, 0.0F, 700.0F);
 			guiGraphics.fill(drawX, drawY, drawX + 80, drawY + 14, 0xAA222222);
 			guiGraphics.renderOutline(drawX, drawY, 80, 14, 0xAAD4AF37);
 			guiGraphics.drawString(font, this.mouseHandler.getDraggedVariableName(), drawX + 4, drawY + 3, 0xAAFFFFFF,
@@ -304,7 +365,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				}
 			}
 		}
-		float baseZ = (maxZ * 10.0F) + 150.0F;
+		float baseZ = (maxZ * 2.0F) + 5.0F;
 
 		if (this.activeSubmenu != null) {
 			guiGraphics.pose().pushPose();
@@ -316,27 +377,23 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		if (this.openedDropdown != null) {
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 10.0F);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 2.0F);
 			this.openedDropdown.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
 		}
 
 		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
-			guiGraphics.fill(0, 0, this.width, this.height, 0xD0000000);
-
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, 600.0F);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 10.0F);
 			this.activeSettingsOverlay.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
 		}
 
 		if (this.activeModalPopup != null && this.activeModalPopup.visible) {
-			guiGraphics.fill(0, 0, this.width, this.height, 0x80000000);
-
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 200.0F);
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 20.0F);
 			this.activeModalPopup.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
@@ -351,6 +408,30 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			widget.setShowCustomTooltip(true);
 			widget.setIsHovered(true);
 		}
+	}
+
+	public FlowWidgetContainer getContainerOfWidget(GuiEventListener element) {
+		for (Renderable r : this.renderables) {
+			if (r instanceof FlowWidgetContainer container) {
+				if (container.children().contains(element)) {
+					return container;
+				}
+			}
+		}
+		return null;
+	}
+
+	public FlowWidgetBase getBaseOfWidget(GuiEventListener element) {
+		for (Renderable r : this.renderables) {
+			if (r instanceof FlowWidgetContainer container) {
+				for (GuiEventListener child : container.children()) {
+					if (child instanceof FlowWidgetBase base && base.children().contains(element)) {
+						return base;
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	private void resetFlagsRecursive(Renderable renderable) {
@@ -543,8 +624,21 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 	@Override
 	protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+		int commandWidth = this.font.width(Component.translatable("gui.sfmflow.commands", getMenu().getCommandCount()));
 		guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.commands", getMenu().getCommandCount()),
 				4, 244, 4210752, false);
+
+		int errorCount = 0;
+		for (var comp : getMenu().getManagerBlockEntity().getFlowComponents().values()) {
+			if (hasUnboundInventoryError(this, comp)) {
+				errorCount++;
+			}
+		}
+
+		if (errorCount > 0) {
+			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.errors", errorCount),
+					4 + commandWidth + 12, 244, 0xFFD00000, false);
+		}
 	}
 
 	public Font getFont() {
@@ -553,6 +647,10 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 	public boolean isElementHoverable(GuiEventListener element) {
 		return this.mouseHandler.isElementHoverable(element);
+	}
+
+	public ManagerMouseHandler getMouseHandler() {
+		return this.mouseHandler;
 	}
 
 	@Override
@@ -612,15 +710,5 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			refreshWidgetLayout();
 		}
 		}
-	}
-
-	/**
-	 * Retrieves the centralized Mouse Input Coordinator managing interaction
-	 * physics [3].
-	 *
-	 * @return the screen's mouseHandler context [3]
-	 */
-	public ManagerMouseHandler getMouseHandler() {
-		return this.mouseHandler;
 	}
 }

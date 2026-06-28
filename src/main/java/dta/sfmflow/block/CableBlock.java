@@ -9,14 +9,15 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.common.network.PhysicalNetwork;
 import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.common.network.NetworkMutationEngine;
 import dta.sfmflow.common.network.CableNetworkRegistry;
 import dta.sfmflow.registry.ModTags;
+import dta.sfmflow.util.ConnectionBlockType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -38,60 +39,44 @@ public class CableBlock extends Block {
 	@Override
 	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
 		if (!level.isClientSide()) {
-			BlockPos firstController = null;
-			boolean collision = false;
-
-			// 1. Verify adjacencies against the Single Controller Constraint [3]
-			for (Direction dir : Direction.values()) {
-				BlockPos adjacent = pos.relative(dir);
-				BlockPos controller = null;
-
-				if (level.getBlockState(adjacent).is(ModBlocks.MANAGER_BLOCK.get())) {
-					controller = adjacent;
-				} else {
-					controller = CableNetworkRegistry.getController(level, adjacent);
-				}
-
-				if (controller != null) {
-					if (firstController == null) {
-						firstController = controller;
-					} else if (!firstController.equals(controller)) {
-						collision = true;
-						break;
-					}
-				}
-			}
-
-			if (collision) {
-				// Cancel placement: set to Air, spawn dropped resource, and send warning [3]
-				level.setBlock(pos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
-				Block.popResource(level, pos, new ItemStack(state.getBlock().asItem()));
-
-				Player pPlayer = level.getNearestPlayer(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, 8.0,
-						false);
-				if (pPlayer != null) {
-					pPlayer.sendSystemMessage(Component.translatable("gui.sfmflow.multi_controller_collision")
-							.withStyle(ChatFormatting.RED));
-				}
-				return;
-			}
-
 			ManagerBlockEntity manager = findConnectedManager(level, pos);
 			if (manager != null) {
 				PhysicalNetwork network = manager.getPhysicalNetwork();
 				if (!network.isDirty()) {
-					// O(1) extension optimization path [3]
-					PhysicalNetworkMap map = network.getNetworkMap();
-					int newId = map.getOrAddNode(pos);
+					boolean touchesCapability = false;
+					// Check if any newly connected neighbor exposes inventory/fluid capabilities
+					// [3]
 					for (Direction dir : Direction.values()) {
 						BlockPos neighbor = pos.relative(dir);
-						int neighborId = map.getNodeId(neighbor);
-						if (neighborId != -1) {
-							map.addEdge(newId, neighborId);
+						BlockState nState = level.getBlockState(neighbor);
+						if (!nState.is(ModTags.CABLES) && !nState.is(ModBlocks.MANAGER_BLOCK.get())) {
+							BlockEntity be = level.getBlockEntity(neighbor);
+							for (ConnectionBlockType type : ConnectionBlockType.values()) {
+								if (type.isPresentAnywhere(level, neighbor, nState, be)) {
+									touchesCapability = true;
+									break;
+								}
+							}
 						}
+						if (touchesCapability)
+							break;
 					}
-					CableNetworkRegistry.registerCable(level, pos, manager.getBlockPos());
-					return;
+
+					if (!touchesCapability) {
+						// O(1) extension optimization path [3]
+						PhysicalNetworkMap map = network.getNetworkMap();
+						int newId = map.getOrAddNode(pos);
+						for (Direction dir : Direction.values()) {
+							BlockPos neighbor = pos.relative(dir);
+							int neighborId = map.getNodeId(neighbor);
+							if (neighborId != -1) {
+								map.addEdge(newId, neighborId);
+							}
+						}
+						CableNetworkRegistry.registerCable(level, pos, manager.getBlockPos());
+						super.onPlace(state, level, pos, oldState, isMoving);
+						return;
+					}
 				}
 			}
 			markNearbyNetworksDirty(level, pos);

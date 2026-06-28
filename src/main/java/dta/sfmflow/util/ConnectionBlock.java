@@ -4,6 +4,8 @@ import java.util.EnumSet;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -11,7 +13,6 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Declares scannable target inventory indices mapped to physical coordinates
- * [3]. Upgraded to cache NeoForge BlockCapabilityCache references on the server
  * [3].
  */
 public class ConnectionBlock implements IContainerSelection {
@@ -21,7 +22,6 @@ public class ConnectionBlock implements IContainerSelection {
 	private int id;
 	private boolean sleeping = false;
 
-	// NeoForge capability caches [3]
 	private BlockCapabilityCache<IItemHandler, Direction> itemCache;
 	private BlockCapabilityCache<IFluidHandler, Direction> fluidCache;
 
@@ -51,6 +51,14 @@ public class ConnectionBlock implements IContainerSelection {
 		this.sleeping = sleeping;
 	}
 
+	public int getCableDistance() {
+		return this.cableDistance;
+	}
+
+	public EnumSet<ConnectionBlockType> getTypes() {
+		return this.types;
+	}
+
 	public void setItemCache(BlockCapabilityCache<IItemHandler, Direction> itemCache) {
 		this.itemCache = itemCache;
 	}
@@ -60,12 +68,30 @@ public class ConnectionBlock implements IContainerSelection {
 	}
 
 	/**
-	 * Retrieves the cached IItemHandler capability [3]. Defensively returns null if
-	 * the target chunk unloads or the cache throws [3].
+	 * Resolves the localized display name of this block coordinate safely and
+	 * appends coordinates [3].
 	 *
-	 * @param side target block face [3]
-	 * @return IItemHandler instance, or null if sleeping [3]
+	 * @param level level context [3]
+	 * @return localized display text with block position info [3]
 	 */
+	public Component getDisplayName(Level level) {
+		Component baseName;
+		if (level != null) {
+			var state = level.getBlockState(this.blockPos);
+			if (!state.isAir()) {
+				baseName = state.getBlock().getName();
+			} else {
+				baseName = Component.literal("Inventory #" + this.id);
+			}
+		} else {
+			baseName = Component.literal("Inventory #" + this.id);
+		}
+		// Append coordinates directly inside display name to let player identify chest
+		// locations [3]
+		return Component.literal(baseName.getString() + " at (" + this.blockPos.getX() + ", " + this.blockPos.getY()
+				+ ", " + this.blockPos.getZ() + ")");
+	}
+
 	public @Nullable IItemHandler getItemHandler(@Nullable Direction side) {
 		if (this.sleeping || this.itemCache == null) {
 			return null;
@@ -73,17 +99,10 @@ public class ConnectionBlock implements IContainerSelection {
 		try {
 			return this.itemCache.getCapability();
 		} catch (IllegalStateException e) {
-			return null; // Defensive catch to protect against off-thread unload cycles [3]
+			return null;
 		}
 	}
 
-	/**
-	 * Retrieves the cached IFluidHandler capability [3]. Defensively returns null
-	 * if the target chunk unloads or the cache throws [3].
-	 *
-	 * @param side target block face [3]
-	 * @return IFluidHandler instance, or null if sleeping [3]
-	 */
 	public @Nullable IFluidHandler getFluidHandler(@Nullable Direction side) {
 		if (this.sleeping || this.fluidCache == null) {
 			return null;
@@ -91,7 +110,7 @@ public class ConnectionBlock implements IContainerSelection {
 		try {
 			return this.fluidCache.getCapability();
 		} catch (IllegalStateException e) {
-			return null; // Defensive catch to protect against off-thread unload cycles [3]
+			return null;
 		}
 	}
 

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.EnumSet;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -21,12 +22,16 @@ import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
+import dta.sfmflow.util.ConnectionBlockType;
 import dta.sfmflow.util.Variable;
 import dta.sfmflow.util.VariableColor;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -47,11 +52,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * Backing BlockEntity class for the Manager block [3]. Stores layout settings,
  * flowchart canvas data, and delegates scans to standalone network models [3].
- * Updated to reflect the simplified, compact component layout and purged NBT
- * properties [3]. Upgraded to serialize flat long arrays, perform first-tick
- * validation sweeps, and run chunk-safety filters [3]. Upgraded to process
- * lock-free circular ring buffer execution pipelines synchronously during ticks
- * [3].
  */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private final Variable[] variables;
@@ -63,11 +63,18 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 
-	// High-performance ring buffer pre-allocated to hold up to 1024 transfer frames
-	// [3]
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
+
 	private final List<dta.sfmflow.api.variable.InventoryGroupVariable> groupVariables = new java.util.ArrayList<>();
 	private final List<dta.sfmflow.api.variable.ItemFilterVariable> filterVariables = new java.util.ArrayList<>();
+
+	public List<dta.sfmflow.api.variable.InventoryGroupVariable> getGroupVariables() {
+		return this.groupVariables;
+	}
+
+	public List<dta.sfmflow.api.variable.ItemFilterVariable> getFilterVariables() {
+		return this.filterVariables;
+	}
 
 	/**
 	 * Instantiates a new Manager block entity and binds synchronized container
@@ -108,22 +115,14 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		return Component.translatable("block.sfmflow.manager_block");
 	}
 
-	/**
-	 * Retrieves the pre-allocated circular ring buffer managing cross-thread
-	 * execution transfers [3].
-	 *
-	 * @return circular ring buffer instance [3]
-	 */
 	public ExecutionRingBuffer getExecutionBuffer() {
 		return this.executionBuffer;
 	}
 
 	/**
 	 * Ticking loop driving pathfinder scanning sweeps on the physical server level
-	 * [3]. Upgraded with an offline first-tick verification sweep to inspect graph
-	 * sanity [3]. Upgraded to process lock-free circular ring buffer execution
-	 * pipelines synchronously during ticks [3]. Upgraded to periodically capture
-	 * and submit deep-copied planning snapshots off-thread [3].
+	 * [3]. Upgraded to evaluate timer triggers on every tick, and trigger
+	 * block-entity updates immediately upon scan completions [3].
 	 *
 	 * @param pLevel      world level instance [3]
 	 * @param pBlockPos   manager coordinates [3]
@@ -149,65 +148,88 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				}
 			}
 
-			// Synchronously poll and execute published tasks from the lock-free ring buffer
-			// [3]
+			// Synchronously poll and execute published tasks from the lock-free ring buffer [3]
 			this.executionBuffer.pollAndExecute(task -> {
-				// Query capabilities directly from the level instance [3]
+				// Query capabilities with Direction.UP side-context to resolve vanilla containers successfully [3]
 				var source = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
-						task.getSourcePos(), null);
+						task.getSourcePos(), Direction.UP);
 				var target = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
-						task.getTargetPos(), null);
+						task.getTargetPos(), Direction.UP);
+
+				if (source == null) {
+					source = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+							task.getSourcePos(), null);
+				}
+				if (target == null) {
+					target = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+							task.getTargetPos(), null);
+				}
 
 				if (source != null && target != null) {
-					// Re-verify that requested item parameters match physical slot configurations
-					// [3]
 					ItemStack simExtracted = source.extractItem(task.getSourceSlot(), task.getCount(), true);
 					if (ItemStack.isSameItemSameComponents(simExtracted, task.getItem())) {
-						ItemStack targetRemaining = target.insertItem(task.getTargetSlot(), simExtracted, true);
+						ItemStack targetRemaining;
+						if (task.getTargetSlot() != -1) {
+							targetRemaining = target.insertItem(task.getTargetSlot(), simExtracted, true);
+						} else {
+							targetRemaining = net.neoforged.neoforge.items.ItemHandlerHelper.insertItemStacked(target,
+									simExtracted, true);
+						}
+
 						int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
 
 						if (realTransferCount > 0) {
 							ItemStack realExtracted = source.extractItem(task.getSourceSlot(), realTransferCount,
 									false);
-							target.insertItem(task.getTargetSlot(), realExtracted, false);
+							if (task.getTargetSlot() != -1) {
+								target.insertItem(task.getTargetSlot(), realExtracted, false);
+							} else {
+								net.neoforged.neoforge.items.ItemHandlerHelper.insertItemStacked(target, realExtracted,
+										false);
+							}
 						}
 					}
 				}
 			});
 
-			// Submit background planning task dynamically every 10 server ticks [3]
-			if (pLevel.getGameTime() % 10 == 0) {
-				var snapshot = dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.create(this);
-				dta.sfmflow.kernel.FlowExecutionKernel.submitTask(this, snapshot);
+			// Symmetrical timer evaluation: gather all elapsed interval triggers [3]
+			List<UUID> activeTriggers = new ArrayList<>();
+			long currentTime = pLevel.getGameTime();
+			for (var comp : this.getFlowComponents().values()) {
+				if (comp instanceof dta.sfmflow.flowcomponents.IntervalTriggerComponent trigger) {
+					long elapsed = currentTime - trigger.getLastExecutionTick();
+
+					if (elapsed < 0) {
+						trigger.setLastExecutionTick(currentTime);
+					} else if (elapsed >= trigger.getTotalTicks()) {
+						trigger.setLastExecutionTick(currentTime);
+						activeTriggers.add(trigger.getId());
+					}
+				}
 			}
 
-			this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
+			// Only schedule planning runs if active triggers have actually elapsed [3]
+			if (!activeTriggers.isEmpty()) {
+				var snapshot = dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.create(this);
+				dta.sfmflow.kernel.FlowExecutionKernel.submitTask(this, snapshot, activeTriggers);
+			}
+
+			// Sync to client dynamically whenever physical cable topology changes [3]
+			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
+			if (scanned) {
+				this.setChanged(); // Force immediate client-side synchronizations! [3]
+			}
 		}
 	}
 
-	/**
-	 * Triggers a cable-network rebuild during the next scanning cycle [3].
-	 */
 	public void updateInventories() {
 		this.physicalNetwork.markDirty();
 	}
 
-	/**
-	 * Retrieves the physical network topology model [3].
-	 *
-	 * @return PhysicalNetwork coordinator [3]
-	 */
 	public PhysicalNetwork getPhysicalNetwork() {
 		return this.physicalNetwork;
 	}
 
-	/**
-	 * Exposes active connection blocks cached on our standalone network model [3].
-	 * Upgraded with a double-pass check querying graph sleep states and chunk
-	 * loading bounds [3].
-	 *
-	 * @return a list of scanned targets [3]
-	 */
 	public List<ConnectionBlock> getInventories() {
 		List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
 		if (this.level != null) {
@@ -247,6 +269,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			flatPosArray[idx++] = mappedPos.asLong();
 		}
 		pTag.putLongArray("ScannedCablePositions", flatPosArray);
+
 		dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
 				.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.groupVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
@@ -256,6 +279,23 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.filterVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 				.ifPresent(nbt -> pTag.put("FilterVariables", nbt));
+
+		// Serialize scanned inventories list to synchronize targets dynamically to the client [3]
+		ListTag invList = new ListTag();
+		for (ConnectionBlock inv : this.physicalNetwork.getScannedInventories()) {
+			CompoundTag invTag = new CompoundTag();
+			invTag.putLong("pos", inv.getBlockPos().asLong());
+			invTag.putInt("id", inv.getId());
+			invTag.putInt("distance", inv.getCableDistance());
+
+			ListTag typeList = new ListTag();
+			for (ConnectionBlockType type : inv.getTypes()) {
+				typeList.add(net.minecraft.nbt.StringTag.valueOf(type.name()));
+			}
+			invTag.put("types", typeList);
+			invList.add(invTag);
+		}
+		pTag.put("ScannedInventories", invList);
 
 		super.saveAdditional(pTag, pRegistries);
 	}
@@ -307,11 +347,35 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					});
 		}
 
-		commandCount = flowchart.components().size();
-	}
+		// Parse and cache the synchronized scanned inventories list on client [3]
+		if (pTag.contains("ScannedInventories")) {
+			ListTag invList = pTag.getList("ScannedInventories", Tag.TAG_COMPOUND);
+			List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
+			scanned.clear();
+			for (int i = 0; i < invList.size(); i++) {
+				CompoundTag invTag = invList.getCompound(i);
+				BlockPos pos = BlockPos.of(invTag.getLong("pos"));
+				int id = invTag.getInt("id");
+				int distance = invTag.getInt("distance");
 
-	private long[] getLongArrayHelper(CompoundTag tag) {
-		return tag.getLongArray("ScannedCablePositions");
+				ConnectionBlock inv = new ConnectionBlock(pos, distance);
+				inv.setId(id);
+
+				EnumSet<ConnectionBlockType> types = EnumSet.noneOf(ConnectionBlockType.class);
+				ListTag typeList = invTag.getList("types", Tag.TAG_STRING);
+				for (int k = 0; k < typeList.size(); k++) {
+					try {
+						types.add(ConnectionBlockType.valueOf(typeList.getString(k)));
+					} catch (IllegalArgumentException e) {
+						// Ignore unrecognized values
+					}
+				}
+				inv.setTypes(types);
+				scanned.add(inv);
+			}
+		}
+
+		commandCount = flowchart.components().size();
 	}
 
 	@Nullable
@@ -472,11 +536,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 						.sendToPlayer((net.minecraft.server.level.ServerPlayer) player, packet));
 	}
 
-	/**
-	 * Broadcasts connection update packets to all observing clients [3].
-	 *
-	 * @param packet the sync connection wire packet [3]
-	 */
 	public void broadcastConnectionsUpdate(dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket packet) {
 		if (this.level == null || this.level.isClientSide()) {
 			return;
@@ -496,13 +555,4 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private long[] dirOrdinals(long[] arr) {
 		return arr;
 	}
-
-	public List<dta.sfmflow.api.variable.InventoryGroupVariable> getGroupVariables() {
-		return this.groupVariables;
-	}
-
-	public List<dta.sfmflow.api.variable.ItemFilterVariable> getFilterVariables() {
-		return this.filterVariables;
-	}
-
 }

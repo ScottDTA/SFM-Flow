@@ -17,8 +17,10 @@ public class ModLanguageProvider extends LanguageProvider {
 
 	@Override
 	protected void addTranslations() {
+		// Creative Mode Tab Translation
 		add("itemGroup.sfmflow", "SFM-Flow");
 
+		// Block Translations
 		add(ModBlocks.MANAGER_BLOCK.get(), "Machine Inventory Manager");
 		add(ModBlocks.CABLE_BLOCK.get(), "Network Cable");
 		add(ModBlocks.HARDENED_CABLE_BLOCK.get(), "Hardened Network Cable");
@@ -28,7 +30,13 @@ public class ModLanguageProvider extends LanguageProvider {
 		add(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(), "Item Ejection Hatch");
 		add(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(), "Item Vacuum Hatch");
 		add(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), "Fluid Extraction Hatch");
+		add(ModBlocks.CABLE_CLUSTER_BLOCK.get(), "Standard Card Cluster");
+		add(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(), "Advanced Card Cluster");
 
+		add("container.sfmflow.cable_cluster", "Card Cluster");
+		add("container.sfmflow.advanced_cable_cluster", "Advanced Card Cluster");
+
+		// Sidebar Category & Menu Button Translations
 		add("gui.sfmflow.menu.trigger", "Trigger");
 		add("gui.sfmflow.menu.input", "Input");
 		add("gui.sfmflow.menu.output", "Output");
@@ -46,21 +54,26 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.menu.logic", "Logic");
 		add("gui.sfmflow.menu.utility", "Utility");
 
+		// Interval Trigger Configuration UI Labels
 		add("gui.sfmflow.time_unit", "Time Unit");
 		add("gui.sfmflow.interval_trigger", "Interval Trigger");
 		add("gui.sfmflow.commands", "Commands: %1$s");
 		add("gui.sfmflow.loading", "%1$s REQUESTS LOADING...");
 
+		// Integration & Type Labels
 		add("gui.sfmflow.type_inventory", "Inventory");
 
+		// Item Translations
 		add("item.sfmflow.test_item", "Test Item");
 
+		// Milestone 1.3 New Localization Entries [3]
 		add("gui.sfmflow.item_input", "Item Input");
 		add("gui.sfmflow.item_output", "Item Output");
 		add("sfmflow.configuration.maxNestedGroupDepth", "Max Nested Group Depth");
 		add("sfmflow.configuration.maxNestedGroupDepth.tooltip",
 				"The maximum allowable folder hierarchy nesting depth inside the manager.");
 
+		// Server-side limits and performance configuration translations
 		add("sfmflow.configuration.section.sfmflow.server.toml", "SFM-Flow Server Configs");
 		add("sfmflow.configuration.section.sfmflow.server.toml.limits", "Performance Limits");
 		add("sfmflow.configuration.section.sfmflow.server.toml.limits.tooltip",
@@ -81,8 +94,10 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.maxIntervalTicks.tooltip",
 				"The absolute maximum duration (in ticks) allowed for Interval Triggers.");
 
+		// Under Redstone/Capabilities translations inside ModLanguageProvider.java
 		add("gui.sfmflow.type_redstone", "Redstone");
 
+		// --- Dynamic Client Configuration Translations [3] ---
 		add("sfmflow.configuration.section.sfmflow.client.toml", "SFM-Flow Client Configurations");
 		add("sfmflow.configuration.section.sfmflow.client.toml.title", "SFM-Flow Client Configurations");
 		add("sfmflow.configuration.title", "SFM-Flow Client Configurations");
@@ -111,6 +126,7 @@ public class ModLanguageProvider extends LanguageProvider {
 			add("sfmflow.configuration." + name + ".button", capitalized + " Settings");
 		}
 
+		// --- Milestone 1.4 Config translation keys [3] ---
 		add("sfmflow.configuration.networkScanCooldown", "Network Scan Cooldown (Ticks)");
 		add("sfmflow.configuration.networkScanCooldown.tooltip",
 				"The minimum tick duration/cooldown required between consecutive physical cable network scans.");
@@ -119,8 +135,14 @@ public class ModLanguageProvider extends LanguageProvider {
 				"Enables verbose diagnostic logging of physical network BFS scans inside the server console.");
 		add("sfmflow.configuration.section.sfmflow.server.toml.title", "SFM-Flow Server Configs");
 		add("sfmflow.configuration.section.sfmflow.server.toml.limits.button", "Performance Limit Options");
+		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");
 
-		// Multi-controller collision Warning [3]
-		add("gui.sfmflow.multi_controller_collision", "Cannot bridge two separate manager networks!");
+		// --- Milestone 1.8 Client-Side Override keys [3] ---
+		add("sfmflow.configuration.forceGuiScale", "Force GUI Scale");
+		add("sfmflow.configuration.forceGuiScale.tooltip",
+				"Force a specific GUI scale when opening the Machine Inventory Manager screen. Set to 0 to use standard adaptive auto-scaling.");
+
+		// --- Symmetrical Variables Drawers and Error translation keys [3] ---
+		add("gui.sfmflow.errors", "Errors: %1$s");
 	}
 }

@@ -6,22 +6,27 @@ import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.GradientBlitUtil;
+import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.util.Color;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Basic panel base class rendering compact visual cards [3].
+ * Basic panel base class rendering compact visual cards [3]. Upgraded to
+ * dynamically process error indicator lines and outline highlights [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class FlowWidgetBase extends AbstractFlowWidget {
 	private static final ResourceLocation COMPONENT_MIN_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/flowcomponents/component_min_bg.png");
+	private static final ResourceLocation ERROR_INDICATOR = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/error_indicator.png");
 
 	private final FlowWidgetContainer container;
 	private FlowWidgetMoveButton moveButton;
@@ -42,9 +47,6 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 					return mask != null ? mask.getHexTextColor() : 4210752;
 				});
 		this.children.add(this.titleText);
-
-		// Purged: No FlowWidgetOpenCloseButton added here, keeping visual footprint
-		// locked [3]
 	}
 
 	@Override
@@ -56,9 +58,30 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 
 		org.joml.Matrix4f matrix = guiGraphics.pose().last().pose();
 
-		// Symmetrical visual bounds: Render min background only [3]
+		// Check error state dynamically [3]
+		boolean hasError = ManagerScreen.hasUnboundInventoryError(container.getParent(), comp);
+
+		// Adjust title text position depending on error state [3]
+		if (hasError) {
+			this.titleText.setX(getX() + 10);
+		} else {
+			this.titleText.setX(getX() + 4);
+		}
+
 		GradientBlitUtil.blitWithGradient(matrix, COMPONENT_MIN_BG, getX(), getY(), 64, 20, 0.0F, 0.0F, 64, 20, 64, 20,
 				comp.getColorMask());
+
+		// Draw red outline and error indicator if card is in error state [3]
+		if (hasError) {
+			guiGraphics.renderOutline(getX(), getY(), 64, 20, 0xFFFF0000); // Red card outline [3]
+
+			int vOffset = 0;
+			// Check mouse hover over the indicator position [3]
+			if (mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
+				vOffset = 14; // Hovered state V offset [3]
+			}
+			guiGraphics.blit(ERROR_INDICATOR, getX() + 4, getY() + 3, 0, vOffset, 4, 14, 4, 28);
+		}
 
 		for (GuiEventListener child : children) {
 			if (child instanceof AbstractFlowWidget widget) {
@@ -67,6 +90,26 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 				widget.render(guiGraphics, mouseX, mouseY, partialTick);
 			}
 		}
+
+		// Render tooltip directly if indicator is hovered [3]
+		  if (hasError && mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
+		        Component errorMsg = Component.translatable("gui.sfmflow.error.unbound_inventory");
+		        if (comp instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
+		            if (transfer.getInventoryId() != -1 && transfer.isWhitelist()) {
+		                boolean empty = true;
+		                for (ItemStack stack : transfer.getFilterItems()) {
+		                    if (stack != null && !stack.isEmpty()) {
+		                        empty = false;
+		                        break;
+		                    }
+		                }
+		                if (empty) {
+		                    errorMsg = Component.translatable("gui.sfmflow.error.empty_whitelist");
+		                }
+		            }
+		        }
+		        guiGraphics.renderTooltip(container.getParent().getFont(), errorMsg, mouseX, mouseY);
+		    }
 	}
 
 	public FlowWidgetContainer getContainer() {

@@ -1,7 +1,9 @@
 package dta.sfmflow.api.execution;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
@@ -15,26 +17,20 @@ import java.util.Map;
 /**
  * Immutable thread-safe snapshot container holding deep copies of target
  * inventory slot configurations [3]. Instantiated strictly on the main server
- * thread to prevent concurrency collisions during evaluation runs [3].
+ * thread to prevent concurrency collisions during evaluation runs [3]. Upgraded
+ * to query block capabilities using standard sided contexts [3].
  */
 public final class ThreadSafeInventorySnapshot {
 
-	/**
-	 * A deep-copied snapshot of an individual inventory slot's item stack and max
-	 * limit [3].
-	 */
 	public record SlotSnapshot(ItemStack stack, int slotLimit) {
 		public SlotSnapshot {
 			stack = stack.copy(); // Ensure a deep copy of the ItemStack [3]
 		}
 	}
 
-	/**
-	 * Encapsulates unmodifiable slot snapshots for a targeted block coordinate [3].
-	 */
 	public record InventorySnapshot(Map<Integer, SlotSnapshot> slots) {
 		public InventorySnapshot(Map<Integer, SlotSnapshot> slots) {
-			this.slots = Collections.unmodifiableMap(new HashMap<>(slots));
+			this.slots = new HashMap<>(slots);
 		}
 	}
 
@@ -42,6 +38,20 @@ public final class ThreadSafeInventorySnapshot {
 
 	private ThreadSafeInventorySnapshot(Map<BlockPos, InventorySnapshot> snapshotMap) {
 		this.snapshotMap = Collections.unmodifiableMap(new HashMap<>(snapshotMap));
+	}
+
+	/**
+	 * Resolves the inventory capability safely, utilizing sided contexts for
+	 * vanilla container compatibility [3].
+	 */
+	public static @Nullable IItemHandler getItemHandler(Level level, BlockPos pos) {
+		// Query with Direction.UP to ensure standard containers return their capability
+		// [3]
+		IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
+		if (handler != null) {
+			return handler;
+		}
+		return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
 	}
 
 	/**
@@ -58,7 +68,7 @@ public final class ThreadSafeInventorySnapshot {
 			for (ConnectionBlock block : manager.getInventories()) {
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
-					IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+					IItemHandler handler = getItemHandler(level, pos);
 					if (handler != null) {
 						Map<Integer, SlotSnapshot> slots = new HashMap<>();
 						int count = handler.getSlots();
@@ -74,8 +84,7 @@ public final class ThreadSafeInventorySnapshot {
 		return new ThreadSafeInventorySnapshot(map);
 	}
 
-	@Nullable
-	public InventorySnapshot getInventory(BlockPos pos) {
+	public @Nullable InventorySnapshot getInventory(BlockPos pos) {
 		return snapshotMap.get(pos);
 	}
 

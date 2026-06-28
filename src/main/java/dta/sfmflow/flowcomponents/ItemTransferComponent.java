@@ -7,26 +7,32 @@ import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * Unified logic component handling both item inputs (extractions) and item
  * outputs (depositions) [3]. Upgraded to serialize optional group and filter
- * variable mappings safely [3].
+ * variables and 12-slot Whitelist/Blacklist item arrays [3]. Utilizes
+ * ItemStack.OPTIONAL_CODEC to allow empty slot serialization safely.
  */
 public class ItemTransferComponent extends AbstractFlowComponent {
 	private final boolean isInput;
 	private int inventoryId = -1;
 	private boolean useAll = true;
 	private int targetSlot = -1;
-	private int itemCount = 64;
 
-	// Optional bound variables [3]
 	private UUID boundGroupVariableId = null;
 	private UUID boundFilterVariableId = null;
+
+	// Symmetrical Filter Variables [3]
+	private boolean whitelist = true;
+	private final List<ItemStack> filterItems = new java.util.ArrayList<>();
 
 	public static final MapCodec<ItemTransferComponent> INPUT_CODEC = makeCodec(true);
 	public static final MapCodec<ItemTransferComponent> OUTPUT_CODEC = makeCodec(false);
@@ -37,22 +43,31 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 						Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemTransferComponent::getInventoryId),
 						Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
 						Codec.INT.optionalFieldOf("targetSlot", -1).forGetter(ItemTransferComponent::getTargetSlot),
-						Codec.INT.optionalFieldOf("itemCount", 64).forGetter(ItemTransferComponent::getItemCount),
 						UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
 								.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
 						UUIDUtil.CODEC.optionalFieldOf("boundFilterVariableId")
-								.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())))
-				.apply(instance, (baseProps, invId, useAllVal, slot, count, groupVar, filterVar) -> {
-					ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
-					comp.setBaseProperties(baseProps);
-					comp.inventoryId = invId;
-					comp.useAll = useAllVal;
-					comp.targetSlot = slot;
-					comp.itemCount = count;
-					comp.boundGroupVariableId = groupVar.orElse(null);
-					comp.boundFilterVariableId = filterVar.orElse(null);
-					return comp;
-				}));
+								.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())),
+						Codec.BOOL.optionalFieldOf("whitelist", true).forGetter(ItemTransferComponent::isWhitelist),
+						// Upgraded to OPTIONAL_CODEC to support empty ghost slots cleanly
+						ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
+								.forGetter(ItemTransferComponent::getFilterItems))
+				.apply(instance,
+						(baseProps, invId, useAllVal, slot, groupVar, filterVar, whitelistVal, filtersList) -> {
+							ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
+							comp.setBaseProperties(baseProps);
+							comp.inventoryId = invId;
+							comp.useAll = useAllVal;
+							comp.targetSlot = slot;
+							comp.boundGroupVariableId = groupVar.orElse(null);
+							comp.boundFilterVariableId = filterVar.orElse(null);
+							comp.whitelist = whitelistVal;
+							comp.filterItems.clear();
+							comp.filterItems.addAll(filtersList);
+							while (comp.filterItems.size() < 12) {
+								comp.filterItems.add(ItemStack.EMPTY);
+							}
+							return comp;
+						}));
 	}
 
 	public ItemTransferComponent(UUID uuid, boolean isInput) {
@@ -62,6 +77,9 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 		this.numInputs = 1;
 		this.hasOutputNodes = true;
 		this.numOutputs = 1;
+		for (int i = 0; i < 12; i++) {
+			this.filterItems.add(ItemStack.EMPTY);
+		}
 	}
 
 	public boolean isInput() {
@@ -92,14 +110,6 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 		this.targetSlot = targetSlot;
 	}
 
-	public int getItemCount() {
-		return itemCount;
-	}
-
-	public void setItemCount(int itemCount) {
-		this.itemCount = itemCount;
-	}
-
 	public @Nullable UUID getBoundGroupVariableId() {
 		return boundGroupVariableId;
 	}
@@ -114,6 +124,18 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 
 	public void setBoundFilterVariableId(@Nullable UUID id) {
 		this.boundFilterVariableId = id;
+	}
+
+	public boolean isWhitelist() {
+		return whitelist;
+	}
+
+	public void setWhitelist(boolean whitelist) {
+		this.whitelist = whitelist;
+	}
+
+	public List<ItemStack> getFilterItems() {
+		return filterItems;
 	}
 
 	@Override
@@ -131,9 +153,14 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 					this.inventoryId = decoded.getInventoryId();
 					this.useAll = decoded.isUseAll();
 					this.targetSlot = decoded.getTargetSlot();
-					this.itemCount = decoded.getItemCount();
 					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
 					this.boundFilterVariableId = decoded.getBoundFilterVariableId();
+					this.whitelist = decoded.isWhitelist();
+					this.filterItems.clear();
+					this.filterItems.addAll(decoded.getFilterItems());
+					while (this.filterItems.size() < 12) {
+						this.filterItems.add(ItemStack.EMPTY);
+					}
 				});
 	}
 

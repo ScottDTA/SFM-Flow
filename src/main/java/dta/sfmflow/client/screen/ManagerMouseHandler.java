@@ -40,7 +40,6 @@ public class ManagerMouseHandler {
 	private double wiringCurrentMouseX = 0;
 	private double wiringCurrentMouseY = 0;
 
-	// Interactive Drag-and-Drop Variables Caching [3]
 	private UUID activeDraggedVariableId = null;
 	private boolean isDraggingGroupVariable = false;
 	private String draggedVariableName = "";
@@ -110,8 +109,18 @@ public class ManagerMouseHandler {
 
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (screen.getActiveSettingsOverlay() != null) {
-			screen.getActiveSettingsOverlay().mouseClicked(mouseX, mouseY, button);
-			return true;
+			var overlay = screen.getActiveSettingsOverlay();
+			int ox = overlay.getX();
+			int oy = overlay.getY();
+			int ow = overlay.getWidth();
+			int oh = overlay.getHeight();
+
+			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
+				overlay.mouseClicked(mouseX, mouseY, button);
+				return true;
+			} else {
+				return false; // Fall through: lets players click container items cleanly [3]
+			}
 		}
 
 		if (screen.getActiveModalPopup() != null) {
@@ -139,11 +148,9 @@ public class ManagerMouseHandler {
 			return true;
 		}
 
-		// Variable Drawer click checking [3]
 		int x = screen.getLeftPos();
 		int y = screen.getTopPos();
 		if (button == 0) {
-			// Left Drawer (Inventory Groups) [3]
 			if (mouseX >= x + 4 && mouseX < x + 166 && mouseY >= y + 256 && mouseY < y + 352) {
 				var groupVars = screen.getMenu().getManagerBlockEntity().getGroupVariables();
 				int clickedIdx = (int) ((mouseY - (y + 260)) / 16);
@@ -155,7 +162,6 @@ public class ManagerMouseHandler {
 				}
 			}
 
-			// Right Drawer (Item Filters) [3]
 			if (mouseX >= x + 346 && mouseX < x + 508 && mouseY >= y + 256 && mouseY < y + 352) {
 				var filterVars = screen.getMenu().getManagerBlockEntity().getFilterVariables();
 				int clickedIdx = (int) ((mouseY - (y + 260)) / 16);
@@ -237,8 +243,17 @@ public class ManagerMouseHandler {
 
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
 		if (screen.getActiveSettingsOverlay() != null) {
-			screen.getActiveSettingsOverlay().mouseDragged(mouseX, mouseY, button, dragX, dragY);
-			return true;
+			var overlay = screen.getActiveSettingsOverlay();
+			int ox = overlay.getX();
+			int oy = overlay.getY();
+			int ow = overlay.getWidth();
+			int oh = overlay.getHeight();
+			// Checks overlay coordinate bounds cleanly [3]
+			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
+				overlay.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+				return true;
+			}
+			return false;
 		}
 
 		if (screen.getActiveModalPopup() != null) {
@@ -252,7 +267,6 @@ public class ManagerMouseHandler {
 			return true;
 		}
 
-		// Track active variables dragging [3]
 		if (this.activeDraggedVariableId != null) {
 			return true;
 		}
@@ -269,8 +283,17 @@ public class ManagerMouseHandler {
 
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
 		if (screen.getActiveSettingsOverlay() != null) {
-			screen.getActiveSettingsOverlay().mouseReleased(mouseX, mouseY, button);
-			return true;
+			var overlay = screen.getActiveSettingsOverlay();
+			int ox = overlay.getX();
+			int oy = overlay.getY();
+			int ow = overlay.getWidth();
+			int oh = overlay.getHeight();
+			// Checks overlay coordinate bounds cleanly [3]
+			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
+				overlay.mouseReleased(mouseX, mouseY, button);
+				return true;
+			}
+			return false;
 		}
 
 		if (screen.getActiveModalPopup() != null) {
@@ -293,7 +316,6 @@ public class ManagerMouseHandler {
 			return true;
 		}
 
-		// Finalize variables drop hit-testing on cards [3]
 		if (button == 0 && this.activeDraggedVariableId != null) {
 			FlowWidgetBase hitBase = getTopBaseAt(mouseX, mouseY);
 			if (hitBase != null) {
@@ -369,7 +391,7 @@ public class ManagerMouseHandler {
 			}
 		}
 
-		GuiEventListener topElement = getTopHoveredElement();
+		GuiEventListener topElement = getTopElementAt(mouseX, mouseY);
 		if (topElement != null && topElement.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) {
 			return true;
 		}
