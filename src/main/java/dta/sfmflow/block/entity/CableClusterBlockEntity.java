@@ -29,13 +29,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * Backing block entity logic running cluster card proxy sweeps, pre-allocated
  * directional capability routing, staggered logic executions, and adjacent pipe
- * cache flush notifications [3]. Upgraded to utilize 1.21.1 Data Components to
- * check card NBT data safely [3].
+ * cache flush notifications [3]. Fully cleaned to delegate execution behavior to
+ * HatchBehaviorHelper [3].
  */
 public class CableClusterBlockEntity extends BlockEntity implements MenuProvider {
 	private final int numSlots;
@@ -50,13 +49,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 	private final ItemStackHandler[] slotBuffers;
 	private final FluidTank[] fluidBuffers;
 
-	/**
-	 * Instantiates the CableClusterBlockEntity and pre-allocates proxy handlers
-	 * [3].
-	 *
-	 * @param pos   coordinate positions [3]
-	 * @param state block behavior parameters [3]
-	 */
 	public CableClusterBlockEntity(BlockPos pos, BlockState state) {
 		super(ModBlockEntities.CABLE_CLUSTER_BE.get(), pos, state);
 		this.numSlots = state.is(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get()) ? 18 : 9;
@@ -102,9 +94,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		}
 	}
 
-	/**
-	 * Forces immediate cache invalidations across connected networks and pipes [3].
-	 */
 	public void notifyNeighbors() {
 		if (this.level != null && !this.level.isClientSide()) {
 			this.level.updateNeighborsAt(this.worldPosition, this.getBlockState().getBlock());
@@ -127,10 +116,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		return null;
 	}
 
-	/**
-	 * Cycles the slot configuration's face routing, triggering adjacent pipeline
-	 * flush notifications [3].
-	 */
 	public void setSlotDirection(int slot, int ordinal) {
 		if (slot >= 0 && slot < numSlots) {
 			Direction dir = (ordinal == -1 || ordinal < 0 || ordinal >= 6) ? null : Direction.values()[ordinal];
@@ -179,10 +164,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		return this.fluidBuffers[slot];
 	}
 
-	/**
-	 * Ticking loop scanning hardware items inside slots and executing modular sweep
-	 * actions [3].
-	 */
 	public static void tick(Level level, BlockPos pos, BlockState state, CableClusterBlockEntity be) {
 		if (level.isClientSide()) {
 			return;
@@ -197,102 +178,24 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 				continue;
 			}
 			if (stack.is(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get().asItem())) {
-				be.tickVacuum(i, dir);
-			} else if (stack.is(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get().asItem())) {
-				be.tickEjection(i, dir);
-			} else if (stack.is(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem())) {
-				be.tickFluidHatch(i, dir);
-			}
-		}
-	}
-
-	private void tickVacuum(int slotIdx, Direction dir) {
-		if ((this.level.getGameTime() + slotIdx) % 10 != 0) {
-			return;
-		}
-		BlockPos targetPos = this.worldPosition.relative(dir);
-		net.minecraft.world.phys.AABB area = new net.minecraft.world.phys.AABB(targetPos).inflate(1.0);
-		List<net.minecraft.world.entity.item.ItemEntity> items = this.level.getEntitiesOfClass(
-				net.minecraft.world.entity.item.ItemEntity.class, area,
-				item -> item.isAlive() && !item.hasPickUpDelay());
-		for (net.minecraft.world.entity.item.ItemEntity item : items) {
-			ItemStack stack = item.getItem();
-			ItemStack remaining = this.slotBuffers[slotIdx].insertItem(0, stack, false);
-			if (remaining.isEmpty()) {
-				item.discard();
-			} else {
-				item.setItem(remaining);
-			}
-			this.setChanged();
-		}
-	}
-
-	private void tickEjection(int slotIdx, Direction dir) {
-		if ((this.level.getGameTime() + slotIdx) % 4 != 0) {
-			return;
-		}
-		ItemStack stackInSlot = this.slotBuffers[slotIdx].getStackInSlot(0);
-		if (stackInSlot.isEmpty()) {
-			return;
-		}
-		BlockPos mouthPos = this.worldPosition.relative(dir);
-		net.minecraft.world.phys.AABB mouthBox = new net.minecraft.world.phys.AABB(mouthPos);
-		List<net.minecraft.world.entity.item.ItemEntity> existingEntities = this.level
-				.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class, mouthBox);
-		if (existingEntities.size() >= 8) {
-			return; // Crowding limit check [3]
-		}
-		int toExtract = Math.min(stackInSlot.getMaxStackSize(), stackInSlot.getCount());
-		ItemStack ejectStack = this.slotBuffers[slotIdx].extractItem(0, toExtract, false);
-		if (!ejectStack.isEmpty()) {
-			double spawnX = mouthPos.getX() + 0.5;
-			double spawnY = mouthPos.getY() + 0.5;
-			double spawnZ = mouthPos.getZ() + 0.5;
-			net.minecraft.world.entity.item.ItemEntity itemEntity = new net.minecraft.world.entity.item.ItemEntity(
-					this.level, spawnX, spawnY, spawnZ, ejectStack);
-			itemEntity.setDeltaMovement(dir.getStepX() * 0.2, dir.getStepY() * 0.2 + 0.1, dir.getStepZ() * 0.2);
-			this.level.addFreshEntity(itemEntity);
-			this.setChanged();
-		}
-	}
-
-	private void tickFluidHatch(int slotIdx, Direction dir) {
-		if ((this.level.getGameTime() + slotIdx) % 10 != 0) {
-			return;
-		}
-		ItemStack stack = this.inventory.getStackInSlot(slotIdx);
-		String modeStr = "vacuum";
-
-		// Upgraded component checking: query 1.21.1 Custom Data tags [3]
-		CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-		if (tag.contains("mode")) {
-			modeStr = tag.getString("mode");
-		}
-
-		BlockPos mouthPos = this.worldPosition.relative(dir);
-		if ("vacuum".equals(modeStr)) {
-			net.minecraft.world.level.material.FluidState fluidState = this.level.getFluidState(mouthPos);
-			if (fluidState.isSource()) {
-				net.minecraft.world.level.material.Fluid fluid = fluidState.getType();
-				net.neoforged.neoforge.fluids.FluidStack sample = new net.neoforged.neoforge.fluids.FluidStack(fluid,
-						1000);
-				int accepted = this.fluidBuffers[slotIdx].fill(sample, IFluidHandler.FluidAction.SIMULATE);
-				if (accepted == 1000) {
-					this.fluidBuffers[slotIdx].fill(sample, IFluidHandler.FluidAction.EXECUTE);
-					this.level.setBlock(mouthPos, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
-					this.setChanged();
+				if ((level.getGameTime() + i) % 10 == 0) {
+					HatchBehaviorHelper.performVacuum(level, pos, dir, be.slotBuffers[i], be::setChanged);
 				}
-			}
-		} else {
-			FluidStack stored = this.fluidBuffers[slotIdx].getFluid();
-			if (stored.getAmount() >= 1000) {
-				BlockState mouthState = this.level.getBlockState(mouthPos);
-				if (mouthState.isAir() || mouthState.canBeReplaced(stored.getFluid())) {
-					BlockState fluidBlockState = stored.getFluid().defaultFluidState().createLegacyBlock();
-					if (!fluidBlockState.isAir()) {
-						this.level.setBlock(mouthPos, fluidBlockState, 3);
-						this.fluidBuffers[slotIdx].drain(1000, IFluidHandler.FluidAction.EXECUTE);
-						this.setChanged();
+			} else if (stack.is(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get().asItem())) {
+				if ((level.getGameTime() + i) % 4 == 0) {
+					HatchBehaviorHelper.performEjection(level, pos, dir, be.slotBuffers[i], be::setChanged);
+				}
+			} else if (stack.is(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem())) {
+				if ((level.getGameTime() + i) % 10 == 0) {
+					String modeStr = "vacuum";
+					CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+					if (tag.contains("mode")) {
+						modeStr = tag.getString("mode");
+					}
+					if ("vacuum".equals(modeStr)) {
+						HatchBehaviorHelper.performFluidVacuum(level, pos, dir, be.fluidBuffers[i], be::setChanged);
+					} else {
+						HatchBehaviorHelper.performFluidEjection(level, pos, dir, be.fluidBuffers[i], be::setChanged);
 					}
 				}
 			}
@@ -397,33 +300,18 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 
 		@Override
 		public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-			if (stack.isEmpty())
+			if (stack.isEmpty()) {
 				return ItemStack.EMPTY;
-			ItemStack remaining = stack.copy();
-			for (int i = 0; i < parent.numSlots; i++) {
-				if (parent.slotDirections[i] == direction && parent.isItemCard(i)) {
-					remaining = parent.slotBuffers[i].insertItem(0, remaining, simulate);
-					if (remaining.isEmpty()) {
-						break;
-					}
-				}
 			}
-			return remaining;
+			return parent.slotBuffers[slot].insertItem(0, stack, simulate);
 		}
 
 		@Override
 		public ItemStack extractItem(int slot, int amount, boolean simulate) {
-			if (amount <= 0)
+			if (amount <= 0) {
 				return ItemStack.EMPTY;
-			for (int i = 0; i < parent.numSlots; i++) {
-				if (parent.slotDirections[i] == direction && parent.isItemCard(i)) {
-					ItemStack extracted = parent.slotBuffers[i].extractItem(0, amount, simulate);
-					if (!extracted.isEmpty()) {
-						return extracted;
-					}
-				}
 			}
-			return ItemStack.EMPTY;
+			return parent.slotBuffers[slot].extractItem(0, amount, simulate);
 		}
 
 		@Override

@@ -8,6 +8,7 @@ import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
@@ -269,4 +270,178 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		}
 		return Component.translatable(isInput ? "gui.sfmflow.item_input" : "gui.sfmflow.item_output");
 	}
+	
+	@Override
+	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
+		if (this.isInput()) {
+			for (dta.sfmflow.flowcomponents.FlowComponentConnections conn : context.getConnections()) {
+				if (conn.getSourceComponentId().equals(this.getId())) {
+					AbstractFlowComponent targetComponent = context.getComponents().get(conn.getTargetComponentId());
+					if (targetComponent instanceof ItemTransferComponent targetOutput && !targetOutput.isInput()) {
+						planItemTransfer(context, this, targetOutput);
+						context.enqueue(targetOutput.getId());
+					}
+				}
+			}
+		}
+	}
+
+	private void planItemTransfer(dta.sfmflow.api.execution.FlowchartPlanningContext context, ItemTransferComponent source, ItemTransferComponent target) {
+		var inventories = context.getConnectedInventories();
+		BlockPos srcInventoryPos = null;
+		BlockPos tgtInventoryPos = null;
+
+		for (var block : inventories) {
+			if (block.getId() == source.getInventoryId()) {
+				srcInventoryPos = block.getBlockPos();
+			}
+			if (block.getId() == target.getInventoryId()) {
+				tgtInventoryPos = block.getBlockPos();
+			}
+		}
+
+		if (srcInventoryPos == null || tgtInventoryPos == null) {
+			return;
+		}
+
+		java.util.List<Direction> activeSrcSides = new java.util.ArrayList<>();
+		for (Direction dir : Direction.values()) {
+			if (source.isSideActive(dir)) {
+				activeSrcSides.add(dir);
+			}
+		}
+		if (activeSrcSides.isEmpty()) {
+			activeSrcSides.add(null);
+		}
+
+		java.util.List<Direction> activeTgtSides = new java.util.ArrayList<>();
+		for (Direction dir : Direction.values()) {
+			if (target.isSideActive(dir)) {
+				activeTgtSides.add(dir);
+			}
+		}
+		if (activeTgtSides.isEmpty()) {
+			activeTgtSides.add(null);
+		}
+
+		for (Direction srcSide : activeSrcSides) {
+			var srcInv = context.getSnapshot().getInventory(srcInventoryPos, srcSide);
+			if (srcInv == null)
+				continue;
+
+			for (Direction tgtSide : activeTgtSides) {
+				var tgtInv = context.getSnapshot().getInventory(tgtInventoryPos, tgtSide);
+				if (tgtInv == null)
+					continue;
+
+				java.util.List<Integer> sortedSrcSlots = new java.util.ArrayList<>(srcInv.slots().keySet());
+				java.util.Collections.sort(sortedSrcSlots);
+
+				java.util.List<Integer> sortedTgtSlots = new java.util.ArrayList<>(tgtInv.slots().keySet());
+				java.util.Collections.sort(sortedTgtSlots);
+
+				for (int srcSlot : sortedSrcSlots) {
+					dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.SlotSnapshot srcEntry = srcInv.slots().get(srcSlot);
+					ItemStack srcStack = srcEntry.stack();
+					if (srcStack.isEmpty()) {
+						continue;
+					}
+
+					if (source.getTargetSlot() != -1 && source.getTargetSlot() != srcSlot) {
+						continue;
+					}
+
+					int mainSrcSlot = srcEntry.mainSlotIndex();
+					if (!source.isSlotEnabled(srcSide, mainSrcSlot)) {
+						continue;
+					}
+
+					if (!matchesFilter(source, srcStack)) {
+						continue;
+					}
+
+					int srcRemaining = srcStack.getCount();
+
+					for (int tgtSlot : sortedTgtSlots) {
+						if (srcRemaining <= 0) {
+							break;
+						}
+
+						dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
+						ItemStack tgtStack = tgtEntry.stack();
+
+						if (target.getTargetSlot() != -1 && target.getTargetSlot() != tgtSlot) {
+							continue;
+						}
+
+						int mainTgtSlot = tgtEntry.mainSlotIndex();
+						if (!target.isSlotEnabled(tgtSide, mainTgtSlot)) {
+							continue;
+						}
+
+						if (!matchesFilter(target, srcStack)) {
+							continue;
+						}
+
+						boolean canInsert = false;
+						int maxInsertable = 0;
+
+						int actualLimit = Math.min(tgtEntry.slotLimit(), srcStack.getMaxStackSize());
+
+						if (tgtStack.isEmpty()) {
+							canInsert = true;
+							maxInsertable = actualLimit;
+						} else if (ItemStack.isSameItemSameComponents(srcStack, tgtStack)) {
+							int remainingSpace = actualLimit - tgtStack.getCount();
+							if (remainingSpace > 0) {
+								canInsert = true;
+								maxInsertable = remainingSpace;
+							}
+						}
+
+						if (canInsert) {
+							int amountToTransfer = Math.min(srcRemaining, maxInsertable);
+							if (amountToTransfer > 0) {
+								boolean success = context.tryWriteTask(srcInventoryPos, srcSlot,
+										srcSide, tgtInventoryPos, tgtSlot, tgtSide, srcStack, amountToTransfer);
+								if (success) {
+									if (tgtStack.isEmpty()) {
+										ItemStack newTgt = srcStack.copy();
+										newTgt.setCount(amountToTransfer);
+										tgtInv.slots().put(tgtSlot, new dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
+												tgtEntry.slotLimit(), mainTgtSlot));
+									} else {
+										tgtStack.grow(amountToTransfer);
+									}
+									srcStack.shrink(amountToTransfer);
+									srcRemaining -= amountToTransfer;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private boolean matchesFilter(ItemTransferComponent component, ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+
+		boolean found = false;
+		for (ItemStack filter : component.getFilterItems()) {
+			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
+				found = true;
+				break;
+			}
+		}
+
+		if (component.isWhitelist()) {
+			return found;
+		} else {
+			return !found;
+		}
+	}
+	
 }

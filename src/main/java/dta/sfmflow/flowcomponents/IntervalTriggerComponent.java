@@ -140,4 +140,14 @@ public class IntervalTriggerComponent extends AbstractTriggerComponent
      }
     return Component.translatable("gui.sfmflow.interval_trigger");
    }
+  
+  @Override
+	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
+		for (FlowComponentConnections conn : context.getConnections()) {
+			if (conn.getSourceComponentId().equals(this.getId())) {
+				context.enqueue(conn.getTargetComponentId());
+			}
+		}
+	} 
+  
  }

@@ -23,11 +23,8 @@ import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
 import dta.sfmflow.util.ConnectionBlockType;
-import dta.sfmflow.util.Variable;
-import dta.sfmflow.util.VariableColor;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -56,7 +53,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * flowchart canvas data, and delegates scans to standalone network models [3].
  */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
-	private final Variable[] variables;
 	private Flowchart flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
 	protected final ContainerData data;
 	private int commandCount = 0;
@@ -88,7 +84,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public ManagerBlockEntity(BlockPos pos, BlockState blockState) {
 		super(ModBlockEntities.MANAGER_BE.get(), pos, blockState);
 
-		variables = new Variable[VariableColor.values().length];
 		data = new ContainerData() {
 			@Override
 			public int get(int index) {

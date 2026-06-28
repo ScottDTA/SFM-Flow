@@ -1,12 +1,15 @@
 6-28-2026 Round 2
 
 ### [Added]
+* Added an extensible logic planning API, enabling future addon developers to build custom logic blocks, sensors, and conditional triggers that integrate directly with the background planning engine.
 * Added authentic, high-fidelity slot layout screens for vanilla Furnaces, Smokers, Blast Furnaces, Brewing Stands, Crafters, Droppers, Dispensers, and Hoppers that replicate their original inventory styles.
 * Added support for custom JSON-driven slot layouts, allowing pack makers and developers to define custom background textures and slot alignments for any block.
 * Added warning tooltips on slot layout screens to indicate exactly why a slot is inaccessible from a specific block face (e.g., trying to access a furnace output from the top).
 * Added specialized visual fallbacks in the 3D block preview scene to render Chests, Trapped Chests, and Ender Chests cleanly without missing textures or model glitches.
 
 ### [Changed]
+* Refactored the core flowchart evaluation system to process nodes polymorphically, improving server-side background execution performance and code stability.
+* Streamlined internal ticking routines for Card Clusters and Hatches to reduce server tick overhead.
 * Relocated core slot layout systems to the public API, enabling third-party integration mods to register their own visual inventory screens programmatically.
 
 

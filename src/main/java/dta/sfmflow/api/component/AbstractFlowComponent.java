@@ -244,4 +244,15 @@ public abstract class AbstractFlowComponent {
 	public void setActiveCategory(int category) {
 		this.activeCategory = category;
 	}
+	
+	/**
+	 * Executes or plans the logical behavior of this component during a flowchart evaluation sweep [3].
+	 * Custom components can override this to implement custom logic [3].
+	 *
+	 * @param context the execution context providing safe access to snapshot states and connection queues [3]
+	 */
+	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
+		// Default implementation: do nothing [3]
+	}	
+	
 }
