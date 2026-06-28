@@ -7,247 +7,261 @@ import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 
 import java.util.*;
 
 /**
- * Cooperative state-machine planning task executing flowchart logic off-thread
- * [3]. Implements a 1000-node traversal limit to prevent stack overflows and
- * cyclic loop lockups [3]. Upgraded with sorted slot indices and
- * copy-before-shrink safety validations [3].
+ * Cooperative state-machine planning task executing flowchart logic off-thread [3].
+ * Implements a 1000-node traversal limit to prevent stack overflows and cyclic loop lockups [3].
+ * Upgraded with sorted slot indices and copy-before-shrink safety validations [3].
  */
 public class FlowchartPlanningTask {
-	private final ManagerBlockEntity manager;
-	private final ThreadSafeInventorySnapshot snapshot;
-	private final List<FlowComponentConnections> connections;
-	private final Map<UUID, AbstractFlowComponent> components;
+    private final ManagerBlockEntity manager;
+    private final ThreadSafeInventorySnapshot snapshot;
+    private final List<FlowComponentConnections> connections;
+    private final Map<UUID, AbstractFlowComponent> components;
 
-	private final Queue<UUID> evaluationQueue = new ArrayDeque<>();
-	private int nodesTraversed = 0;
-	private boolean completed = false;
+    private final Queue<UUID> evaluationQueue = new ArrayDeque<>();
+    private int nodesTraversed = 0;
+    private boolean completed = false;
 
-	/**
-	 * Initializes the planning task and seeds only the currently elapsed triggers
-	 * [3].
-	 *
-	 * @param manager        the managing block entity [3]
-	 * @param snapshot       the immutable deep-copied inventory snapshot [3]
-	 * @param activeTriggers list of UUIDs representing elapsed interval triggers
-	 *                       [3]
-	 */
-	public FlowchartPlanningTask(ManagerBlockEntity manager, ThreadSafeInventorySnapshot snapshot,
-			List<UUID> activeTriggers) {
-		this.manager = manager;
-		this.snapshot = snapshot;
-		this.connections = new ArrayList<>(manager.getFlowConnections());
-		this.components = new HashMap<>(manager.getFlowComponents());
+    /**
+     * Initializes the planning task and seeds only the currently elapsed triggers [3].
+     *
+     * @param manager the managing block entity [3]
+     * @param snapshot the immutable deep-copied inventory snapshot [3]
+     * @param activeTriggers list of UUIDs representing elapsed interval triggers [3]
+     */
+    public FlowchartPlanningTask(ManagerBlockEntity manager, ThreadSafeInventorySnapshot snapshot, List<UUID> activeTriggers) {
+        this.manager = manager;
+        this.snapshot = snapshot;
+        this.connections = new ArrayList<>(manager.getFlowConnections());
+        this.components = new HashMap<>(manager.getFlowComponents());
 
-		for (UUID id : activeTriggers) {
-			if (this.components.containsKey(id)) {
-				this.evaluationQueue.add(id);
-			}
-		}
-	}
+        for (UUID id : activeTriggers) {
+            if (this.components.containsKey(id)) {
+                this.evaluationQueue.add(id);
+            }
+        }
+    }
 
-	/**
-	 * Executes a cooperative slice of evaluation logic, yielding if it exceeds
-	 * standard bounds [3].
-	 *
-	 * @param timeBudgetNs execution time limit in nanoseconds (e.g. 1ms =
-	 *                     1,000,000) [3]
-	 * @return true if the planning task is fully completed, false otherwise [3]
-	 */
-	public boolean evaluateSlice(long timeBudgetNs) {
-		if (completed) {
-			return true;
-		}
+    /**
+     * Executes a cooperative slice of evaluation logic, yielding if it exceeds standard bounds [3].
+     *
+     * @param timeBudgetNs execution time limit in nanoseconds (e.g. 1ms = 1,000,000) [3]
+     * @return true if the planning task is fully completed, false otherwise [3]
+     */
+    public boolean evaluateSlice(long timeBudgetNs) {
+        if (completed) {
+            return true;
+        }
 
-		long startTime = System.nanoTime();
+        long startTime = System.nanoTime();
 
-		while (!evaluationQueue.isEmpty()) {
-			if (System.nanoTime() - startTime >= timeBudgetNs) {
-				return false; // Yield
-			}
+        while (!evaluationQueue.isEmpty()) {
+            if (System.nanoTime() - startTime >= timeBudgetNs) {
+                return false; // Yield
+            }
 
-			if (nodesTraversed >= 1000) {
-				dta.sfmflow.SFMFlow.LOGGER.error(
-						"[SFM-Flow] Circuit breaker tripped! Flowchart exceeded the 1000-node traversal limit, canceling planning task [3].");
-				completed = true;
-				return true;
-			}
+            if (nodesTraversed >= 1000) {
+                dta.sfmflow.SFMFlow.LOGGER.error("[SFM-Flow] Circuit breaker tripped! Flowchart exceeded the 1000-node traversal limit, canceling planning task [3].");
+                completed = true;
+                return true;
+            }
 
-			UUID currentId = evaluationQueue.poll();
-			AbstractFlowComponent current = components.get(currentId);
-			if (current != null) {
-				nodesTraversed++;
-				this.evaluateNode(current);
-			}
-		}
-		this.completed = true;
-		return true;
-	}
+            UUID currentId = evaluationQueue.poll();
+            AbstractFlowComponent current = components.get(currentId);
+            if (current != null) {
+                nodesTraversed++;
+                this.evaluateNode(current);
+            }
+        }
+        this.completed = true;
+        return true;
+    }
 
-	private void evaluateNode(AbstractFlowComponent current) {
-		if (current instanceof IntervalTriggerComponent trigger) {
-			List<FlowComponentConnections> outputs = findOutputConnections(trigger.getId());
-			for (FlowComponentConnections conn : outputs) {
-				evaluationQueue.add(conn.getTargetComponentId());
-			}
-		} else if (current instanceof ItemTransferComponent transfer) {
-			if (transfer.isInput()) {
-				List<FlowComponentConnections> outputs = findOutputConnections(transfer.getId());
-				for (FlowComponentConnections conn : outputs) {
-					AbstractFlowComponent targetComponent = components.get(conn.getTargetComponentId());
-					if (targetComponent instanceof ItemTransferComponent targetOutput && !targetOutput.isInput()) {
-						planItemTransfer(transfer, targetOutput);
-						evaluationQueue.add(targetOutput.getId());
-					}
-				}
-			}
-		}
-	}
+    private void evaluateNode(AbstractFlowComponent current) {
+        if (current instanceof IntervalTriggerComponent trigger) {
+            List<FlowComponentConnections> outputs = findOutputConnections(trigger.getId());
+            for (FlowComponentConnections conn : outputs) {
+                evaluationQueue.add(conn.getTargetComponentId());
+            }
+        } else if (current instanceof ItemTransferComponent transfer) {
+            if (transfer.isInput()) {
+                List<FlowComponentConnections> outputs = findOutputConnections(transfer.getId());
+                for (FlowComponentConnections conn : outputs) {
+                    AbstractFlowComponent targetComponent = components.get(conn.getTargetComponentId());
+                    if (targetComponent instanceof ItemTransferComponent targetOutput && !targetOutput.isInput()) {
+                        planItemTransfer(transfer, targetOutput);
+                        evaluationQueue.add(targetOutput.getId());
+                    }
+                }
+            }
+        }
+    }
 
-	private List<FlowComponentConnections> findOutputConnections(UUID sourceId) {
-		List<FlowComponentConnections> list = new ArrayList<>();
-		for (FlowComponentConnections conn : connections) {
-			if (conn.getSourceComponentId().equals(sourceId)) {
-				list.add(conn);
-			}
-		}
-		return list;
-	}
+    private List<FlowComponentConnections> findOutputConnections(UUID sourceId) {
+        List<FlowComponentConnections> list = new ArrayList<>();
+        for (FlowComponentConnections conn : connections) {
+            if (conn.getSourceComponentId().equals(sourceId)) {
+                list.add(conn);
+            }
+        }
+        return list;
+    }
 
-	private boolean matchesFilter(ItemTransferComponent component, ItemStack stack) {
-		if (stack.isEmpty()) {
-			return false;
-		}
+    private boolean matchesFilter(ItemTransferComponent component, ItemStack stack) {
+        if (stack.isEmpty()) {
+            return false;
+        }
 
-		boolean found = false;
-		for (ItemStack filter : component.getFilterItems()) {
-			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
-				found = true;
-				break;
-			}
-		}
+        boolean found = false;
+        for (ItemStack filter : component.getFilterItems()) {
+            if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
+                found = true;
+                break;
+            }
+        }
 
-		if (component.isWhitelist()) {
-			return found;
-		} else {
-			return !found;
-		}
-	}
+        if (component.isWhitelist()) {
+            return found;
+        } else {
+            return !found;
+        }
+    }
 
-	/**
-	 * Executes multi-slot transaction planning, updating virtual snapshot states in
-	 * real-time [3]. Upgraded to sort keys sequentially and copy stacks before
-	 * shrinking them [3].
-	 */
-	private void planItemTransfer(ItemTransferComponent source, ItemTransferComponent target) {
-		var inventories = manager.getInventories();
-		BlockPos srcInventoryPos = null;
-		BlockPos tgtInventoryPos = null;
+    /**
+     * Executes multi-slot transaction planning, updating virtual snapshot states in real-time [3].
+     * Upgraded to sort keys sequentially and copy stacks before shrinking them [3].
+     */
+    private void planItemTransfer(ItemTransferComponent source, ItemTransferComponent target) {
+        var inventories = manager.getInventories();
+        BlockPos srcInventoryPos = null;
+        BlockPos tgtInventoryPos = null;
 
-		for (var block : inventories) {
-			if (block.getId() == source.getInventoryId()) {
-				srcInventoryPos = block.getBlockPos();
-			}
-			if (block.getId() == target.getInventoryId()) {
-				tgtInventoryPos = block.getBlockPos();
-			}
-		}
+        for (var block : inventories) {
+            if (block.getId() == source.getInventoryId()) {
+                srcInventoryPos = block.getBlockPos();
+            }
+            if (block.getId() == target.getInventoryId()) {
+                tgtInventoryPos = block.getBlockPos();
+            }
+        }
 
-		if (srcInventoryPos == null || tgtInventoryPos == null) {
-			return;
-		}
+        if (srcInventoryPos == null || tgtInventoryPos == null) {
+            return;
+        }
 
-		var srcInv = snapshot.getInventory(srcInventoryPos);
-		var tgtInv = snapshot.getInventory(tgtInventoryPos);
+        // Collect the user's active directions for the source container [3]
+        List<Direction> activeSrcSides = new ArrayList<>();
+        for (Direction dir : Direction.values()) {
+            if (source.isSideActive(dir)) {
+                activeSrcSides.add(dir);
+            }
+        }
+        if (activeSrcSides.isEmpty()) {
+            activeSrcSides.add(null);
+        }
 
-		if (srcInv == null || tgtInv == null) {
-			return;
-		}
+        // Collect the user's active directions for the target container [3]
+        List<Direction> activeTgtSides = new ArrayList<>();
+        for (Direction dir : Direction.values()) {
+            if (target.isSideActive(dir)) {
+                activeTgtSides.add(dir);
+            }
+        }
+        if (activeTgtSides.isEmpty()) {
+            activeTgtSides.add(null);
+        }
 
-		// Sort slot keys sequentially from 0 to N to guarantee orderly evaluations [3]
-		List<Integer> sortedSrcSlots = new ArrayList<>(srcInv.slots().keySet());
-		Collections.sort(sortedSrcSlots);
+        for (Direction srcSide : activeSrcSides) {
+            var srcInv = snapshot.getInventory(srcInventoryPos, srcSide);
+            if (srcInv == null) continue;
 
-		List<Integer> sortedTgtSlots = new ArrayList<>(tgtInv.slots().keySet());
-		Collections.sort(sortedTgtSlots);
+            for (Direction tgtSide : activeTgtSides) {
+                var tgtInv = snapshot.getInventory(tgtInventoryPos, tgtSide);
+                if (tgtInv == null) continue;
 
-		for (int srcSlot : sortedSrcSlots) {
-			ThreadSafeInventorySnapshot.SlotSnapshot srcEntry = srcInv.slots().get(srcSlot);
-			ItemStack srcStack = srcEntry.stack();
-			if (srcStack.isEmpty()) {
-				continue;
-			}
+                // Sort slot keys sequentially from 0 to N to guarantee orderly evaluations [3]
+                List<Integer> sortedSrcSlots = new ArrayList<>(srcInv.slots().keySet());
+                Collections.sort(sortedSrcSlots);
 
-			if (source.getTargetSlot() != -1 && source.getTargetSlot() != srcSlot) {
-				continue;
-			}
+                List<Integer> sortedTgtSlots = new ArrayList<>(tgtInv.slots().keySet());
+                Collections.sort(sortedTgtSlots);
 
-			if (!matchesFilter(source, srcStack)) {
-				continue;
-			}
+                for (int srcSlot : sortedSrcSlots) {
+                    ThreadSafeInventorySnapshot.SlotSnapshot srcEntry = srcInv.slots().get(srcSlot);
+                    ItemStack srcStack = srcEntry.stack();
+                    if (srcStack.isEmpty()) {
+                        continue;
+                    }
 
-			// Track remaining count to transfer for this specific source slot's stack
-			int srcRemaining = srcStack.getCount();
+                    if (source.getTargetSlot() != -1 && source.getTargetSlot() != srcSlot) {
+                        continue;
+                    }
 
-			for (int tgtSlot : sortedTgtSlots) {
-				if (srcRemaining <= 0) {
-					break;
-				}
+                    if (!matchesFilter(source, srcStack)) {
+                        continue;
+                    }
 
-				ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
-				ItemStack tgtStack = tgtEntry.stack();
+                    int srcRemaining = srcStack.getCount();
 
-				if (target.getTargetSlot() != -1 && target.getTargetSlot() != tgtSlot) {
-					continue;
-				}
+                    for (int tgtSlot : sortedTgtSlots) {
+                        if (srcRemaining <= 0) {
+                            break;
+                        }
 
-				if (!matchesFilter(target, srcStack)) {
-					continue;
-				}
+                        ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
+                        ItemStack tgtStack = tgtEntry.stack();
 
-				boolean canInsert = false;
-				int maxInsertable = 0;
+                        if (target.getTargetSlot() != -1 && target.getTargetSlot() != tgtSlot) {
+                            continue;
+                        }
 
-				// Resolve the item's maximum stack size limit for the target slot capability
-				// wrapper
-				int actualLimit = Math.min(tgtEntry.slotLimit(), srcStack.getMaxStackSize());
+                        if (!matchesFilter(target, srcStack)) {
+                            continue;
+                        }
 
-				if (tgtStack.isEmpty()) {
-					canInsert = true;
-					maxInsertable = actualLimit;
-				} else if (ItemStack.isSameItemSameComponents(srcStack, tgtStack)) {
-					int remainingSpace = actualLimit - tgtStack.getCount();
-					if (remainingSpace > 0) {
-						canInsert = true;
-						maxInsertable = remainingSpace;
-					}
-				}
+                        boolean canInsert = false;
+                        int maxInsertable = 0;
 
-				if (canInsert) {
-					int amountToTransfer = Math.min(srcRemaining, maxInsertable);
-					if (amountToTransfer > 0) {
-						boolean success = manager.getExecutionBuffer().tryWrite(srcInventoryPos, srcSlot,
-								tgtInventoryPos, tgtSlot, srcStack, amountToTransfer);
-						if (success) {
-							// Copy FIRST before shrinking to preserve type and components completely [3]
-							if (tgtStack.isEmpty()) {
-								ItemStack newTgt = srcStack.copy();
-								newTgt.setCount(amountToTransfer);
-								tgtInv.slots().put(tgtSlot,
-										new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt, tgtEntry.slotLimit()));
-							} else {
-								tgtStack.grow(amountToTransfer);
-							}
-							srcStack.shrink(amountToTransfer);
-							srcRemaining -= amountToTransfer;
-						}
-					}
-				}
-			}
-		}
-	}
+                        // Resolve the item's maximum stack size limit for the target slot capability wrapper [3]
+                        int actualLimit = Math.min(tgtEntry.slotLimit(), srcStack.getMaxStackSize());
+
+                        if (tgtStack.isEmpty()) {
+                            canInsert = true;
+                            maxInsertable = actualLimit;
+                        } else if (ItemStack.isSameItemSameComponents(srcStack, tgtStack)) {
+                            int remainingSpace = actualLimit - tgtStack.getCount();
+                            if (remainingSpace > 0) {
+                                canInsert = true;
+                                maxInsertable = remainingSpace;
+                            }
+                        }
+
+                        if (canInsert) {
+                            int amountToTransfer = Math.min(srcRemaining, maxInsertable);
+                            if (amountToTransfer > 0) {
+                                boolean success = manager.getExecutionBuffer().tryWrite(srcInventoryPos, srcSlot, srcSide, tgtInventoryPos, tgtSlot, tgtSide, srcStack, amountToTransfer);
+                                if (success) {
+                                    // Copy FIRST before shrinking to preserve type and components completely [3]
+                                    if (tgtStack.isEmpty()) {
+                                        ItemStack newTgt = srcStack.copy();
+                                        newTgt.setCount(amountToTransfer);
+                                        tgtInv.slots().put(tgtSlot, new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt, tgtEntry.slotLimit()));
+                                    } else {
+                                        tgtStack.grow(amountToTransfer);
+                                    }
+                                    srcStack.shrink(amountToTransfer);
+                                    srcRemaining -= amountToTransfer;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

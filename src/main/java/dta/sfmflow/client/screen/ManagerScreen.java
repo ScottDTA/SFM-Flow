@@ -40,6 +40,10 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	private static final ResourceLocation GUI_BG2 = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/background2.png");
 
+	// Player inventory and hotbar beveled background texture [3]
+	private static final ResourceLocation PLAYER_INV_TX = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/player_inventory.png");
+
 	private final List<FlowWidgetContainer> componentsToRemove = new ArrayList<>();
 	private CategoryHoverSubmenu activeSubmenu = null;
 	private AbstractModalPopup activeModalPopup = null;
@@ -113,8 +117,57 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 					}
 				}
 			}
+
+			// 3. No active sides error check [3]
+			if (transfer.getActiveSidesMask() == 0) {
+				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
+				for (var conn : connections) {
+					if (conn.getSourceComponentId().equals(transfer.getId())
+							|| conn.getTargetComponentId().equals(transfer.getId())) {
+						return true;
+					}
+				}
+			}
 		}
 		return false;
+	}
+	
+	/**
+	 * Modifies a slot's coordinate mapping at runtime using Java Reflection to bypass final access constraints [3].
+	 *
+	 * @param slot the container slot instance to update [3]
+	 * @param x    new target X coordinate [3]
+	 * @param y    new target Y coordinate [3]
+	 */
+	private void setSlotPosition(net.minecraft.world.inventory.Slot slot, int x, int y) {
+		try {
+			java.lang.reflect.Field xField = net.minecraft.world.inventory.Slot.class.getDeclaredField("x");
+			java.lang.reflect.Field yField = net.minecraft.world.inventory.Slot.class.getDeclaredField("y");
+			xField.setAccessible(true);
+			yField.setAccessible(true);
+			xField.setInt(slot, x);
+			yField.setInt(slot, y);
+		} catch (NoSuchFieldException e) {
+			try {
+				// Fallback search by type mapping if mappings differ [3]
+				java.util.List<java.lang.reflect.Field> intFields = new java.util.ArrayList<>();
+				for (java.lang.reflect.Field field : net.minecraft.world.inventory.Slot.class.getDeclaredFields()) {
+					if (field.getType() == int.class) {
+						intFields.add(field);
+					}
+				}
+				java.lang.reflect.Field xField = intFields.get(1);
+				java.lang.reflect.Field yField = intFields.get(2);
+				xField.setAccessible(true);
+				yField.setAccessible(true);
+				xField.setInt(slot, x);
+				yField.setInt(slot, y);
+			} catch (Exception ex) {
+				SFMFlow.LOGGER.error("Failed to resolve dynamic Slot fields", ex);
+			}
+		} catch (Exception e) {
+			SFMFlow.LOGGER.error("Failed to dynamically reposition container slot", e);
+		}
 	}
 
 	@Override
@@ -141,12 +194,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 					return;
 				}
 				scaleApplied = true;
-			} else {
-				if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
-					//SFMFlow.LOGGER.warn(
-					//		"[SFM-Flow] Window size is too small for configured FORCE_GUI_SCALE ({}). Falling back to adaptive scaling.",
-					//		forcedScale);
-				}
 			}
 		}
 
@@ -197,6 +244,30 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		buildComponents(x, y);
 
+		// Anchor player inventory and hotbar slots dynamically to the bottom center of the game window [3]
+		int textureX = (this.width - 176) / 2;
+		int textureY = this.height - 90;
+
+		// Inventory slots (indices 0 to 26 in the menu) [3]
+		for (int r = 0; r < 3; r++) {
+			for (int c = 0; c < 9; c++) {
+				int slotIndex = r * 9 + c;
+				if (slotIndex < this.menu.slots.size()) {
+					net.minecraft.world.inventory.Slot slot = this.menu.slots.get(slotIndex);
+					setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 8 + r * 18 + textureY - this.topPos);
+				}
+			}
+		}
+
+		// Hotbar slots (indices 27 to 35 in the menu) [3]
+		for (int c = 0; c < 9; c++) {
+			int slotIndex = 27 + c;
+			if (slotIndex < this.menu.slots.size()) {
+				net.minecraft.world.inventory.Slot slot = this.menu.slots.get(slotIndex);
+				setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 66 + textureY - this.topPos);
+			}
+		}
+
 		if (this.activeModalPopup != null) {
 			int pWidth = this.activeModalPopup.getWidth();
 			int pHeight = this.activeModalPopup.getHeight();
@@ -208,7 +279,13 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			int pWidth = this.activeSettingsOverlay.getWidth();
 			int pHeight = this.activeSettingsOverlay.getHeight();
 			this.activeSettingsOverlay.setX((this.width - pWidth) / 2);
-			this.activeSettingsOverlay.setY((256 - pHeight) / 2);
+			
+			if (pHeight >= 360) {
+				// Preserve the custom Y position of the expanded layout [3]
+				this.activeSettingsOverlay.setY(25);
+			} else {
+				this.activeSettingsOverlay.setY((256 - pHeight) / 2);
+			}
 		}
 	}
 
@@ -253,20 +330,10 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		guiGraphics.fill(x + 170, y + 256, x + 172, y + 352, 0xFF151515);
 		guiGraphics.fill(x + 342, y + 256, x + 344, y + 352, 0xFF151515);
 
-		for (int r = 0; r < 3; r++) {
-			for (int c = 0; c < 9; c++) {
-				int slotX = x + 174 + c * 18;
-				int slotY = y + 265 + r * 18;
-				guiGraphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF151515);
-				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF434343);
-			}
-		}
-		for (int c = 0; c < 9; c++) {
-			int slotX = x + 174 + c * 18;
-			int slotY = y + 323;
-			guiGraphics.fill(slotX, slotY, slotX + 18, slotY + 18, 0xFF151515);
-			guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF434343);
-		}
+		// Draw the new player inventory and hotbar texture sheet anchored to the bottom of the window [3]
+		int textureX = (this.width - 176) / 2;
+		int textureY = this.height - 90;
+		guiGraphics.blit(PLAYER_INV_TX, textureX, textureY, 0, 0, 176, 90, 176, 90);
 
 		// 🔥 PAINTER'S ALGORITHM: Draw connection wires directly inside renderBg [3]
 		// Drawn on top of standard background panels, but beneath card widgets and
@@ -294,7 +361,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		// Canvas boundary dimming: Symmetrically dims only the top canvas [3]
 		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
-			guiGraphics.fill(0, 0, this.width, y + 256, 0xD0000000);
+			guiGraphics.fill(x, y, x + 512, y + 256, 0xD0000000);
 		}
 
 		guiGraphics.enableScissor(x + 4, y + 256, x + 166, y + 352);

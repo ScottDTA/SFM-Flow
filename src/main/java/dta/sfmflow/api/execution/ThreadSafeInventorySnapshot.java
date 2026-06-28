@@ -18,7 +18,7 @@ import java.util.Map;
  * Immutable thread-safe snapshot container holding deep copies of target
  * inventory slot configurations [3]. Instantiated strictly on the main server
  * thread to prevent concurrency collisions during evaluation runs [3]. Upgraded
- * to query block capabilities using standard sided contexts [3].
+ * to support side-specific capability indexing [3].
  */
 public final class ThreadSafeInventorySnapshot {
 
@@ -34,24 +34,13 @@ public final class ThreadSafeInventorySnapshot {
 		}
 	}
 
-	private final Map<BlockPos, InventorySnapshot> snapshotMap;
+	// Composite key mapping coordinates and active sides to their respective slots [3]
+	public record SnapshotKey(BlockPos pos, @Nullable Direction side) {}
 
-	private ThreadSafeInventorySnapshot(Map<BlockPos, InventorySnapshot> snapshotMap) {
+	private final Map<SnapshotKey, InventorySnapshot> snapshotMap;
+
+	private ThreadSafeInventorySnapshot(Map<SnapshotKey, InventorySnapshot> snapshotMap) {
 		this.snapshotMap = Collections.unmodifiableMap(new HashMap<>(snapshotMap));
-	}
-
-	/**
-	 * Resolves the inventory capability safely, utilizing sided contexts for
-	 * vanilla container compatibility [3].
-	 */
-	public static @Nullable IItemHandler getItemHandler(Level level, BlockPos pos) {
-		// Query with Direction.UP to ensure standard containers return their capability
-		// [3]
-		IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
-		if (handler != null) {
-			return handler;
-		}
-		return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
 	}
 
 	/**
@@ -59,24 +48,26 @@ public final class ThreadSafeInventorySnapshot {
 	 * to the manager block entity [3].
 	 *
 	 * @param manager the managing block entity [3]
-	 * @return a complete immutable snapshot containing deep copies [3]
+	 * @return a complete immutable side-specific snapshot [3]
 	 */
 	public static ThreadSafeInventorySnapshot create(ManagerBlockEntity manager) {
-		Map<BlockPos, InventorySnapshot> map = new HashMap<>();
-		var level = manager.getLevel();
+		Map<SnapshotKey, InventorySnapshot> map = new HashMap<>();
+		Level level = manager.getLevel();
 		if (level != null && !level.isClientSide()) {
 			for (ConnectionBlock block : manager.getInventories()) {
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
-					IItemHandler handler = getItemHandler(level, pos);
-					if (handler != null) {
-						Map<Integer, SlotSnapshot> slots = new HashMap<>();
-						int count = handler.getSlots();
-						for (int i = 0; i < count; i++) {
-							ItemStack stack = handler.getStackInSlot(i);
-							slots.put(i, new SlotSnapshot(stack, handler.getSlotLimit(i)));
+					// Index the block's non-directional state [3]
+					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+					if (nullHandler != null) {
+						map.put(new SnapshotKey(pos, null), createInventorySnapshot(nullHandler));
+					}
+					// Index all 6 active directions independently [3]
+					for (Direction dir : Direction.values()) {
+						IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
+						if (handler != null) {
+							map.put(new SnapshotKey(pos, dir), createInventorySnapshot(handler));
 						}
-						map.put(pos, new InventorySnapshot(slots));
 					}
 				}
 			}
@@ -84,11 +75,22 @@ public final class ThreadSafeInventorySnapshot {
 		return new ThreadSafeInventorySnapshot(map);
 	}
 
-	public @Nullable InventorySnapshot getInventory(BlockPos pos) {
-		return snapshotMap.get(pos);
+	private static InventorySnapshot createInventorySnapshot(IItemHandler handler) {
+		Map<Integer, SlotSnapshot> slots = new HashMap<>();
+		int count = handler.getSlots();
+		for (int i = 0; i < count; i++) {
+			ItemStack stack = handler.getStackInSlot(i);
+			slots.put(i, new SlotSnapshot(stack, handler.getSlotLimit(i)));
+		}
+		return new InventorySnapshot(slots);
 	}
 
-	public Map<BlockPos, InventorySnapshot> getSnapshotMap() {
-		return snapshotMap;
+	public @Nullable InventorySnapshot getInventory(BlockPos pos, @Nullable Direction side) {
+		InventorySnapshot direct = snapshotMap.get(new SnapshotKey(pos, side));
+		if (direct != null) {
+			return direct;
+		}
+		// Fallback to non-directional if side-specific capability is absent [3]
+		return snapshotMap.get(new SnapshotKey(pos, null));
 	}
 }

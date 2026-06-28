@@ -6,12 +6,17 @@ import dta.sfmflow.api.client.FlowSettingsRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ISettingsWidgetProvider;
+import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.screen.CableClusterScreen;
+import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsWidget;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.screen.ModMenuTypes;
+import dta.sfmflow.util.Color;
 import dta.sfmflow.screen.CableClusterMenu;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -22,9 +27,11 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.registries.DeferredHolder;
 
 import java.util.function.Supplier;
@@ -55,6 +62,10 @@ public class SFMFlowClient {
 	 */
 	@SubscribeEvent
 	public static void clientSetup(FMLClientSetupEvent event) {
+
+		// Register in-world highlight manager to NeoForge game event bus [3]
+		NeoForge.EVENT_BUS.register(HighlightManager.class);
+
 		event.enqueueWork(() -> {
 			FlowSettingsRegistry.register(FlowComponentType.INTERVAL_TRIGGER.get(), (container, component) -> {
 				if (component instanceof IntervalTriggerComponent intervalTrigger) {
@@ -63,22 +74,20 @@ public class SFMFlowClient {
 				return null;
 			});
 
-			dta.sfmflow.util.Color.setResolver((color, isText) -> {
+			Color.setResolver((color, isText) -> {
 				if (isText) {
-					var specValue = dta.sfmflow.ClientConfig.TEXT_CONFIGS.get(color);
+					var specValue = ClientConfig.TEXT_CONFIGS.get(color);
 					return specValue != null
-							? dta.sfmflow.ClientConfig.parseHexColor(specValue.get(), color.getDefaultHexTextColor())
+							? ClientConfig.parseHexColor(specValue.get(), color.getDefaultHexTextColor())
 							: color.getDefaultHexTextColor();
 				} else {
-					var specValue = dta.sfmflow.ClientConfig.BG_CONFIGS.get(color);
-					return specValue != null
-							? dta.sfmflow.ClientConfig.parseHexColor(specValue.get(), color.getDefaultHexColor())
+					var specValue = ClientConfig.BG_CONFIGS.get(color);
+					return specValue != null ? ClientConfig.parseHexColor(specValue.get(), color.getDefaultHexColor())
 							: color.getDefaultHexColor();
 				}
 			});
 
-			for (dta.sfmflow.api.component.FlowComponentBuilder builder : dta.sfmflow.api.component.FlowComponentBuilder
-					.getRegisteredBuilders()) {
+			for (FlowComponentBuilder builder : FlowComponentBuilder.getRegisteredBuilders()) {
 				FlowClientRegistry.register(builder.getHolder().get(), new INodeClientProperties() {
 					@Override
 					public NodeCategory getCategory() {
@@ -101,14 +110,18 @@ public class SFMFlowClient {
 					}
 
 					@Override
-					public AbstractFlowWidget createSettingsWidget(
-							dta.sfmflow.client.screen.widgets.FlowWidgetContainer container,
-							dta.sfmflow.api.component.AbstractFlowComponent component) {
+					public AbstractFlowWidget createSettingsWidget(FlowWidgetContainer container,
+							AbstractFlowComponent component) {
 						ISettingsWidgetProvider provider = FlowSettingsRegistry.getProvider(component.getType());
 						return provider != null ? provider.createSettingsWidget(container, component) : null;
 					}
 				});
 			}
 		});
+	}
+
+	@SubscribeEvent
+	public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
+		HighlightManager.registerKeyMappings(event);
 	}
 }

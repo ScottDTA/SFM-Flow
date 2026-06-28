@@ -95,7 +95,9 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 		  if (hasError && mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
 		        Component errorMsg = Component.translatable("gui.sfmflow.error.unbound_inventory");
 		        if (comp instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
-		            if (transfer.getInventoryId() != -1 && transfer.isWhitelist()) {
+		            if (transfer.getActiveSidesMask() == 0) {
+		                errorMsg = Component.translatable("gui.sfmflow.error.no_active_sides");
+		            } else if (transfer.getInventoryId() != -1 && transfer.isWhitelist()) {
 		                boolean empty = true;
 		                for (ItemStack stack : transfer.getFilterItems()) {
 		                    if (stack != null && !stack.isEmpty()) {

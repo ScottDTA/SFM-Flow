@@ -1,8 +1,11 @@
 package dta.sfmflow.kernel;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.jetbrains.annotations.Nullable;
 
 /**
  * High-performance Disruptor-style circular queue for thread-safe pipeline
@@ -37,7 +40,7 @@ public final class ExecutionRingBuffer {
 	 *
 	 * @return true if successfully published [3]
 	 */
-	public boolean tryWrite(BlockPos src, int srcSlot, BlockPos dest, int destSlot, ItemStack stack, int amount) {
+	public boolean tryWrite(BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, ItemStack stack, int amount) {
 		long currentWrite = writeSequence.get();
 		long currentRead = readSequence.get();
 
@@ -52,7 +55,7 @@ public final class ExecutionRingBuffer {
 			return false; // Reader has not completed reading this slot [3]
 		}
 
-		task.set(src, srcSlot, dest, destSlot, stack, amount);
+		task.set(src, srcSlot, srcSide, dest, destSlot, destSide, stack, amount);
 		writeSequence.incrementAndGet();
 		return true;
 	}

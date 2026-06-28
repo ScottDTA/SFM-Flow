@@ -47,6 +47,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
@@ -148,21 +150,21 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				}
 			}
 
-			// Synchronously poll and execute published tasks from the lock-free ring buffer [3]
+			// Synchronously poll and execute published tasks from the lock-free ring buffer
+			// [3]
 			this.executionBuffer.pollAndExecute(task -> {
-				// Query capabilities with Direction.UP side-context to resolve vanilla containers successfully [3]
-				var source = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
-						task.getSourcePos(), Direction.UP);
-				var target = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
-						task.getTargetPos(), Direction.UP);
+				// Query capabilities with side-specific directions (furnaces, machines, etc.)
+				// [3]
+				var source = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getSourcePos(),
+						task.getSourceSide());
+				var target = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getTargetPos(),
+						task.getTargetSide());
 
 				if (source == null) {
-					source = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
-							task.getSourcePos(), null);
+					source = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getSourcePos(), null);
 				}
 				if (target == null) {
-					target = pLevel.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
-							task.getTargetPos(), null);
+					target = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getTargetPos(), null);
 				}
 
 				if (source != null && target != null) {
@@ -172,8 +174,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 						if (task.getTargetSlot() != -1) {
 							targetRemaining = target.insertItem(task.getTargetSlot(), simExtracted, true);
 						} else {
-							targetRemaining = net.neoforged.neoforge.items.ItemHandlerHelper.insertItemStacked(target,
-									simExtracted, true);
+							targetRemaining = ItemHandlerHelper.insertItemStacked(target, simExtracted, true);
 						}
 
 						int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
@@ -184,8 +185,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 							if (task.getTargetSlot() != -1) {
 								target.insertItem(task.getTargetSlot(), realExtracted, false);
 							} else {
-								net.neoforged.neoforge.items.ItemHandlerHelper.insertItemStacked(target, realExtracted,
-										false);
+								ItemHandlerHelper.insertItemStacked(target, realExtracted, false);
 							}
 						}
 					}
@@ -280,7 +280,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 				.ifPresent(nbt -> pTag.put("FilterVariables", nbt));
 
-		// Serialize scanned inventories list to synchronize targets dynamically to the client [3]
+		// Serialize scanned inventories list to synchronize targets dynamically to the
+		// client [3]
 		ListTag invList = new ListTag();
 		for (ConnectionBlock inv : this.physicalNetwork.getScannedInventories()) {
 			CompoundTag invTag = new CompoundTag();

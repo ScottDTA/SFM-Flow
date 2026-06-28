@@ -5,6 +5,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -17,15 +18,17 @@ import java.util.List;
 
 /**
  * Unified logic component handling both item inputs (extractions) and item
- * outputs (depositions) [3]. Upgraded to serialize optional group and filter
- * variables and 12-slot Whitelist/Blacklist item arrays [3]. Utilizes
- * ItemStack.OPTIONAL_CODEC to allow empty slot serialization safely.
+ * outputs (depositions) [3]. Upgraded to serialize optional group, filter
+ * variables, and a bitmask representing active directions [3].
  */
 public class ItemTransferComponent extends AbstractFlowComponent {
 	private final boolean isInput;
 	private int inventoryId = -1;
 	private boolean useAll = true;
 	private int targetSlot = -1;
+
+	// Bitmask representing active directions (all 6 active by default: 111111 binary = 63) [3]
+	private int activeSidesMask = 63;
 
 	private UUID boundGroupVariableId = null;
 	private UUID boundFilterVariableId = null;
@@ -43,21 +46,22 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 						Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemTransferComponent::getInventoryId),
 						Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
 						Codec.INT.optionalFieldOf("targetSlot", -1).forGetter(ItemTransferComponent::getTargetSlot),
+						Codec.INT.optionalFieldOf("activeSidesMask", 63).forGetter(ItemTransferComponent::getActiveSidesMask),
 						UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
 								.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
 						UUIDUtil.CODEC.optionalFieldOf("boundFilterVariableId")
 								.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())),
 						Codec.BOOL.optionalFieldOf("whitelist", true).forGetter(ItemTransferComponent::isWhitelist),
-						// Upgraded to OPTIONAL_CODEC to support empty ghost slots cleanly
 						ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
 								.forGetter(ItemTransferComponent::getFilterItems))
 				.apply(instance,
-						(baseProps, invId, useAllVal, slot, groupVar, filterVar, whitelistVal, filtersList) -> {
+						(baseProps, invId, useAllVal, slot, sidesMask, groupVar, filterVar, whitelistVal, filtersList) -> {
 							ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
 							comp.setBaseProperties(baseProps);
 							comp.inventoryId = invId;
 							comp.useAll = useAllVal;
 							comp.targetSlot = slot;
+							comp.activeSidesMask = sidesMask;
 							comp.boundGroupVariableId = groupVar.orElse(null);
 							comp.boundFilterVariableId = filterVar.orElse(null);
 							comp.whitelist = whitelistVal;
@@ -110,6 +114,30 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 		this.targetSlot = targetSlot;
 	}
 
+	public boolean isSideActive(Direction dir) {
+		return (activeSidesMask & (1 << dir.ordinal())) != 0;
+	}
+
+	public void toggleSide(Direction dir) {
+		activeSidesMask ^= (1 << dir.ordinal());
+	}
+
+	public void setSideActive(Direction dir, boolean active) {
+		if (active) {
+			activeSidesMask |= (1 << dir.ordinal());
+		} else {
+			activeSidesMask &= ~(1 << dir.ordinal());
+		}
+	}
+
+	public int getActiveSidesMask() {
+		return activeSidesMask;
+	}
+
+	public void setActiveSidesMask(int mask) {
+		this.activeSidesMask = mask;
+	}
+
 	public @Nullable UUID getBoundGroupVariableId() {
 		return boundGroupVariableId;
 	}
@@ -153,6 +181,7 @@ public class ItemTransferComponent extends AbstractFlowComponent {
 					this.inventoryId = decoded.getInventoryId();
 					this.useAll = decoded.isUseAll();
 					this.targetSlot = decoded.getTargetSlot();
+					this.activeSidesMask = decoded.getActiveSidesMask();
 					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
 					this.boundFilterVariableId = decoded.getBoundFilterVariableId();
 					this.whitelist = decoded.isWhitelist();
