@@ -77,6 +77,15 @@ public class ManagerBlock extends BaseEntityBlock {
 
 	@Override
 	public void onRemove(BlockState pState, Level pLevel, BlockPos pPos, BlockState pNewState, boolean pIsMoving) {
+		if (!pState.is(pNewState.getBlock())) {
+			if (!pLevel.isClientSide()) {
+				BlockEntity bEntity = pLevel.getBlockEntity(pPos);
+				if (bEntity instanceof ManagerBlockEntity manager) {
+					// Clean up the external file before final block removal [3]
+					manager.deleteExternalData();
+				}
+			}
+		}
 		super.onRemove(pState, pLevel, pPos, pNewState, pIsMoving);
 
 		updateInventories(pLevel, pPos);

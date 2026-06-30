@@ -1,3 +1,16 @@
+6-30-2026
+
+### [Added]
+* External Data Storage: Flowchart layouts and configurations are now stored in dedicated .dat files within the world save folder (<world_folder>/sfmflow/managers/) instead of inside the block's NBT. This mitigates chunk NBT bloating, reduces save overhead,     and keeps world save sizes stable.
+* Automated Save Cleanup: When a Machine Inventory Manager block is broken, its corresponding external save file is automatically deleted from disk to prevent unreferenced data buildup.
+
+### [Changed]
+* Storage Architecture: Loading and saving processes now fetch layout data asynchronously from the filesystem once the world is loaded.
+* Initial Client Synchronization: Data-sync tags continue to package layouts dynamically on chunk load to ensure visual flowchart canvases update immediately when logging in.
+
+###[Fixed]
+* Backward Compatibility: Legacy worlds storing layout data directly inside chunk NBT are automatically parsed, loaded, and migrated to the new external format upon first load.
+
 6-29-2026
 
 ### [Added]
