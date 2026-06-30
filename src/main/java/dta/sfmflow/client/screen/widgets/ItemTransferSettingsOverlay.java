@@ -2,13 +2,18 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
+import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
 import dta.sfmflow.util.ConnectionBlockType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Screen interface mapping slots to directional faces via instant feedback
@@ -31,36 +36,37 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		component.setUseAll(false);
 		component.setTargetSlot(-1);
 
-		// 1. Instantiate the 3D preview widget first so its final reference is fully assigned [3]
-		this.previewWidget = new BlockPreview3DWidget(
-				getX() + 25, getY() + 78, 250, 210,
-				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null,
-				component,
-				face -> sideSupportsItems(parentScreen.getMenu().getManagerBlockEntity().getLevel(), getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, face),
-				parentScreen,
-				() -> {
+		// Activate the ghost slots on the client menu [3]
+		parentScreen.getMenu().setActiveFilterComponent(component);
+
+		// Activate the ghost slots on the server menu [3]
+		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
+				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId()));
+
+		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 210,
+				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
+				face -> sideSupportsItems(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
+						getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, face),
+				parentScreen, () -> {
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
-				}
-		);
+				});
 
-		// 2. Instantiate the selector widget next, safely capturing the initialized previewWidget [3]
-		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component, ConnectionBlockType.ITEM, parentScreen, newInv -> {
-			if (this.previewWidget != null) {
-				this.previewWidget.updateHighlightState(); // Sync checkbox highlight state smoothly [3]
-			}
-			parentScreen.getMenu().getManagerBlockEntity().setChanged();
-			sendSettingsUpdate(); // Transmit changes immediately over the network [3]
-		});
+		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component, ConnectionBlockType.ITEM,
+				parentScreen, newInv -> {
+					if (this.previewWidget != null) {
+						this.previewWidget.updateHighlightState();
+					}
+					parentScreen.getMenu().getManagerBlockEntity().setChanged();
+					sendSettingsUpdate();
+				});
 
-		// 3. Add both widgets to the child hierarchy [3]
 		this.children.add(this.previewWidget);
 		this.children.add(this.selectorWidget);
 
-		// Reusable Item Filter widget handling toggle states and grid slots cleanly [3]
 		this.filterWidget = new ItemFilterWidget(getX() + 30, getY() + 294, component, parentScreen, () -> {
 			parentScreen.getMenu().getManagerBlockEntity().setChanged();
-			sendSettingsUpdate(); // Transmit changes immediately over the network [3]
+			sendSettingsUpdate();
 		});
 		this.children.add(this.filterWidget);
 	}
@@ -81,18 +87,24 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
-		return level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK, pos, side) != null;
+		return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side) != null;
 	}
 
 	private void sendSettingsUpdate() {
-		net.minecraft.nbt.CompoundTag nbt = new net.minecraft.nbt.CompoundTag();
+		CompoundTag nbt = new CompoundTag();
 		component.saveData(nbt);
-		net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-			new dta.sfmflow.networking.packets.serverbound.SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), 
-				component.getId(), 
-				nbt
-			)
-		);
+		PacketDistributor.sendToServer(new SaveComponentSettings(
+				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
+	}
+
+	@Override
+	public void closeAndSave() {
+		// Reset active filter component on the client menu [3]
+		parentScreen.getMenu().setActiveFilterComponent(null);
+
+		// Reset active filter component on the server menu [3]
+		PacketDistributor.sendToServer(
+				new SetActiveFilterComponentPacket(parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), null));
+		super.closeAndSave();
 	}
 }

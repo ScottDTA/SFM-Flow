@@ -56,13 +56,9 @@ public class FlowWidgetOutputNode extends AbstractFlowWidget {
 		AbstractFlowComponent comp = container.getComponent();
 		Color mask = comp.getColorMask();
 
-		if (mask != null && mask != Color.BLACK) {
-			float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
-			RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
-		} else {
-			RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-		}
-
+	    float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
+		RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
+		
 		int vOffset = 0;
 		if (visible && active && actuallyHovered(mouseX, mouseY)) {
 			vOffset = 6;

@@ -15,16 +15,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import java.util.Optional;
 import java.util.UUID;
-
 import org.jetbrains.annotations.Nullable;
-
 import java.util.List;
 
 /**
  * Unified logic component handling both item inputs (extractions) and item
- * outputs (depositions) [3]. Upgraded to serialize optional group, filter
- * variables, and a bitmask representing active directions [3]. Additionally
- * supports saving per-side enabled slot bitmasks [3].
+ * outputs (depositions) [3]. Supports NBT serialization for per-side enabled slot bitmasks,
+ * variable bindings, and custom item quantity limits [3].
  */
 public class ItemTransferComponent extends AbstractFlowComponent
 		implements IFilterable, IInventoryTarget, ISideConfigurable {
@@ -33,21 +30,17 @@ public class ItemTransferComponent extends AbstractFlowComponent
 	private boolean useAll = true;
 	private int targetSlot = -1;
 
-	// Bitmask representing active directions (all 6 active by default: 111111
-	// binary = 63) [3]
 	private int activeSidesMask = 63;
 
-	// Slot bitmasks tracking enabled states per face direction (Default: -1L
-	// meaning all slots enabled) [3]
 	private final List<Long> enabledSlotsMasks = new java.util.ArrayList<>(
 			java.util.List.of(-1L, -1L, -1L, -1L, -1L, -1L));
 
 	private UUID boundGroupVariableId = null;
 	private UUID boundFilterVariableId = null;
 
-	// Symmetrical Filter Variables [3]
 	private boolean whitelist = true;
 	private final List<ItemStack> filterItems = new java.util.ArrayList<>();
+	private final List<Integer> filterLimits = new java.util.ArrayList<>();
 
 	public static final MapCodec<ItemTransferComponent> INPUT_CODEC = makeCodec(true);
 	public static final MapCodec<ItemTransferComponent> OUTPUT_CODEC = makeCodec(false);
@@ -76,9 +69,11 @@ public class ItemTransferComponent extends AbstractFlowComponent
 								Codec.BOOL.optionalFieldOf("whitelist", true)
 										.forGetter(ItemTransferComponent::isWhitelist),
 								ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
-										.forGetter(ItemTransferComponent::getFilterItems))
+										.forGetter(ItemTransferComponent::getFilterItems),
+								Codec.INT.listOf().optionalFieldOf("filterLimits", java.util.List.of(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1))
+										.forGetter(ItemTransferComponent::getFilterLimits))
 						.apply(instance, (baseProps, invId, useAllVal, slot, sidesMask, masksList, groupVar, filterVar,
-								whitelistVal, filtersList) -> {
+								whitelistVal, filtersList, limitsList) -> {
 							ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
 							comp.setBaseProperties(baseProps);
 							comp.inventoryId = invId;
@@ -95,6 +90,11 @@ public class ItemTransferComponent extends AbstractFlowComponent
 							while (comp.filterItems.size() < 12) {
 								comp.filterItems.add(ItemStack.EMPTY);
 							}
+							comp.filterLimits.clear();
+							comp.filterLimits.addAll(limitsList);
+							while (comp.filterLimits.size() < 12) {
+								comp.filterLimits.add(-1);
+							}
 							return comp;
 						}));
 	}
@@ -108,6 +108,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		this.numOutputs = 1;
 		for (int i = 0; i < 12; i++) {
 			this.filterItems.add(ItemStack.EMPTY);
+			this.filterLimits.add(-1);
 		}
 	}
 
@@ -240,37 +241,20 @@ public class ItemTransferComponent extends AbstractFlowComponent
 	}
 
 	@Override
-	public void loadData(net.minecraft.nbt.CompoundTag compoundTag) {
-		var codec = isInput ? ItemTransferComponent.INPUT_CODEC : ItemTransferComponent.OUTPUT_CODEC;
-		codec.codec().parse(net.minecraft.nbt.NbtOps.INSTANCE, compoundTag).resultOrPartial(
-				err -> dta.sfmflow.SFMFlow.LOGGER.error("Failed to parse item transfer component data: {}", err))
-				.ifPresent(decoded -> {
-					this.setBaseProperties(decoded.getBaseProperties());
-					this.inventoryId = decoded.getInventoryId();
-					this.useAll = decoded.isUseAll();
-					this.targetSlot = decoded.getTargetSlot();
-					this.activeSidesMask = decoded.getActiveSidesMask();
-					this.enabledSlotsMasks.clear();
-					this.enabledSlotsMasks.addAll(decoded.getEnabledSlotsMasks());
-					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
-					this.boundFilterVariableId = decoded.getBoundFilterVariableId();
-					this.whitelist = decoded.isWhitelist();
-					this.filterItems.clear();
-					this.filterItems.addAll(decoded.getFilterItems());
-					while (this.filterItems.size() < 12) {
-						this.filterItems.add(ItemStack.EMPTY);
-					}
-				});
+	public List<Integer> getFilterLimits() {
+		return filterLimits;
 	}
 
-	@Override
-	public Component getName() {
-		if (getCustomName() != null && !getCustomName().isEmpty()) {
-			return Component.literal(getCustomName());
+	public int getFilterLimit(ItemStack stack) {
+		for (int i = 0; i < filterItems.size(); i++) {
+			ItemStack filter = filterItems.get(i);
+			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
+				return i < filterLimits.size() ? filterLimits.get(i) : -1;
+			}
 		}
-		return Component.translatable(isInput ? "gui.sfmflow.item_input" : "gui.sfmflow.item_output");
+		return -1;
 	}
-	
+
 	@Override
 	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
 		if (this.isInput()) {
@@ -324,6 +308,13 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			activeTgtSides.add(null);
 		}
 
+		// Track virtual planned additions and extractions to prevent double-counting across face snapshots [3]
+		java.util.Map<BlockPos, java.util.Map<net.minecraft.world.item.Item, Integer>> virtualAdditions = new java.util.HashMap<>();
+		java.util.Map<BlockPos, java.util.Map<net.minecraft.world.item.Item, Integer>> virtualExtractions = new java.util.HashMap<>();
+
+		// Track processed item grab limits for Whitelisted Inputs on this execution run [3]
+		java.util.Map<net.minecraft.world.item.Item, Integer> grabbedCounts = new java.util.HashMap<>();
+
 		for (Direction srcSide : activeSrcSides) {
 			var srcInv = context.getSnapshot().getInventory(srcInventoryPos, srcSide);
 			if (srcInv == null)
@@ -360,7 +351,39 @@ public class ItemTransferComponent extends AbstractFlowComponent
 						continue;
 					}
 
+					int totalInSource = 0;
+					for (var entry : srcInv.slots().values()) {
+						if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
+							totalInSource += entry.stack().getCount();
+						}
+					}
+					// Deduct virtual extractions already scheduled for this source block [3]
+					int plannedExtractions = virtualExtractions.getOrDefault(srcInventoryPos, java.util.Map.of())
+							.getOrDefault(srcStack.getItem(), 0);
+					totalInSource -= plannedExtractions;
+
+					int srcLimit = source.getFilterLimit(srcStack);
 					int srcRemaining = srcStack.getCount();
+
+					// Apply Whitelist / Blacklist Input limits [3]
+					if (source.isWhitelist()) {
+						if (srcLimit > 0) {
+							int alreadyGrabbed = grabbedCounts.getOrDefault(srcStack.getItem(), 0);
+							int remainingGrabLimit = srcLimit - alreadyGrabbed;
+							if (remainingGrabLimit <= 0) {
+								continue;
+							}
+							srcRemaining = Math.min(srcRemaining, remainingGrabLimit);
+						}
+					} else {
+						if (srcLimit > 0) {
+							int availableOverLimit = totalInSource - srcLimit;
+							if (availableOverLimit <= 0) {
+								continue;
+							}
+							srcRemaining = Math.min(srcRemaining, availableOverLimit);
+						}
+					}
 
 					for (int tgtSlot : sortedTgtSlots) {
 						if (srcRemaining <= 0) {
@@ -383,10 +406,42 @@ public class ItemTransferComponent extends AbstractFlowComponent
 							continue;
 						}
 
+						int totalInTarget = 0;
+						for (var entry : tgtInv.slots().values()) {
+							if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
+								totalInTarget += entry.stack().getCount();
+							}
+						}
+						// Add virtual additions already scheduled for this target block [3]
+						int plannedAdditions = virtualAdditions.getOrDefault(tgtInventoryPos, java.util.Map.of())
+								.getOrDefault(srcStack.getItem(), 0);
+						totalInTarget += plannedAdditions;
+
+						int tgtLimit = target.getFilterLimit(srcStack);
+						int maxToDeposit = srcStack.getMaxStackSize();
+
+						// Apply Whitelist / Blacklist Output limits [3]
+						if (target.isWhitelist()) {
+							if (tgtLimit > 0) {
+								maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
+								if (maxToDeposit <= 0) {
+									continue;
+								}
+							}
+						} else {
+							if (tgtLimit > 0) {
+								// Correctly evaluate the blacklist limit against our available buffer count [3]
+								maxToDeposit = Math.max(0, srcRemaining - tgtLimit);
+								if (maxToDeposit <= 0) {
+									continue;
+								}
+							}
+						}
+
 						boolean canInsert = false;
 						int maxInsertable = 0;
 
-						int actualLimit = Math.min(tgtEntry.slotLimit(), srcStack.getMaxStackSize());
+						int actualLimit = Math.min(tgtEntry.slotLimit(), maxToDeposit);
 
 						if (tgtStack.isEmpty()) {
 							canInsert = true;
@@ -415,6 +470,16 @@ public class ItemTransferComponent extends AbstractFlowComponent
 									}
 									srcStack.shrink(amountToTransfer);
 									srcRemaining -= amountToTransfer;
+									
+									grabbedCounts.put(srcStack.getItem(), grabbedCounts.getOrDefault(srcStack.getItem(), 0) + amountToTransfer);
+
+									// Register virtual extraction [3]
+									virtualExtractions.computeIfAbsent(srcInventoryPos, k -> new java.util.HashMap<>())
+											.put(srcStack.getItem(), virtualExtractions.computeIfAbsent(srcInventoryPos, k -> new java.util.HashMap<>()).getOrDefault(srcStack.getItem(), 0) + amountToTransfer);
+
+									// Register virtual addition [3]
+									virtualAdditions.computeIfAbsent(tgtInventoryPos, k -> new java.util.HashMap<>())
+											.put(srcStack.getItem(), virtualAdditions.computeIfAbsent(tgtInventoryPos, k -> new java.util.HashMap<>()).getOrDefault(srcStack.getItem(), 0) + amountToTransfer);
 								}
 							}
 						}
@@ -430,9 +495,12 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		}
 
 		boolean found = false;
-		for (ItemStack filter : component.getFilterItems()) {
+		int limit = -1;
+		for (int i = 0; i < component.getFilterItems().size(); i++) {
+			ItemStack filter = component.getFilterItems().get(i);
 			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
 				found = true;
+				limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
 				break;
 			}
 		}
@@ -440,8 +508,44 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		if (component.isWhitelist()) {
 			return found;
 		} else {
-			return !found;
+			return !found || limit > 0;
 		}
 	}
-	
+
+	@Override
+	public void loadData(net.minecraft.nbt.CompoundTag compoundTag) {
+		var codec = isInput ? ItemTransferComponent.INPUT_CODEC : ItemTransferComponent.OUTPUT_CODEC;
+		codec.codec().parse(net.minecraft.nbt.NbtOps.INSTANCE, compoundTag).resultOrPartial(
+				err -> dta.sfmflow.SFMFlow.LOGGER.error("Failed to parse item transfer component data: {}", err))
+				.ifPresent(decoded -> {
+					this.setBaseProperties(decoded.getBaseProperties());
+					this.inventoryId = decoded.getInventoryId();
+					this.useAll = decoded.isUseAll();
+					this.targetSlot = decoded.getTargetSlot();
+					this.activeSidesMask = decoded.getActiveSidesMask();
+					this.enabledSlotsMasks.clear();
+					this.enabledSlotsMasks.addAll(decoded.getEnabledSlotsMasks());
+					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
+					this.boundFilterVariableId = decoded.getBoundFilterVariableId();
+					this.whitelist = decoded.isWhitelist();
+					this.filterItems.clear();
+					this.filterItems.addAll(decoded.getFilterItems());
+					while (this.filterItems.size() < 12) {
+						this.filterItems.add(ItemStack.EMPTY);
+					}
+					this.filterLimits.clear();
+					this.filterLimits.addAll(decoded.getFilterLimits());
+					while (this.filterLimits.size() < 12) {
+						this.filterLimits.add(-1);
+					}
+				});
+	}
+
+	@Override
+	public Component getName() {
+		if (getCustomName() != null && !getCustomName().isEmpty()) {
+			return Component.literal(getCustomName());
+		}
+		return Component.translatable(isInput ? "gui.sfmflow.item_input" : "gui.sfmflow.item_output");
+	}
 }

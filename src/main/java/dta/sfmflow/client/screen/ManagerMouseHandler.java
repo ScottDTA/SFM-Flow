@@ -3,19 +3,21 @@ package dta.sfmflow.client.screen;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
 import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
-import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
-import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.util.Mth;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
+import net.minecraft.world.inventory.Slot;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -108,8 +110,21 @@ public class ManagerMouseHandler {
 		this.activeDragged = null;
 	}
 
+	private boolean isHoveringAnySlot(double mouseX, double mouseY) {
+		if (screen.getMenu() != null) {
+			for (Slot slot : screen.getMenu().slots) {
+				int slotX = screen.getLeftPos() + slot.x;
+				int slotY = screen.getTopPos() + slot.y;
+				boolean hovering = mouseX >= slotX && mouseX < slotX + 16 && mouseY >= slotY && mouseY < slotY + 16;
+				if (hovering) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		// 1. Short-circuit check: Clicking the settings overlay's Save/Close button always closes both modal and settings [3]
 		if (screen.getActiveSettingsOverlay() != null && button == 0) {
 			var overlay = screen.getActiveSettingsOverlay();
 			int btnX = overlay.getX() + (overlay.getWidth() - 80) / 2;
@@ -117,20 +132,18 @@ public class ManagerMouseHandler {
 
 			if (mouseX >= btnX && mouseX < btnX + 80 && mouseY >= btnY && mouseY < btnY + 14) {
 				if (screen.getActiveModalPopup() != null) {
-					screen.setActiveModalPopup(null); // Force close slots UI [3]
+					screen.setActiveModalPopup(null);
 				}
 				overlay.saveAndClose();
 				return true;
 			}
 		}
 
-		// 2. Normal priority modal popup intercept [3]
 		if (screen.getActiveModalPopup() != null) {
 			screen.getActiveModalPopup().mouseClicked(mouseX, mouseY, button);
 			return true;
 		}
 
-		// 3. Settings overlays checked next if no topmost modals are active [3]
 		if (screen.getActiveSettingsOverlay() != null) {
 			var overlay = screen.getActiveSettingsOverlay();
 			int ox = overlay.getX();
@@ -140,13 +153,19 @@ public class ManagerMouseHandler {
 
 			if (mouseX >= ox && mouseX < ox + ow && mouseY >= oy && mouseY < oy + oh) {
 				boolean handled = overlay.mouseClicked(mouseX, mouseY, button);
+
 				if (handled) {
-					screen.setDragging(true); // Force top-level screen dragging to true [3]
+					screen.setDragging(true);
 					return true;
 				}
 
-				// Block clicks on the settings overlay's empty space *only* within the canvas region (Y < topPos + 256) [3]
-				// This prevents dragging or clicking background canvas cards while letting player slots pass through [3]
+				// If hovering over any active slot, bypass blocking
+				if (isHoveringAnySlot(mouseX, mouseY)) {
+					return false;
+				}
+
+				// Block clicks on the settings overlay's empty space *only* within the canvas
+				// region
 				if (mouseY < screen.getTopPos() + 256) {
 					return true;
 				}
@@ -241,7 +260,7 @@ public class ManagerMouseHandler {
 					screen.getRenderables().add(clickedContainer);
 
 					int maxZ = 0;
-					for (net.minecraft.client.gui.components.Renderable r : screen.getRenderables()) {
+					for (Renderable r : screen.getRenderables()) {
 						if (r instanceof FlowWidgetContainer other) {
 							if (other.getComponent().getZ() > maxZ) {
 								maxZ = other.getComponent().getZ();
@@ -267,7 +286,7 @@ public class ManagerMouseHandler {
 	}
 
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
-		screen.setDragging(false); // Reset top-level screen dragging state [3]
+		screen.setDragging(false);
 
 		if (screen.getActiveModalPopup() != null) {
 			screen.getActiveModalPopup().mouseReleased(mouseX, mouseY, button);
@@ -275,9 +294,13 @@ public class ManagerMouseHandler {
 		}
 
 		if (screen.getActiveSettingsOverlay() != null) {
-			// Delegate release updates directly to the active settings overlay, allowing release out-of-bounds [3]
 			var overlay = screen.getActiveSettingsOverlay();
 			overlay.mouseReleased(mouseX, mouseY, button);
+
+			// If releasing over any active slot, bypass blocking
+			if (isHoveringAnySlot(mouseX, mouseY)) {
+				return false;
+			}
 			return true;
 		}
 
@@ -310,25 +333,6 @@ public class ManagerMouseHandler {
 
 		if (button == 0) {
 			if (activeDragged != null) {
-				if (isMouseOverCopyButton(mouseX, mouseY)) {
-					activeDragged.getComponent().setZ(screen.getRenderables().size() - 1);
-					PacketDistributor
-							.sendToServer(new CanvasActionPacket(screen.getMenu().getManagerBlockEntity().getBlockPos(),
-									activeDragged.getComponent().getId(), CanvasAction.COPY));
-					activeDragged = null;
-					screen.setLastClickedContainer(null);
-					return true;
-				}
-
-				if (isMouseOverDeleteButton(mouseX, mouseY)) {
-					PacketDistributor
-							.sendToServer(new CanvasActionPacket(screen.getMenu().getManagerBlockEntity().getBlockPos(),
-									activeDragged.getComponent().getId(), CanvasAction.DELETE));
-					activeDragged = null;
-					screen.setLastClickedContainer(null);
-					return true;
-				}
-
 				int x = (screen.width - screen.getImageWidth()) / 2;
 				int y = (screen.height - screen.getImageHeight()) / 2;
 				int newX = clampCoordinate((int) (mouseX - this.dragStartX), false, activeDragged);
@@ -337,8 +341,6 @@ public class ManagerMouseHandler {
 				activeDragged.getComponent().setY(newY - y);
 				activeDragged.getComponent().setZ(screen.getRenderables().size() - 1);
 				sendCoordsToServer(activeDragged.getComponent().getId());
-
-				screen.setRefreshCooldown(10);
 			} else if (screen.getLastClickedContainer() != null) {
 				sendCoordsToServer(screen.getLastClickedContainer().getComponent().getId());
 			}
@@ -355,8 +357,6 @@ public class ManagerMouseHandler {
 		}
 
 		if (screen.getActiveSettingsOverlay() != null) {
-			// Delegate drag updates directly to the active settings overlay, allowing drag
-			// out-of-bounds [3]
 			var overlay = screen.getActiveSettingsOverlay();
 			overlay.mouseDragged(mouseX, mouseY, button, dragX, dragY);
 			return true;
@@ -470,7 +470,7 @@ public class ManagerMouseHandler {
 				if (child instanceof AbstractFlowWidget afw) {
 					isVisible = afw.visible;
 					isMouseOver = afw.isMouseOver(mouseX, mouseY);
-				} else if (child instanceof net.minecraft.client.gui.components.AbstractWidget widget) {
+				} else if (child instanceof AbstractWidget widget) {
 					isVisible = widget.visible;
 					isMouseOver = widget.isMouseOver(mouseX, mouseY);
 				}
@@ -486,7 +486,6 @@ public class ManagerMouseHandler {
 		return currentElement;
 	}
 
-	@javax.annotation.Nullable
 	public FlowWidgetBase getTopBaseAt(double mouseX, double mouseY) {
 		for (int i = screen.getRenderables().size() - 1; i >= 0; i--) {
 			var renderable = screen.getRenderables().get(i);
@@ -515,48 +514,11 @@ public class ManagerMouseHandler {
 		return null;
 	}
 
-	private FlowWidgetBase getBaseOf(GuiEventListener element) {
-		if (element instanceof FlowWidgetBase base) {
-			return base;
-		}
-		for (Renderable renderable : screen.getRenderables()) {
-			if (renderable instanceof FlowWidgetContainer container) {
-				for (GuiEventListener child : container.children()) {
-					if (child instanceof FlowWidgetBase base) {
-						if (FlowLayoutHelper.isAncestorOf(base, element)) {
-							return base;
-						}
-					}
-				}
-			}
-		}
-		return null;
-	}
-
 	public boolean isElementHoverable(GuiEventListener element) {
 		if (this.topHoveredElement == null) {
 			return false;
 		}
 		return FlowLayoutHelper.isAncestorOf(element, this.topHoveredElement);
-	}
-
-	private boolean isMouseOverDeleteButton(double mouseX, double mouseY) {
-		for (Renderable renderable : screen.getRenderables()) {
-			if (renderable instanceof CanvasActionButton deleteButton
-					&& deleteButton.getAction() == CanvasAction.DELETE) {
-				return deleteButton.isMouseOver(mouseX, mouseY);
-			}
-		}
-		return false;
-	}
-
-	private boolean isMouseOverCopyButton(double mouseX, double mouseY) {
-		for (Renderable renderable : screen.getRenderables()) {
-			if (renderable instanceof CanvasActionButton copyButton && copyButton.getAction() == CanvasAction.COPY) {
-				return copyButton.isMouseOver(mouseX, mouseY);
-			}
-		}
-		return false;
 	}
 
 	private void sendCoordsToServer(UUID draggedId) {
@@ -578,16 +540,16 @@ public class ManagerMouseHandler {
 		if (isY) {
 			int minY = origin + (container.getComponent().hasInputNodes() ? 10 : 4);
 			int maxY = origin + 240 - container.getHeight();
-			return net.minecraft.util.Mth.clamp(rawPos, minY, maxY);
+			return Mth.clamp(rawPos, minY, maxY);
 		} else {
 			int minX = origin + 22;
 			int maxX = origin + 508 - container.getWidth();
-			return net.minecraft.util.Mth.clamp(rawPos, minX, maxX);
+			return Mth.clamp(rawPos, minX, maxX);
 		}
 	}
 
 	private boolean checkWireShiftClick(double mouseX, double mouseY) {
-		if (!net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+		if (!Screen.hasShiftDown()) {
 			return false;
 		}
 

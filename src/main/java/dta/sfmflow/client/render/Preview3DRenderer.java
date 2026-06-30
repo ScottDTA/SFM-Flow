@@ -2,8 +2,10 @@ package dta.sfmflow.client.render;
 
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat.Mode;
 import com.mojang.math.Axis;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.registry.ModTags;
@@ -17,6 +19,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -25,8 +28,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.minecraft.client.renderer.RenderStateShard;
+import net.minecraft.client.renderer.GameRenderer;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Predicate;
 
 /**
@@ -36,6 +43,30 @@ import java.util.function.Predicate;
  */
 @OnlyIn(Dist.CLIENT)
 public final class Preview3DRenderer {
+
+	// Custom RenderType ignoring both depth writes and depth testing [3]
+	private static final RenderType MARKER_RENDER_TYPE = RenderType.create("sfm_marker",
+			DefaultVertexFormat.POSITION_COLOR, Mode.QUADS, 256, false, true,
+			RenderType.CompositeState.builder()
+					.setShaderState(new RenderStateShard.ShaderStateShard(GameRenderer::getPositionColorShader))
+					.setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+					.setCullState(new RenderStateShard.CullStateShard(false))
+					.setWriteMaskState(RenderStateShard.COLOR_WRITE) // Disables depth writes [3]
+					.setDepthTestState(RenderStateShard.NO_DEPTH_TEST) // Disables depth testing [3]
+					.createCompositeState(false));
+
+	// Custom RenderType for ghost blocks that disables depth writing and binds
+	// standard LIGHTMAP values [3]
+	private static final RenderType GHOST_BLOCK_RENDER_TYPE = RenderType.create("sfm_ghost_block",
+			DefaultVertexFormat.BLOCK, Mode.QUADS, 2097152, true, true,
+			RenderType.CompositeState.builder()
+					.setShaderState(new RenderStateShard.ShaderStateShard(GameRenderer::getRendertypeTranslucentShader))
+					.setTextureState(new RenderStateShard.TextureStateShard(InventoryMenu.BLOCK_ATLAS, false, false))
+					.setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+					.setCullState(new RenderStateShard.CullStateShard(false))
+					.setLightmapState(RenderStateShard.LIGHTMAP) // Restores environmental lighting [3]
+					.setWriteMaskState(RenderStateShard.COLOR_WRITE) // Disables depth writes [3]
+					.createCompositeState(false));
 
 	private Preview3DRenderer() {
 	}
@@ -98,7 +129,7 @@ public final class Preview3DRenderer {
 	 * @return sorted list of 3 closest faces [3]
 	 */
 	public static List<Direction> getVisibleFaces(float yaw, float pitch, float scale, int centerX, int centerY) {
-		List<ProjectedFace> faceList = new java.util.ArrayList<>();
+		List<ProjectedFace> faceList = new ArrayList<>();
 		for (Direction dir : Direction.values()) {
 			ProjectedVec proj = getFaceScreenCoords(dir, yaw, pitch, scale, centerX, centerY);
 			faceList.add(new ProjectedFace(dir, proj));
@@ -106,7 +137,7 @@ public final class Preview3DRenderer {
 
 		faceList.sort((f1, f2) -> Float.compare(f2.proj().z(), f1.proj().z()));
 
-		List<Direction> visibleFaces = new java.util.ArrayList<>();
+		List<Direction> visibleFaces = new ArrayList<>();
 		for (int i = 0; i < 3; i++) {
 			visibleFaces.add(faceList.get(i).face());
 		}
@@ -122,7 +153,8 @@ public final class Preview3DRenderer {
 		PoseStack poseStack = guiGraphics.pose();
 		poseStack.pushPose();
 
-		poseStack.translate(centerX, centerY, 150.0F);
+		// Reduced Z-translation to 80.0F to prevent depth conflicts with overlays [3]
+		poseStack.translate(centerX, centerY, 80.0F);
 
 		float scale = 40.0F;
 		poseStack.scale(scale, -scale, scale);
@@ -162,8 +194,14 @@ public final class Preview3DRenderer {
 			}
 			poseStack.popPose();
 
+			// Force-flush the central block immediately so it is drawn to the frame/depth
+			// buffers before the markers [3]
+			bufferSource.endBatch();
+
 			poseStack.pushPose();
 			poseStack.translate(0.5F, 0.5F, 0.5F);
+			RenderSystem.enableBlend();
+			RenderSystem.defaultBlendFunc();
 			List<Direction> visibleFaces = getVisibleFaces(yaw, pitch, 40.0F, centerX, centerY);
 			for (Direction face : visibleFaces) {
 				boolean active = sideModel.isSideActive(face);
@@ -241,10 +279,12 @@ public final class Preview3DRenderer {
 	private static void draw3DQuad(VertexConsumer builder, org.joml.Matrix4f matrix, float x1, float y1, float z1,
 			float x2, float y2, float z2, float x3, float y3, float z3, float x4, float y4, float z4, int r, int g,
 			int b) {
-		builder.addVertex(matrix, x1, y1, z1).setColor(r, g, b, 255);
-		builder.addVertex(matrix, x2, y2, z2).setColor(r, g, b, 255);
-		builder.addVertex(matrix, x3, y3, z3).setColor(r, g, b, 255);
-		builder.addVertex(matrix, x4, y4, z4).setColor(r, g, b, 255);
+		// Set to 128 (50% alpha) to increase text and orientation visibility underneath
+		// [3]
+		builder.addVertex(matrix, x1, y1, z1).setColor(r, g, b, 128);
+		builder.addVertex(matrix, x2, y2, z2).setColor(r, g, b, 128);
+		builder.addVertex(matrix, x3, y3, z3).setColor(r, g, b, 128);
+		builder.addVertex(matrix, x4, y4, z4).setColor(r, g, b, 128);
 	}
 
 	private static void draw3DLine(VertexConsumer builder, org.joml.Matrix4f matrix, Direction face, float x1, float y1,
@@ -252,8 +292,10 @@ public final class Preview3DRenderer {
 		float nx = face.getStepX();
 		float ny = face.getStepY();
 		float nz = face.getStepZ();
-		builder.addVertex(matrix, x1, y1, z1).setColor(r, g, b, 255).setNormal(nx, ny, nz);
-		builder.addVertex(matrix, x2, y2, z2).setColor(r, g, b, 255).setNormal(nx, ny, nz);
+		// Set to 128 (50% alpha) to increase text and orientation visibility underneath
+		// [3]
+		builder.addVertex(matrix, x1, y1, z1).setColor(r, g, b, 128).setNormal(nx, ny, nz);
+		builder.addVertex(matrix, x2, y2, z2).setColor(r, g, b, 128).setNormal(nx, ny, nz);
 	}
 
 	private static void draw3DMarker(PoseStack poseStack, MultiBufferSource bufferSource, Direction face,
@@ -277,7 +319,9 @@ public final class Preview3DRenderer {
 		}
 
 		if (supported) {
-			VertexConsumer builder = bufferSource.getBuffer(RenderType.debugQuads());
+			// Use our custom MARKER_RENDER_TYPE to properly support alpha transparency
+			// blending [3]
+			VertexConsumer builder = bufferSource.getBuffer(MARKER_RENDER_TYPE);
 			switch (face) {
 			case UP -> draw3DQuad(builder, matrix, -0.25F, 0.505F, -0.25F, -0.25F, 0.505F, 0.25F, 0.25F, 0.505F, 0.25F,
 					0.25F, 0.505F, -0.25F, r, g, b);
@@ -309,7 +353,7 @@ public final class Preview3DRenderer {
 			}
 			case SOUTH -> {
 				draw3DLine(builder, matrix, face, -0.25F, -0.25F, 0.505F, 0.25F, 0.25F, 0.505F, r, g, b);
-				draw3DLine(builder, matrix, face, -0.25F, 0.25F, 0.505F, 0.25F, -0.25F, 0.505F, r, g, b);
+				draw3DLine(builder, matrix, face, -0.25F, 0.25F, 0.505F, 0.25F, -0.25F, -0.505F, r, g, b);
 			}
 			case WEST -> {
 				draw3DLine(builder, matrix, face, -0.505F, -0.25F, -0.25F, -0.505F, 0.25F, 0.25F, r, g, b);
@@ -363,7 +407,7 @@ public final class Preview3DRenderer {
 			}
 
 			if (texture != null) {
-				String name = renderType.toString().toLowerCase(java.util.Locale.ROOT);
+				String name = renderType.toString().toLowerCase(Locale.ROOT);
 				if (name.contains("entity_solid") || name.contains("entity_cutout")
 						|| name.contains("entity_cutout_no_mips")) {
 					actualType = RenderType.entityTranslucentCull(Sheets.CHEST_SHEET);
@@ -385,7 +429,7 @@ public final class Preview3DRenderer {
 
 		@Override
 		public VertexConsumer getBuffer(RenderType renderType) {
-			return new GhostVertexConsumer(delegate.getBuffer(RenderType.translucent()), alpha);
+			return new GhostVertexConsumer(delegate.getBuffer(GHOST_BLOCK_RENDER_TYPE), alpha);
 		}
 	}
 

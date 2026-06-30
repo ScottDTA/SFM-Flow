@@ -10,17 +10,21 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.function.Consumer;
 
 /**
- * Reusable side-scrolling UI selector list allowing users to find, search,
- * and select target blocks matching a specific capability type [3].
+ * Reusable side-scrolling UI selector list allowing users to find, search, and
+ * select target blocks matching a specific capability type [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class InventorySelectorWidget extends AbstractFlowWidget {
@@ -28,12 +32,12 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 	private final ConnectionBlockType capabilityType;
 	private final ManagerScreen parentScreen;
 	private final EditBox searchEdit;
-	private final java.util.function.Consumer<ConnectionBlock> onSelected;
+	private final Consumer<ConnectionBlock> onSelected;
 
 	private float scrollX = 0.0F;
 
 	public InventorySelectorWidget(int x, int y, IInventoryTarget model, ConnectionBlockType capabilityType,
-			ManagerScreen parentScreen, java.util.function.Consumer<ConnectionBlock> onSelected) {
+			ManagerScreen parentScreen, Consumer<ConnectionBlock> onSelected) {
 		super(x, y, 260, 52, Component.literal("Inventory Selector"));
 		this.model = model;
 		this.capabilityType = capabilityType;
@@ -50,13 +54,13 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 	private List<ConnectionBlock> getFilteredInventories(Level level) {
 		List<ConnectionBlock> list = parentScreen.getMenu().getManagerBlockEntity().getInventories();
-		String query = searchEdit.getValue().toLowerCase(java.util.Locale.ROOT);
-		
+		String query = searchEdit.getValue().toLowerCase(Locale.ROOT);
+
 		List<ConnectionBlock> filtered = new ArrayList<>();
 		for (ConnectionBlock inv : list) {
 			// Pre-filter by our target capability type first [3]
 			if (inv.getTypes().contains(capabilityType)) {
-				String name = inv.getDisplayName(level).getString().toLowerCase(java.util.Locale.ROOT);
+				String name = inv.getDisplayName(level).getString().toLowerCase(Locale.ROOT);
 				if (query.isEmpty() || name.contains(query)) {
 					filtered.add(inv);
 				}
@@ -109,7 +113,7 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 			int maxScrollX = Math.max(0, getFilteredInventories(level).size() * 20 - 260);
 			if (maxScrollX > 0) {
-				this.scrollX = net.minecraft.util.Mth.clamp(this.scrollX - (float) scrollY * 10.0F, 0.0F, (float) maxScrollX);
+				this.scrollX = Mth.clamp(this.scrollX - (float) scrollY * 10.0F, 0.0F, (float) maxScrollX);
 				return true;
 			}
 		}
@@ -119,8 +123,8 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
 		// Render section header [3]
-		guiGraphics.drawString(parentScreen.getFont(), Component.literal("Search Inventories:"), getX(),
-				getY(), 0xFF404040, false);
+		guiGraphics.drawString(parentScreen.getFont(), Component.literal("Search Inventories:"), getX(), getY(),
+				0xFF404040, false);
 
 		// Render the search box child [3]
 		for (GuiEventListener child : children) {
@@ -150,12 +154,15 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			int border = isSelected ? 0xFF39FF14 : (hovered ? 0xFF8B8B8B : 0xFF434343);
 			guiGraphics.renderOutline(cardX, listY, 18, 18, border);
 
-			net.minecraft.world.level.block.state.BlockState state = level.getBlockState(inv.getBlockPos());
+			BlockState state = level.getBlockState(inv.getBlockPos());
 			ItemStack blockStack = new ItemStack(state.getBlock().asItem());
 			if (!blockStack.isEmpty()) {
 				guiGraphics.renderItem(blockStack, cardX + 1, listY + 1);
 			}
 		}
+
+		// Flush deferred item renders inside the scissor mask bounds [3]
+		guiGraphics.flush();
 
 		guiGraphics.disableScissor();
 

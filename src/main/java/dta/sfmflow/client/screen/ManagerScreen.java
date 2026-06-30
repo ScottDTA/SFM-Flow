@@ -6,15 +6,14 @@ import java.util.List;
 import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.NodeCategory;
-import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
 import dta.sfmflow.client.screen.helper.WorkspaceValidator;
-import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
-import dta.sfmflow.client.screen.helper.GuiScaleManager;
+import dta.sfmflow.util.MenuSlotRepositioner;
+import dta.sfmflow.client.render.VectorWireRenderer;
 import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
-import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
+import dta.sfmflow.client.screen.helper.GuiScaleManager;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -23,9 +22,10 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -43,7 +43,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	private static final ResourceLocation GUI_BG2 = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/background2.png");
 
-	// Player inventory and hotbar beveled background texture [3]
 	private static final ResourceLocation PLAYER_INV_TX = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/flowcomponents/player_inventory.png");
 
@@ -54,12 +53,10 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	private NodeSettingsOverlay activeSettingsOverlay = null;
 	private DropdownMenuWidget openedDropdown = null;
 	private final ManagerMouseHandler mouseHandler;
-	private int refreshCooldown = 0;
 	private final int originalGuiScale;
 	private final Minecraft mc;
 
-	public ManagerScreen(ManagerMenu menu, net.minecraft.world.entity.player.Inventory playerInventory,
-			Component title) {
+	public ManagerScreen(ManagerMenu menu, Inventory playerInventory, Component title) {
 		super(menu, playerInventory, title);
 		this.imageWidth = 512;
 		this.imageHeight = 352;
@@ -72,8 +69,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	protected void init() {
 		super.init();
 
-		// Delegate display scaling checking and override configurations to the GuiScaleManager helper [3]
-		boolean resized = GuiScaleManager.applyOverrides(this.mc, this.width, this.height, this.originalGuiScale, 512, 352);
+		boolean resized = GuiScaleManager.applyOverrides(this.mc, this.width, this.height, this.originalGuiScale, 512,
+				352);
 		if (resized) {
 			return;
 		}
@@ -83,9 +80,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		this.leftPos = x;
 		this.topPos = y;
 
-		this.addRenderableWidget(new CanvasActionButton(CanvasAction.COPY, this, x + 38, y + 4));
-		this.addRenderableWidget(new CanvasActionButton(CanvasAction.DELETE, this, x + 22, y + 4));
-
 		int categoryYOffset = 4;
 		for (NodeCategory category : NodeCategory.values()) {
 			this.addRenderableWidget(new CategoryButton(category, x + 4, y + categoryYOffset, this));
@@ -94,27 +88,26 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		buildComponents(x, y);
 
-		// Anchor player inventory and hotbar slots dynamically to the bottom center of the game window [3]
 		int textureX = (this.width - 176) / 2;
 		int textureY = this.height - 90;
 
-		// Inventory slots (indices 0 to 26 in the menu) [3]
 		for (int r = 0; r < 3; r++) {
 			for (int c = 0; c < 9; c++) {
 				int slotIndex = r * 9 + c;
 				if (slotIndex < this.menu.slots.size()) {
-					net.minecraft.world.inventory.Slot slot = this.menu.slots.get(slotIndex);
-					MenuSlotRepositioner.setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 8 + r * 18 + textureY - this.topPos);
+					Slot slot = this.menu.slots.get(slotIndex);
+					MenuSlotRepositioner.setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos,
+							8 + r * 18 + textureY - this.topPos);
 				}
 			}
 		}
 
-		// Hotbar slots (indices 27 to 35 in the menu) [3]
 		for (int c = 0; c < 9; c++) {
 			int slotIndex = 27 + c;
 			if (slotIndex < this.menu.slots.size()) {
-				net.minecraft.world.inventory.Slot slot = this.menu.slots.get(slotIndex);
-				MenuSlotRepositioner.setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos, 66 + textureY - this.topPos);
+				Slot slot = this.menu.slots.get(slotIndex);
+				MenuSlotRepositioner.setSlotPosition(slot, 8 + c * 18 + textureX - this.leftPos,
+						66 + textureY - this.topPos);
 			}
 		}
 
@@ -129,9 +122,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			int pWidth = this.activeSettingsOverlay.getWidth();
 			int pHeight = this.activeSettingsOverlay.getHeight();
 			this.activeSettingsOverlay.setX((this.width - pWidth) / 2);
-			
+
 			if (pHeight >= 360) {
-				// Preserve the custom Y position of the expanded layout [3]
 				this.activeSettingsOverlay.setY(25);
 			} else {
 				this.activeSettingsOverlay.setY((256 - pHeight) / 2);
@@ -171,7 +163,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		int y = (height - imageHeight) / 2;
 
 		guiGraphics.blit(GUI_BG1, x, y, 0, 0, 256, 256);
-		RenderSystem.setShaderTexture(0, GUI_BG2); // Standard unit 0 mapping [3]
+		RenderSystem.setShaderTexture(0, GUI_BG2);
 		guiGraphics.blit(GUI_BG2, x + 256, y, 0, 0, 256, 256);
 
 		guiGraphics.fill(x, y + 256, x + 512, y + 352, 0xFF2B2B2B);
@@ -180,15 +172,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		guiGraphics.fill(x + 170, y + 256, x + 172, y + 352, 0xFF151515);
 		guiGraphics.fill(x + 342, y + 256, x + 344, y + 352, 0xFF151515);
 
-		// Draw the new player inventory and hotbar texture sheet anchored to the bottom of the window [3]
 		int textureX = (this.width - 176) / 2;
 		int textureY = this.height - 90;
 		guiGraphics.blit(PLAYER_INV_TX, textureX, textureY, 0, 0, 176, 90, 176, 90);
 
-		// 🔥 PAINTER'S ALGORITHM: Draw connection wires directly inside renderBg [3]
-		// Drawn on top of standard background panels, but beneath card widgets and
-		// overlays [3]
-		dta.sfmflow.client.render.VectorWireRenderer.renderWires(guiGraphics, this, mouseX, mouseY, partialTick);
+		VectorWireRenderer.renderWires(guiGraphics, this, mouseX, mouseY, partialTick);
 	}
 
 	@Override
@@ -202,17 +190,15 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		this.mouseHandler.updateTopHoveredElement(mouseX, mouseY);
 		this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
-		// Call standard render directly. Depth tests disabled to prevent projection
-		// clipping [3]
-		super.render(guiGraphics, mouseX, mouseY, partialTick);
-
 		int x = this.leftPos;
 		int y = this.topPos;
 
-		// Canvas boundary dimming: Symmetrically dims only the top canvas [3]
+		// Canvas boundary dimming: Drawn BEFORE super.render to keep slots on top [3]
 		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
 			guiGraphics.fill(x, y, x + 512, y + 256, 0xD0000000);
 		}
+
+		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
 		guiGraphics.enableScissor(x + 4, y + 256, x + 166, y + 352);
 		var groupVars = getMenu().getManagerBlockEntity().getGroupVariables();
@@ -284,10 +270,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 		float baseZ = (maxZ * 2.0F) + 5.0F;
 
-		// Clear depth buffer to cleanly isolate overlays from background widget passes [3]
 		RenderSystem.clear(256, Minecraft.ON_OSX);
 
-		// Sequential elevated Z-translations to render on top of 150.0F 3D projections [3]
 		if (this.activeSubmenu != null) {
 			guiGraphics.pose().pushPose();
 			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 300.0F);
@@ -317,16 +301,15 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		if (this.activeModalPopup != null && this.activeModalPopup.visible) {
 			RenderSystem.clear(256, Minecraft.ON_OSX);
 			guiGraphics.pose().pushPose();
-			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 600.0F);
+			// Increased Z-translation to baseZ + 800.0F to guarantee modal popup renders on top of the 3D scene [3]
+			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 800.0F);
 			this.activeModalPopup.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
 			guiGraphics.pose().popPose();
 		}
 
-		// Symmetrical override: Draw cursor carried item on top of overlays if active [3]
 		boolean hasActiveOverlay = (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible)
-				|| (this.activeModalPopup != null && this.activeModalPopup.visible)
-				|| (this.openedDropdown != null);
+				|| (this.activeModalPopup != null && this.activeModalPopup.visible) || (this.openedDropdown != null);
 
 		if (hasActiveOverlay) {
 			ItemStack carried = this.menu.getCarried();
@@ -462,7 +445,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	}
 
 	public void setRefreshCooldown(int ticks) {
-		this.refreshCooldown = ticks;
 	}
 
 	@Override
@@ -472,9 +454,16 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	}
 
 	@Override
+	public List<? extends GuiEventListener> children() {
+		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
+			return List.of(this.activeSettingsOverlay);
+		}
+		return super.children();
+	}
+
+	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (keyCode == 256) {
-			// Symmetrical ESC close precedence: Dismiss topmost active modals before secondary overlays [3]
 			if (this.activeModalPopup != null) {
 				this.activeModalPopup.close();
 				return true;
@@ -489,7 +478,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Prioritize bubbling keys to the topmost active modal layer first [3]
 		if (this.activeModalPopup != null) {
 			this.activeModalPopup.keyPressed(keyCode, scanCode, modifiers);
 			return true;
@@ -510,7 +498,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 	@Override
 	public boolean charTyped(char codePoint, int modifiers) {
-		// Prioritize bubbling unicode characters to the topmost active modal layer first [3]
 		if (this.activeModalPopup != null) {
 			this.activeModalPopup.charTyped(codePoint, modifiers);
 			return true;

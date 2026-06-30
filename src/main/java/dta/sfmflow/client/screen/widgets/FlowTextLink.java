@@ -10,8 +10,8 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Compact side-safe clickable text widget for lists and dropdown overlays [3].
- * Inverts styling on cursor hovering to create responsive highlighted options
- * [3].
+ * Inverts styling on cursor hovering to create responsive highlighted options [3].
+ * Styled with standard grey palette [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class FlowTextLink extends AbstractFlowWidget {
@@ -36,13 +36,12 @@ public class FlowTextLink extends AbstractFlowWidget {
 		Font font = Minecraft.getInstance().font;
 
 		if (hovered) {
-			// Hovered state: Solid gold background, inverted charcoal black text with
-			// shadow disabled [3]
-			guiGraphics.fill(getX(), getY(), getX() + width, getY() + height, 0xFFD4AF37);
+			// Hovered state: Solid grey background, inverted charcoal black text with shadow disabled [3]
+			guiGraphics.fill(getX(), getY(), getX() + width, getY() + height, 0xFF8B8B8B);
 			guiGraphics.drawString(font, getMessage(), getX() + 4, getY() + 3, 0xFF111111, false);
 		} else {
-			// Default state: Transparent background, golden text [3]
-			guiGraphics.drawString(font, getMessage(), getX() + 4, getY() + 3, 0xFFD4AF37, false);
+			// Default state: Transparent background, grey text [3]
+			guiGraphics.drawString(font, getMessage(), getX() + 4, getY() + 3, 0xFF8B8B8B, false);
 		}
 	}
 

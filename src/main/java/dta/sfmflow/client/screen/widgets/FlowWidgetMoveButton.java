@@ -33,14 +33,8 @@ public class FlowWidgetMoveButton extends AbstractFlowWidget {
 		AbstractFlowComponent comp = parent.getContainer().getComponent();
 		Color mask = comp.getColorMask();
 
-		// 🔥 Gated check: Bypass tinting on BLACK mask to preserve visual handle
-		// contrast [3]
-		if (mask != null && mask != Color.BLACK) {
-			float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
-			RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
-		} else {
-			RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-		}
+		float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
+		RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
 
 		RenderSystem.setShader(GameRenderer::getPositionTexShader);
 		RenderSystem.setShaderTexture(0, MOVE_BUTTON);

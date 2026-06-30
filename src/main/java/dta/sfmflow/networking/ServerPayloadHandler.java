@@ -3,20 +3,29 @@ package dta.sfmflow.networking;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
+import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
+import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
+import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
+import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
+import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
+import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.networking.packets.serverbound.SyncClusterSlotDirectionPacket;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -96,18 +105,19 @@ public class ServerPayloadHandler {
 
 	/**
 	 * Processes a client settings update payload on the main server thread [3].
-	 * Returns any cursor-carried item stack safely back to the player inventory on completion [3].
+	 * Returns any cursor-carried item stack safely back to the player inventory on
+	 * completion [3].
 	 */
 	public static void handleSaveComponentSettings(final SaveComponentSettings data, final IPayloadContext context) {
 		context.enqueueWork(() -> {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
-				dta.sfmflow.api.component.AbstractFlowComponent component = manager.getFlowComponents()
-						.get(data.componentId());
+				AbstractFlowComponent component = manager.getFlowComponents().get(data.componentId());
 				if (component != null) {
 					component.loadData(data.settings());
 					manager.setChanged();
 
-					// Symmetrical carried item snap-back: safely return any held item to the inventory slots [3]
+					// Symmetrical carried item snap-back: safely return any held item to the
+					// inventory slots [3]
 					ServerPlayer player = (ServerPlayer) context.player();
 					ItemStack carried = player.containerMenu.getCarried();
 					if (carried != null && !carried.isEmpty()) {
@@ -139,9 +149,7 @@ public class ServerPayloadHandler {
 	 * Processes an incoming connection request on the server main thread. Enforces
 	 * 1-wire limits on both pins and broadcasts connections sync packet [3].
 	 */
-	public static void handleCreateConnection(
-			final dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket data,
-			final IPayloadContext context) {
+	public static void handleCreateConnection(final CreateConnectionPacket data, final IPayloadContext context) {
 		context.enqueueWork(() -> {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				var connections = manager.getFlowConnections();
@@ -154,23 +162,22 @@ public class ServerPayloadHandler {
 								&& conn.getInputNodeIndex() == data.inputIdx()));
 
 				// Register new connection wire
-				connections.add(new dta.sfmflow.flowcomponents.FlowComponentConnections(data.sourceId(),
-						data.outputIdx(), data.targetId(), data.inputIdx()));
+				connections.add(new FlowComponentConnections(data.sourceId(), data.outputIdx(), data.targetId(),
+						data.inputIdx()));
 				manager.setChanged();
 
 				// Serialize updated connections list to NBT Tag [3]
-				net.minecraft.nbt.CompoundTag dataTag = new net.minecraft.nbt.CompoundTag();
-				net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
+				CompoundTag dataTag = new CompoundTag();
+				ListTag listTag = new ListTag();
 				for (var conn : connections) {
-					net.minecraft.nbt.CompoundTag connTag = new net.minecraft.nbt.CompoundTag();
+					CompoundTag connTag = new CompoundTag();
 					conn.save(connTag);
 					listTag.add(connTag);
 				}
 				dataTag.put("connections", listTag);
 
 				// Broadcast synchronized connections update to clients
-				manager.broadcastConnectionsUpdate(new dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket(
-						manager.getBlockPos(), dataTag));
+				manager.broadcastConnectionsUpdate(new SyncConnectionsPacket(manager.getBlockPos(), dataTag));
 			}
 		});
 	}
@@ -180,9 +187,7 @@ public class ServerPayloadHandler {
 	 * Cleans up the flowchart's wire array and broadcasts synchronization packets
 	 * [3].
 	 */
-	public static void handleRemoveConnection(
-			final dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket data,
-			final IPayloadContext context) {
+	public static void handleRemoveConnection(final RemoveConnectionPacket data, final IPayloadContext context) {
 		context.enqueueWork(() -> {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				var connections = manager.getFlowConnections();
@@ -195,18 +200,17 @@ public class ServerPayloadHandler {
 				manager.setChanged();
 
 				// Re-serialize connections NBT package [3]
-				net.minecraft.nbt.CompoundTag dataTag = new net.minecraft.nbt.CompoundTag();
-				net.minecraft.nbt.ListTag listTag = new net.minecraft.nbt.ListTag();
+				CompoundTag dataTag = new CompoundTag();
+				ListTag listTag = new ListTag();
 				for (var conn : connections) {
-					net.minecraft.nbt.CompoundTag connTag = new net.minecraft.nbt.CompoundTag();
+					CompoundTag connTag = new CompoundTag();
 					conn.save(connTag);
 					listTag.add(connTag);
 				}
 				dataTag.put("connections", listTag);
 
 				// Broadcast update instantly to observing players
-				manager.broadcastConnectionsUpdate(new dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket(
-						manager.getBlockPos(), dataTag));
+				manager.broadcastConnectionsUpdate(new SyncConnectionsPacket(manager.getBlockPos(), dataTag));
 			}
 		});
 	}
@@ -215,12 +219,11 @@ public class ServerPayloadHandler {
 	 * Processes an incoming variable binding request on the server main thread.
 	 * Maps variables to target components and broadcasts setting changes [3].
 	 */
-	public static void handleBindVariable(final dta.sfmflow.networking.packets.serverbound.BindVariablePacket data,
-			final IPayloadContext context) {
+	public static void handleBindVariable(final BindVariablePacket data, final IPayloadContext context) {
 		context.enqueueWork(() -> {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				var component = manager.getFlowComponents().get(data.componentId());
-				if (component instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
+				if (component instanceof ItemTransferComponent transfer) {
 					if (data.isGroupVariable()) {
 						transfer.setBoundGroupVariableId(data.variableId());
 					} else {
@@ -229,13 +232,10 @@ public class ServerPayloadHandler {
 					manager.setChanged();
 
 					// Broadcast setting updates cleanly to other observing menus
-					net.minecraft.nbt.CompoundTag settingsTag = new net.minecraft.nbt.CompoundTag();
+					CompoundTag settingsTag = new CompoundTag();
 					transfer.saveData(settingsTag);
-					manager.broadcastDeltaUpdate(
-							new dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket(
-									manager.getBlockPos(), transfer.getId(),
-									dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket.DeltaType.SETTINGS,
-									settingsTag));
+					manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), transfer.getId(),
+							SyncComponentDeltaPacket.DeltaType.SETTINGS, settingsTag));
 				}
 			}
 		});
@@ -244,10 +244,11 @@ public class ServerPayloadHandler {
 	/**
 	 * Processes an incoming slot item layout sync request on the server thread [3].
 	 */
-	public static void handleRequestInventorySlots(final RequestInventorySlotsPacket data, final IPayloadContext context) {
+	public static void handleRequestInventorySlots(final RequestInventorySlotsPacket data,
+			final IPayloadContext context) {
 		context.enqueueWork(() -> {
 			ServerPlayer player = (ServerPlayer) context.player();
-			net.minecraft.world.level.Level level = player.level();
+			Level level = player.level();
 			if (level.hasChunkAt(data.pos())) {
 				IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
 				if (handler != null) {
@@ -270,4 +271,24 @@ public class ServerPayloadHandler {
 			}
 		});
 	}
+
+	public static void handleSetActiveFilterComponent(final SetActiveFilterComponentPacket data,
+			final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			if (context.player().containerMenu instanceof ManagerMenu menu) {
+				ManagerBlockEntity manager = menu.getManagerBlockEntity();
+				if (!manager.isRemoved() && manager.getBlockPos().equals(data.pos())) {
+					if (data.componentId() == null) {
+						menu.setActiveFilterComponent(null);
+					} else {
+						var comp = manager.getFlowComponents().get(data.componentId());
+						if (comp instanceof ItemTransferComponent transfer) {
+							menu.setActiveFilterComponent(transfer);
+						}
+					}
+				}
+			}
+		});
+	}
+
 }

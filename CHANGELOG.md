@@ -1,6 +1,8 @@
-6-28-2026 Round 2
+6-29-2026
 
 ### [Added]
+* New Right-Click Actions: Context dropdown menus now include "Copy Node" and "Delete Node" options for faster flowchart canvas management.
+* Ghost Item Slots: Filters now use interactive ghost slots, allowing you to drag and drop items from your player inventory to define filters.
 * Added an extensible logic planning API, enabling future addon developers to build custom logic blocks, sensors, and conditional triggers that integrate directly with the background planning engine.
 * Added authentic, high-fidelity slot layout screens for vanilla Furnaces, Smokers, Blast Furnaces, Brewing Stands, Crafters, Droppers, Dispensers, and Hoppers that replicate their original inventory styles.
 * Added support for custom JSON-driven slot layouts, allowing pack makers and developers to define custom background textures and slot alignments for any block.
@@ -8,10 +10,16 @@
 * Added specialized visual fallbacks in the 3D block preview scene to render Chests, Trapped Chests, and Ender Chests cleanly without missing textures or model glitches.
 
 ### [Changed]
+* Compact Context Menus: The right-click node dropdown menu has been scaled down to 66% size and updated with standard grey styling for a more compact and streamlined appearance.
+* Face Marker Blending: The 3D preview's face markers are now rendered with 50% opacity to improve text and orientation visibility underneath.
+* Dimming Adjustments: Canvas dimming now correctly applies beneath active inventory slots when a settings overlay is open, keeping player slots fully readable.
 * Refactored the core flowchart evaluation system to process nodes polymorphically, improving server-side background execution performance and code stability.
 * Streamlined internal ticking routines for Card Clusters and Hatches to reduce server tick overhead.
 * Relocated core slot layout systems to the public API, enabling third-party integration mods to register their own visual inventory screens programmatically.
 
+### [Fixed]
+* Depth Sorting Glitches: Resolved rendering issues where 3D previews could overlap or clip into settings overlays.
+* Overlay Input Conflicts: Fixed settings overlays swallowing mouse clicks meant for active inventory slots.
 
 6-28-2026
 

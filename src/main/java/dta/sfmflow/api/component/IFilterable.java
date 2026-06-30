@@ -28,4 +28,12 @@ public interface IFilterable {
 	 * @return the list of ItemStack instances [3]
 	 */
 	List<ItemStack> getFilterItems();
+
+	/**
+	 * Retrieves the mutable list of quantity limits corresponding to each filter item slot [3].
+	 * -1 represents unlimited, and positive integers represent specific limits [3].
+	 *
+	 * @return list of integer limits [3]
+	 */
+	List<Integer> getFilterLimits();
 }

@@ -19,6 +19,7 @@ import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
+import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.networking.packets.serverbound.SyncClusterSlotDirectionPacket;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import dta.sfmflow.screen.ModMenuTypes;
@@ -80,6 +81,8 @@ public class SFMFlow {
 				(payload, context) -> ServerPayloadHandler.handleBindVariable(payload, context));
 		registrar.playToServer(RequestInventorySlotsPacket.TYPE, RequestInventorySlotsPacket.STREAM_CODEC,
 				(payload, context) -> ServerPayloadHandler.handleRequestInventorySlots(payload, context));
+		registrar.playToServer(SetActiveFilterComponentPacket.TYPE, SetActiveFilterComponentPacket.STREAM_CODEC,
+				(payload, context) -> ServerPayloadHandler.handleSetActiveFilterComponent(payload, context));
 
 		registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,
 				PacketHandlerManager::handleSyncConnections);

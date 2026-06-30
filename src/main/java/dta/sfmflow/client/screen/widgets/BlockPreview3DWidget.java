@@ -6,6 +6,7 @@ import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.Preview3DRenderer;
 import dta.sfmflow.client.screen.ManagerScreen;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Checkbox;
@@ -201,6 +202,9 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		if (centerPos != null && level != null && level.hasChunkAt(centerPos)) {
 			Preview3DRenderer.render3DScene(guiGraphics, level, centerPos, yawRotation, pitchRotation, centerX, centerY,
 					sideModel, sideSupportChecker);
+			// Restore standard depth mask and depth test states to prevent polygon sorting conflicts on subsequently rendered 3D GUI items [3]
+			RenderSystem.depthMask(true);
+			RenderSystem.enableDepthTest();
 		} else {
 			guiGraphics.drawCenteredString(parentScreen.getFont(), "NO", centerX, centerY - 10, 0xFF8B8B8B);
 			guiGraphics.drawCenteredString(parentScreen.getFont(), "PREVIEW", centerX, centerY + 2, 0xFF8B8B8B);

@@ -1,45 +1,39 @@
 package dta.sfmflow.client.screen.widgets;
 
+import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.event.RegisterDropdownLinksEvent;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.PacketDistributor;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Compact right-click visual dropdown overlay replacing old ContextMenuOverlay
- * [3]. Houses scrolling logic, viewport scissor bounds, and launches settings
- * modals [3].
+ * Compact right-click visual dropdown overlay replacing old ContextMenuOverlay [3].
+ * Houses scrolling logic, viewport scissor bounds, and launches settings
+ * modals [3]. Scaled down to 66% with standard grey styling [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class DropdownMenuWidget extends AbstractFlowWidget {
+	private final List<FlowTextLink> links = new ArrayList<>();
 	private final FlowWidgetContainer targetContainer;
 	private final ManagerScreen parentScreen;
-	private final List<FlowTextLink> links = new ArrayList<>();
 	private int scrollOffset = 0;
 	private final int totalContentHeight;
 	private final boolean needsScrolling;
 
-	/**
-	 * Initializes a Dropdown Menu with a fixed width of 84px and dynamic scrollable
-	 * height [3].
-	 *
-	 * @param targetContainer the card containing targeted properties [3]
-	 * @param mouseX          click placement coordinate [3]
-	 * @param mouseY          click placement coordinate [3]
-	 * @param parentScreen    parent screen interface [3]
-	 */
 	public DropdownMenuWidget(FlowWidgetContainer targetContainer, int mouseX, int mouseY, ManagerScreen parentScreen) {
 		super(mouseX, mouseY, 84, 56, Component.literal("Dropdown Menu"));
 		this.targetContainer = targetContainer;
 		this.parentScreen = parentScreen;
 
-		// Compile default options first
 		RegisterDropdownLinksEvent event = new RegisterDropdownLinksEvent(targetContainer.getComponent());
 		event.addLink(Component.literal("Rename Node"), () -> {
 			RenameModalPopup renamePopup = new RenameModalPopup(parentScreen, targetContainer);
@@ -58,28 +52,48 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 			parentScreen.setActiveSettingsOverlay(settingsOverlay);
 			parentScreen.setOpenedDropdown(null);
 		});
+		event.addLink(Component.literal("Copy Node"), () -> {
+			PacketDistributor.sendToServer(new CanvasActionPacket(
+					parentScreen.getMenu().getManagerBlockEntity().getBlockPos(),
+					targetContainer.getComponent().getId(),
+					CanvasAction.COPY));
+			parentScreen.setOpenedDropdown(null);
+		});
+		event.addLink(Component.literal("Delete Node"), () -> {
+			PacketDistributor.sendToServer(new CanvasActionPacket(
+					parentScreen.getMenu().getManagerBlockEntity().getBlockPos(),
+					targetContainer.getComponent().getId(),
+					CanvasAction.DELETE));
+			parentScreen.setOpenedDropdown(null);
+		});
 
-		// Fire public NeoForge event to gather registrations from third-party add-ons
-		// [3]
 		NeoForge.EVENT_BUS.post(event);
 
-		// Dynamically compute size boundaries (Height = 56 + links * 14) [3]
-		int rawHeight = 56 + (event.getLinks().size() * 14);
-		this.totalContentHeight = event.getLinks().size() * 14;
-		this.needsScrolling = rawHeight > 112; // Enable scroll tracking if exceeds viewport limitations [3]
+		List<RegisterDropdownLinksEvent.LinkEntry> compiled = event.getLinks();
+		
+		// Dynamically compute exact height boundary based on 6px top/bottom padding [3]
+		int rawHeight = (compiled.size() * 14) + 12;
+		this.totalContentHeight = compiled.size() * 14;
+		this.needsScrolling = rawHeight > 112;
 		this.height = Math.min(112, rawHeight);
 
-		// Clamping to keep dropdown context menus safely on the active screen frame [3]
-		int clampedX = Math.max(parentScreen.getLeftPos() + 22,
-				Math.min(mouseX, parentScreen.getLeftPos() + parentScreen.getImageWidth() - this.width - 4));
-		int clampedY = Math.max(parentScreen.getTopPos() + 4,
-				Math.min(mouseY, parentScreen.getTopPos() + parentScreen.getImageHeight() - this.height - 4));
+		int clampedX = mouseX;
+		int clampedY = mouseY;
+		int scaledW = (int) (this.width * 0.66F);
+		int scaledH = (int) (this.height * 0.66F);
+
+		if (clampedX + scaledW > parentScreen.width) {
+			clampedX = parentScreen.width - scaledW;
+		}
+		if (clampedY + scaledH > parentScreen.height) {
+			clampedY = parentScreen.height - scaledH;
+		}
+
 		this.setX(clampedX);
 		this.setY(clampedY);
 
-		// Set up FlowTextLink sub-elements
 		int index = 0;
-		for (RegisterDropdownLinksEvent.LinkEntry entry : event.getLinks()) {
+		for (RegisterDropdownLinksEvent.LinkEntry entry : compiled) {
 			FlowTextLink link = new FlowTextLink(clampedX, clampedY + 6 + (index * 14), entry.label(), entry.action());
 			this.links.add(link);
 			this.children.add(link);
@@ -88,12 +102,17 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 	}
 
 	@Override
+	public boolean isMouseOver(double mouseX, double mouseY) {
+		return this.visible && mouseX >= getX() && mouseX < getX() + (this.width * 0.66F)
+				&& mouseY >= getY() && mouseY < getY() + (this.height * 0.66F);
+	}
+
+	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (this.visible && this.active && isMouseOver(mouseX, mouseY) && needsScrolling) {
 			int maxScroll = totalContentHeight - (this.height - 12);
 			this.scrollOffset = net.minecraft.util.Mth.clamp(this.scrollOffset - (int) (scrollY * 14), 0, maxScroll);
 
-			// Re-align and shift text links based on scrolling ticks
 			int index = 0;
 			for (FlowTextLink link : links) {
 				link.setY(getY() + 6 + (index * 14) - scrollOffset);
@@ -107,11 +126,12 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (this.visible && this.active && isMouseOver(mouseX, mouseY)) {
+			double unscaledMouseX = getX() + (mouseX - getX()) / 0.66F;
+			double unscaledMouseY = getY() + (mouseY - getY()) / 0.66F;
+
 			for (FlowTextLink link : links) {
-				// Safeguard clicked checks: Click target only if within the active visible
-				// scissor viewport [3]
-				if (mouseY >= getY() + 6 && mouseY < getY() + height - 6) {
-					if (link.mouseClicked(mouseX, mouseY, button)) {
+				if (unscaledMouseY >= getY() + 6 && unscaledMouseY < getY() + height - 6) {
+					if (link.mouseClicked(unscaledMouseX, unscaledMouseY, button)) {
 						return true;
 					}
 				}
@@ -122,18 +142,31 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Dark translucent window backdrop with golden border frame [3]
-		guiGraphics.fill(getX(), getY(), getX() + width, getY() + height, 0xFA111111);
-		guiGraphics.renderOutline(getX(), getY(), width, height, 0xFFD4AF37);
+		guiGraphics.pose().pushPose();
+		guiGraphics.pose().translate(getX(), getY(), 0);
+		guiGraphics.pose().scale(0.66F, 0.66F, 1.0F);
+		guiGraphics.pose().translate(-getX(), -getY(), 0);
 
-		// Viewport Scissor to prevent text elements from drawing out-of-bounds on short
-		// devices [3]
-		guiGraphics.enableScissor(getX() + 1, getY() + 6, getX() + width - 1, getY() + height - 6);
+		guiGraphics.fill(getX(), getY(), getX() + width, getY() + height, 0xFA111111);
+		guiGraphics.renderOutline(getX(), getY(), width, height, 0xFF8B8B8B);
+
+		int scissorMinX = getX() + (int) Math.round(1 * 0.66);
+		int scissorMinY = getY() + (int) Math.round(6 * 0.66);
+		int scissorMaxX = getX() + (int) Math.round((width - 1) * 0.66);
+		int scissorMaxY = getY() + (int) Math.round((height - 6) * 0.66);
+
+		guiGraphics.enableScissor(scissorMinX, scissorMinY, scissorMaxX, scissorMaxY);
+
+		int unscaledMouseX = getX() + (int) Math.round((mouseX - getX()) / 0.66F);
+		int unscaledMouseY = getY() + (int) Math.round((mouseY - getY()) / 0.66F);
+
 		for (FlowTextLink link : links) {
 			link.visible = this.visible;
 			link.active = this.active;
-			link.render(guiGraphics, mouseX, mouseY, partialTick);
+			link.render(guiGraphics, unscaledMouseX, unscaledMouseY, partialTick);
 		}
 		guiGraphics.disableScissor();
+
+		guiGraphics.pose().popPose();
 	}
 }

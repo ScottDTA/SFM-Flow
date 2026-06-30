@@ -4,6 +4,7 @@ import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -14,13 +15,14 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Reusable UI widget managing Whitelist/Blacklist filtering and a 1x12 ghost slot item grid [3].
- * Upgraded to render dynamic empty/filled slot states using custom 18x36 textures [3].
+ * Reusable UI widget managing Whitelist/Blacklist filtering and a 1x12 ghost
+ * slot item grid [3]. Repositions physical menu slots to enable robust vanilla
+ * drag-and-drop mechanics [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class ItemFilterWidget extends AbstractFlowWidget {
-	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-			dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
+	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation
+			.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
 
 	private final IFilterable model;
 	private final ManagerScreen parentScreen;
@@ -33,7 +35,6 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 		this.parentScreen = parentScreen;
 		this.onChanged = onChanged;
 
-		// Button positioned at the top right of our local bounds [3]
 		this.toggleWhitelistBtn = Button
 				.builder(Component.literal(model.isWhitelist() ? "Whitelist" : "Blacklist"), btn -> {
 					model.setWhitelist(!model.isWhitelist());
@@ -41,6 +42,25 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 					this.onChanged.run();
 				}).pos(getX() + 130, getY()).size(120, 14).build();
 		this.children.add(new ApiWidgetAdapter<>(this.toggleWhitelistBtn));
+
+		repositionGhostSlots();
+	}
+
+	private void repositionGhostSlots() {
+		int gridStartX = getX();
+		int gridStartY = getY() + 20;
+
+		for (int i = 0; i < 12; i++) {
+			int slotX = gridStartX + i * 20 + 1;
+			int slotY = gridStartY + 1;
+
+			int slotIndexInMenu = 36 + i;
+			if (slotIndexInMenu < parentScreen.getMenu().slots.size()) {
+				var slot = parentScreen.getMenu().slots.get(slotIndexInMenu);
+				MenuSlotRepositioner.setSlotPosition(slot, slotX - parentScreen.getLeftPos(),
+						slotY - parentScreen.getTopPos());
+			}
+		}
 	}
 
 	@Override
@@ -49,43 +69,20 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			return false;
 		}
 
-		// Check standard click on the child toggle button first [3]
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
 				return true;
 			}
 		}
 
-		// 1x12 Ghost Slot Grid Clicks (X: getX(), Y: getY() + 20) [3]
-		int gridStartX = getX();
-		int gridStartY = getY() + 20;
-
-		if (mouseX >= gridStartX && mouseX < gridStartX + 12 * 20 && mouseY >= gridStartY && mouseY < gridStartY + 20) {
-			int col = (int) ((mouseX - gridStartX) / 20);
-			if (col >= 0 && col < 12) {
-				ItemStack carried = parentScreen.getMenu().getCarried();
-				if (carried != null && !carried.isEmpty()) {
-					ItemStack copy = carried.copy();
-					copy.setCount(1);
-					model.getFilterItems().set(col, copy);
-				} else {
-					model.getFilterItems().set(col, ItemStack.EMPTY);
-				}
-				this.onChanged.run();
-				return true;
-			}
-		}
-
-		return false;
+		return false; // Let clicks fall through to the physical slots! [3]
 	}
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Label rendered on the left of our button [3]
-		guiGraphics.drawString(parentScreen.getFont(), Component.literal("Item Filter:"), getX(),
-				getY() + 3, 0xFF404040, false);
+		guiGraphics.drawString(parentScreen.getFont(), Component.literal("Item Filter:"), getX(), getY() + 3,
+				0xFF404040, false);
 
-		// Render children (the toggle button) [3]
 		for (GuiEventListener child : children) {
 			if (child instanceof AbstractFlowWidget widget) {
 				widget.visible = this.visible;
@@ -94,7 +91,6 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			}
 		}
 
-		// Centered 1x12 Ghost Slot Grid Rendering [3]
 		int gridStartX = getX();
 		int gridStartY = getY() + 20;
 
@@ -107,27 +103,34 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			boolean hasItem = stack != null && !stack.isEmpty();
 			int vOffset = hasItem ? 18 : 0;
 
-			// Blit the custom slot background texture (V=0 for empty/question mark, V=18 for filled)
+			// Draw our custom slot design background
 			guiGraphics.blit(FILTER_SLOT_TEXTURE, slotX, slotY, 0, vOffset, 18, 18, 18, 36);
 
-			// Draw a gold highlight border if hovered [3]
 			if (hovered) {
-				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFFD4AF37);
+				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF8B8B8B);
 			}
 
+			// Render the item stack manually on top of the slot background [3]
 			if (hasItem) {
-				// Symmetrical +1px padding shifts the item stack inside standard 16x16 bounds
 				guiGraphics.renderItem(stack, slotX + 1, slotY + 1);
-			}
-		}
+				guiGraphics.renderItemDecorations(parentScreen.getFont(), stack, slotX + 1, slotY + 1);
 
-		// Tooltip rendering pass for 1x12 ghost slot items [3]
-		if (mouseX >= gridStartX && mouseX < gridStartX + 12 * 20 && mouseY >= gridStartY && mouseY < gridStartY + 20) {
-			int col = (int) ((mouseX - gridStartX) / 20);
-			if (col >= 0 && col < 12) {
-				ItemStack stack = model.getFilterItems().get(col);
-				if (stack != null && !stack.isEmpty()) {
-					guiGraphics.renderTooltip(parentScreen.getFont(), stack, mouseX, mouseY);
+				// Render our custom text limits overlay here [3]
+				int limit = model.getFilterLimits().get(c);
+				if (limit > 0) {
+					guiGraphics.pose().pushPose();
+					guiGraphics.pose().translate(0, 0, 200.0F);
+					String limitStr = String.valueOf(limit);
+					int strW = parentScreen.getFont().width(limitStr);
+
+					float textScale = 0.65F;
+					guiGraphics.pose().pushPose();
+					guiGraphics.pose().translate(slotX + 17 - (strW * textScale), slotY + 11, 0);
+					guiGraphics.pose().scale(textScale, textScale, 1.0F);
+					guiGraphics.drawString(parentScreen.getFont(), limitStr, 0, 0, 0xFFFFFFFF, true);
+					guiGraphics.pose().popPose();
+
+					guiGraphics.pose().popPose();
 				}
 			}
 		}
@@ -138,6 +141,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 		int dif = this.getX() - x;
 		super.setX(x);
 		updateChildrenXPositions(dif);
+		repositionGhostSlots();
 	}
 
 	@Override
@@ -145,5 +149,6 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 		int dif = this.getY() - y;
 		super.setY(y);
 		updateChildrenYPositions(dif);
+		repositionGhostSlots();
 	}
 }
