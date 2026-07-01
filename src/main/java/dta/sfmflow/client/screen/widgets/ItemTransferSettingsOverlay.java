@@ -1,5 +1,8 @@
 package dta.sfmflow.client.screen.widgets;
 
+import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
+import dta.sfmflow.api.client.widget.InventorySelectorWidget;
+import dta.sfmflow.api.client.widget.ItemFilterWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;

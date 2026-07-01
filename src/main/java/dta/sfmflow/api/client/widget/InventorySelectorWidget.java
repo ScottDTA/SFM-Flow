@@ -1,7 +1,5 @@
-package dta.sfmflow.client.screen.widgets;
+package dta.sfmflow.api.client.widget;
 
-import dta.sfmflow.api.client.widget.AbstractFlowWidget;
-import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.util.ConnectionBlock;

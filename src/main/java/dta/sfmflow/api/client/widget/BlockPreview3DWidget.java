@@ -1,11 +1,12 @@
-package dta.sfmflow.client.screen.widgets;
+package dta.sfmflow.api.client.widget;
 
-import dta.sfmflow.api.client.widget.AbstractFlowWidget;
-import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.Preview3DRenderer;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -22,6 +23,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
+import java.lang.reflect.Field;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -82,12 +84,12 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 
 	private void setCheckboxSelected(Checkbox checkbox, boolean selected) {
 		try {
-			java.lang.reflect.Field field = Checkbox.class.getDeclaredField("selected");
+			Field field = Checkbox.class.getDeclaredField("selected");
 			field.setAccessible(true);
 			field.setBoolean(checkbox, selected);
 		} catch (Exception e) {
 			try {
-				for (java.lang.reflect.Field field : Checkbox.class.getDeclaredFields()) {
+				for (Field field : Checkbox.class.getDeclaredFields()) {
 					if (field.getType() == boolean.class) {
 						field.setAccessible(true);
 						field.setBoolean(checkbox, selected);
@@ -95,7 +97,7 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 					}
 				}
 			} catch (Exception ex) {
-				dta.sfmflow.SFMFlow.LOGGER.error("Failed to set checkbox state", ex);
+				SFMFlow.LOGGER.error("Failed to set checkbox state", ex);
 			}
 		}
 	}

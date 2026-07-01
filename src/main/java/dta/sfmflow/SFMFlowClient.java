@@ -4,18 +4,16 @@ import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.FlowSettingsRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
+import dta.sfmflow.api.client.plugin.SFMFlowClientPluginRegistry;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ISettingsWidgetProvider;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentBuilder;
-import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.screen.CableClusterScreen;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
 import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
-import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsWidget;
-import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.screen.ModMenuTypes;
 import dta.sfmflow.util.Color;
 import net.minecraft.network.chat.Component;
@@ -35,11 +33,10 @@ import net.neoforged.neoforge.common.NeoForge;
 import java.util.function.Supplier;
 
 /**
- * Client-only event subscriber and bootstrappery driver [3]. Physical dedicated
- * servers entirely ignore this class, ensuring 100% side-safe operations [3].
+ * Client-only event subscriber and bootstrappery driver [3].
  */
 @Mod(value = SFMFlow.MODID, dist = Dist.CLIENT)
-@EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT)
 public class SFMFlowClient {
 	public SFMFlowClient(ModContainer container) {
 		container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
@@ -56,26 +53,14 @@ public class SFMFlowClient {
 		event.registerReloadListener(new SlotLayoutManager());
 	}
 
-	/**
-	 * Processes client-side mod bootstrapping lifecycle operations [3].
-	 * Automatically loops through common-safe builders to populate visual client
-	 * properties side-safely [3].
-	 *
-	 * @param event the client-setup mod bus event [3]
-	 */
 	@SubscribeEvent
 	public static void clientSetup(FMLClientSetupEvent event) {
-
-		// Register in-world highlight manager to NeoForge game event bus [3]
 		NeoForge.EVENT_BUS.register(HighlightManager.class);
 
 		event.enqueueWork(() -> {
-			FlowSettingsRegistry.register(FlowComponentType.INTERVAL_TRIGGER.get(), (container, component) -> {
-				if (component instanceof IntervalTriggerComponent intervalTrigger) {
-					return new IntervalTriggerSettingsWidget(container, intervalTrigger);
-				}
-				return null;
-			});
+			/* STREAMING_CHUNK:Invoking client plugin registrations */
+			// Sweeps and triggers visual layout setup across all client plugins safely [3]
+			SFMFlowClientPluginRegistry.initAllClientProperties();
 
 			Color.setResolver((color, isText) -> {
 				if (isText) {

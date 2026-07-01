@@ -3,25 +3,39 @@ package dta.sfmflow.flowcomponents;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
+import dta.sfmflow.api.execution.FlowItemBuffer;
+import dta.sfmflow.api.execution.FlowchartPlanningContext;
+import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
+import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Unified logic component handling both item inputs (extractions) and item
- * outputs (depositions) [3]. Supports NBT serialization for per-side enabled slot bitmasks,
- * variable bindings, and custom item quantity limits [3].
+ * outputs (depositions) [3]. Supports NBT serialization for per-side enabled
+ * slot bitmasks, variable bindings, and custom item quantity limits [3].
  */
 public class ItemTransferComponent extends AbstractFlowComponent
 		implements IFilterable, IInventoryTarget, ISideConfigurable {
@@ -32,71 +46,64 @@ public class ItemTransferComponent extends AbstractFlowComponent
 
 	private int activeSidesMask = 63;
 
-	private final List<Long> enabledSlotsMasks = new java.util.ArrayList<>(
-			java.util.List.of(-1L, -1L, -1L, -1L, -1L, -1L));
+	private final List<Long> enabledSlotsMasks = new ArrayList<>(List.of(-1L, -1L, -1L, -1L, -1L, -1L));
 
 	private UUID boundGroupVariableId = null;
 	private UUID boundFilterVariableId = null;
 
 	private boolean whitelist = true;
-	private final List<ItemStack> filterItems = new java.util.ArrayList<>();
-	private final List<Integer> filterLimits = new java.util.ArrayList<>();
+	private final List<ItemStack> filterItems = new ArrayList<>();
+	private final List<Integer> filterLimits = new ArrayList<>();
 
 	public static final MapCodec<ItemTransferComponent> INPUT_CODEC = makeCodec(true);
 	public static final MapCodec<ItemTransferComponent> OUTPUT_CODEC = makeCodec(false);
 
 	private static MapCodec<ItemTransferComponent> makeCodec(boolean isInput) {
-		return RecordCodecBuilder
-				.mapCodec(instance -> instance
-						.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemTransferComponent::getBaseProperties),
-								Codec.INT
-										.optionalFieldOf("inventoryId", -1)
-										.forGetter(ItemTransferComponent::getInventoryId),
-								Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
-								Codec.INT.optionalFieldOf("targetSlot", -1)
-										.forGetter(ItemTransferComponent::getTargetSlot),
-								Codec.INT.optionalFieldOf("activeSidesMask", 63)
-										.forGetter(ItemTransferComponent::getActiveSidesMask),
-								Codec.LONG.listOf()
-										.optionalFieldOf("enabledSlotsMasks",
-												java.util.List.of(-1L, -1L, -1L, -1L, -1L, -1L))
-										.forGetter(ItemTransferComponent::getEnabledSlotsMasks),
-								UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
-										.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
-								UUIDUtil.CODEC
-										.optionalFieldOf("boundFilterVariableId")
-										.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())),
-								Codec.BOOL.optionalFieldOf("whitelist", true)
-										.forGetter(ItemTransferComponent::isWhitelist),
-								ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
-										.forGetter(ItemTransferComponent::getFilterItems),
-								Codec.INT.listOf().optionalFieldOf("filterLimits", java.util.List.of(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1))
-										.forGetter(ItemTransferComponent::getFilterLimits))
-						.apply(instance, (baseProps, invId, useAllVal, slot, sidesMask, masksList, groupVar, filterVar,
-								whitelistVal, filtersList, limitsList) -> {
-							ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
-							comp.setBaseProperties(baseProps);
-							comp.inventoryId = invId;
-							comp.useAll = useAllVal;
-							comp.targetSlot = slot;
-							comp.activeSidesMask = sidesMask;
-							comp.enabledSlotsMasks.clear();
-							comp.enabledSlotsMasks.addAll(masksList);
-							comp.boundGroupVariableId = groupVar.orElse(null);
-							comp.boundFilterVariableId = filterVar.orElse(null);
-							comp.whitelist = whitelistVal;
-							comp.filterItems.clear();
-							comp.filterItems.addAll(filtersList);
-							while (comp.filterItems.size() < 12) {
-								comp.filterItems.add(ItemStack.EMPTY);
-							}
-							comp.filterLimits.clear();
-							comp.filterLimits.addAll(limitsList);
-							while (comp.filterLimits.size() < 12) {
-								comp.filterLimits.add(-1);
-							}
-							return comp;
-						}));
+		return RecordCodecBuilder.mapCodec(instance -> instance
+				.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemTransferComponent::getBaseProperties),
+						Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemTransferComponent::getInventoryId),
+						Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
+						Codec.INT.optionalFieldOf("targetSlot", -1).forGetter(ItemTransferComponent::getTargetSlot),
+						Codec.INT.optionalFieldOf("activeSidesMask", 63)
+								.forGetter(ItemTransferComponent::getActiveSidesMask),
+						Codec.LONG.listOf().optionalFieldOf("enabledSlotsMasks", List.of(-1L, -1L, -1L, -1L, -1L, -1L))
+								.forGetter(ItemTransferComponent::getEnabledSlotsMasks),
+						UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
+								.forGetter(comp -> Optional.ofNullable(comp.getBoundGroupVariableId())),
+						UUIDUtil.CODEC.optionalFieldOf("boundFilterVariableId")
+								.forGetter(comp -> Optional.ofNullable(comp.getBoundFilterVariableId())),
+						Codec.BOOL.optionalFieldOf("whitelist", true).forGetter(ItemTransferComponent::isWhitelist),
+						ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
+								.forGetter(ItemTransferComponent::getFilterItems),
+						Codec.INT.listOf()
+								.optionalFieldOf("filterLimits",
+										List.of(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1))
+								.forGetter(ItemTransferComponent::getFilterLimits))
+				.apply(instance, (baseProps, invId, useAllVal, slot, sidesMask, masksList, groupVar, filterVar,
+						whitelistVal, filtersList, limitsList) -> {
+					ItemTransferComponent comp = new ItemTransferComponent(baseProps.id(), isInput);
+					comp.setBaseProperties(baseProps);
+					comp.inventoryId = invId;
+					comp.useAll = useAllVal;
+					comp.targetSlot = slot;
+					comp.activeSidesMask = sidesMask;
+					comp.enabledSlotsMasks.clear();
+					comp.enabledSlotsMasks.addAll(masksList);
+					comp.boundGroupVariableId = groupVar.orElse(null);
+					comp.boundFilterVariableId = filterVar.orElse(null);
+					comp.whitelist = whitelistVal;
+					comp.filterItems.clear();
+					comp.filterItems.addAll(filtersList);
+					while (comp.filterItems.size() < 12) {
+						comp.filterItems.add(ItemStack.EMPTY);
+					}
+					comp.filterLimits.clear();
+					comp.filterLimits.addAll(limitsList);
+					while (comp.filterLimits.size() < 12) {
+						comp.filterLimits.add(-1);
+					}
+					return comp;
+				}));
 	}
 
 	public ItemTransferComponent(UUID uuid, boolean isInput) {
@@ -114,7 +121,9 @@ public class ItemTransferComponent extends AbstractFlowComponent
 
 	@Override
 	public FlowComponentType getType() {
-		return isInput ? FlowComponentType.ITEM_INPUT.get() : FlowComponentType.ITEM_OUTPUT.get();
+		// Change from FlowComponentType.ITEM_INPUT to VanillaSFMFlowPlugin.ITEM_INPUT
+		// [3]
+		return isInput ? VanillaSFMFlowPlugin.ITEM_INPUT.get() : VanillaSFMFlowPlugin.ITEM_OUTPUT.get();
 	}
 
 	public List<Long> getEnabledSlotsMasks() {
@@ -256,41 +265,80 @@ public class ItemTransferComponent extends AbstractFlowComponent
 	}
 
 	@Override
-	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
+	public void plan(FlowchartPlanningContext context) {
 		if (this.isInput()) {
-			for (dta.sfmflow.flowcomponents.FlowComponentConnections conn : context.getConnections()) {
+			/* STREAMING_CHUNK:Extruding items virtually into output wire */
+			FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
+
+			// 1. Carry over any incoming items passed from upstream nodes first [3]
+			FlowItemBuffer myInputBuffer = context.getComponentBuffer(this.getId());
+			if (!myInputBuffer.isEmpty()) {
+				for (FlowItemBuffer.BufferedItem item : myInputBuffer.getItems()) {
+					myOutputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
+				}
+			}
+
+			// 2. Extract our own configured inventory items into the combined buffer [3]
+			extractItemsIntoBuffer(context, myOutputBuffer);
+
+			// 3. Always propagate control flow downstream, even if the buffer is empty [3]
+			for (FlowComponentConnections conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(this.getId())) {
-					AbstractFlowComponent targetComponent = context.getComponents().get(conn.getTargetComponentId());
-					if (targetComponent instanceof ItemTransferComponent targetOutput && !targetOutput.isInput()) {
-						planItemTransfer(context, this, targetOutput);
-						context.enqueue(targetOutput.getId());
+					UUID targetId = conn.getTargetComponentId();
+
+					if (!myOutputBuffer.isEmpty()) {
+						FlowItemBuffer targetInputBuffer = context.getComponentBuffer(targetId);
+						for (FlowItemBuffer.BufferedItem item : myOutputBuffer.getItems()) {
+							targetInputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
+						}
 					}
+					// Always enqueue the next node to keep the flowchart executing [3]
+					context.enqueue(targetId);
+				}
+			}
+		} else {
+			/* STREAMING_CHUNK:Siphoning items virtually from input wire */
+			FlowItemBuffer myInputBuffer = context.getComponentBuffer(this.getId());
+			FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
+
+			// 1. Only attempt depositions if we actually have incoming items to handle [3]
+			if (!myInputBuffer.isEmpty()) {
+				depositItemsFromBuffer(context, myInputBuffer, myOutputBuffer);
+			}
+
+			// 2. Always propagate any remaining leftovers downstream [3]
+			for (FlowComponentConnections conn : context.getConnections()) {
+				if (conn.getSourceComponentId().equals(this.getId())) {
+					UUID targetId = conn.getTargetComponentId();
+					FlowItemBuffer targetInputBuffer = context.getComponentBuffer(targetId);
+
+					for (FlowItemBuffer.BufferedItem item : myOutputBuffer.getItems()) {
+						targetInputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
+					}
+					context.enqueue(targetId);
 				}
 			}
 		}
 	}
 
-	private void planItemTransfer(dta.sfmflow.api.execution.FlowchartPlanningContext context, ItemTransferComponent source, ItemTransferComponent target) {
+	private void extractItemsIntoBuffer(FlowchartPlanningContext context, FlowItemBuffer buffer) {
 		var inventories = context.getConnectedInventories();
 		BlockPos srcInventoryPos = null;
-		BlockPos tgtInventoryPos = null;
 
 		for (var block : inventories) {
-			if (block.getId() == source.getInventoryId()) {
+			if (block.getId() == this.getInventoryId() && !block.isSleeping()) {
 				srcInventoryPos = block.getBlockPos();
-			}
-			if (block.getId() == target.getInventoryId()) {
-				tgtInventoryPos = block.getBlockPos();
+				break;
 			}
 		}
 
-		if (srcInventoryPos == null || tgtInventoryPos == null) {
+		if (srcInventoryPos == null) {
 			return;
 		}
 
-		java.util.List<Direction> activeSrcSides = new java.util.ArrayList<>();
+		java.util.List<Direction> activeSrcSides = new ArrayList<>();
 		for (Direction dir : Direction.values()) {
-			if (source.isSideActive(dir)) {
+			if (this.isSideActive(dir)) {
 				activeSrcSides.add(dir);
 			}
 		}
@@ -298,9 +346,100 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			activeSrcSides.add(null);
 		}
 
-		java.util.List<Direction> activeTgtSides = new java.util.ArrayList<>();
+		Map<Item, Integer> grabbedCounts = new HashMap<>();
+
+		for (Direction srcSide : activeSrcSides) {
+			var srcInv = context.getSnapshot().getInventory(srcInventoryPos, srcSide);
+			if (srcInv == null)
+				continue;
+
+			List<Integer> sortedSrcSlots = new ArrayList<>(srcInv.slots().keySet());
+			Collections.sort(sortedSrcSlots);
+
+			for (int srcSlot : sortedSrcSlots) {
+				ThreadSafeInventorySnapshot.SlotSnapshot srcEntry = srcInv.slots().get(srcSlot);
+				ItemStack srcStack = srcEntry.stack();
+				if (srcStack.isEmpty()) {
+					continue;
+				}
+
+				if (this.getTargetSlot() != -1 && this.getTargetSlot() != srcSlot) {
+					continue;
+				}
+
+				int mainSrcSlot = srcEntry.mainSlotIndex();
+				if (!this.isSlotEnabled(srcSide, mainSrcSlot)) {
+					continue;
+				}
+
+				if (!matchesFilter(this, srcStack)) {
+					continue;
+				}
+
+				int totalInSource = 0;
+				for (var entry : srcInv.slots().values()) {
+					if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
+						totalInSource += entry.stack().getCount();
+					}
+				}
+
+				int srcLimit = this.getFilterLimit(srcStack);
+				int srcRemaining = srcStack.getCount();
+
+				if (this.isWhitelist()) {
+					if (srcLimit > 0) {
+						int alreadyGrabbed = grabbedCounts.getOrDefault(srcStack.getItem(), 0);
+						int remainingGrabLimit = srcLimit - alreadyGrabbed;
+						if (remainingGrabLimit <= 0) {
+							continue;
+						}
+						srcRemaining = Math.min(srcRemaining, remainingGrabLimit);
+					}
+				} else {
+					if (srcLimit > 0) {
+						int availableOverLimit = totalInSource - srcLimit;
+						if (availableOverLimit <= 0) {
+							continue;
+						}
+						srcRemaining = Math.min(srcRemaining, availableOverLimit);
+					}
+				}
+
+				if (srcRemaining > 0) {
+					ItemStack extracted = srcStack.copy();
+					extracted.setCount(srcRemaining);
+					buffer.add(srcInventoryPos, srcSlot, srcSide, extracted);
+
+					srcStack.shrink(srcRemaining);
+					grabbedCounts.put(srcStack.getItem(),
+							grabbedCounts.getOrDefault(srcStack.getItem(), 0) + srcRemaining);
+				}
+			}
+		}
+	}
+
+	private void depositItemsFromBuffer(FlowchartPlanningContext context, FlowItemBuffer inputBuffer,
+			FlowItemBuffer outputBuffer) {
+		var inventories = context.getConnectedInventories();
+		BlockPos tgtInventoryPos = null;
+
+		for (var block : inventories) {
+			if (block.getId() == this.getInventoryId() && !block.isSleeping()) {
+				tgtInventoryPos = block.getBlockPos();
+				break;
+			}
+		}
+
+		if (tgtInventoryPos == null) {
+			for (FlowItemBuffer.BufferedItem item : inputBuffer.getItems()) {
+				outputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
+			}
+			return;
+		}
+
+		List<Direction> activeTgtSides = new ArrayList<>();
 		for (Direction dir : Direction.values()) {
-			if (target.isSideActive(dir)) {
+			if (this.isSideActive(dir)) {
 				activeTgtSides.add(dir);
 			}
 		}
@@ -308,183 +447,114 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			activeTgtSides.add(null);
 		}
 
-		// Track virtual planned additions and extractions to prevent double-counting across face snapshots [3]
-		java.util.Map<BlockPos, java.util.Map<net.minecraft.world.item.Item, Integer>> virtualAdditions = new java.util.HashMap<>();
-		java.util.Map<BlockPos, java.util.Map<net.minecraft.world.item.Item, Integer>> virtualExtractions = new java.util.HashMap<>();
-
-		// Track processed item grab limits for Whitelisted Inputs on this execution run [3]
-		java.util.Map<net.minecraft.world.item.Item, Integer> grabbedCounts = new java.util.HashMap<>();
-
-		for (Direction srcSide : activeSrcSides) {
-			var srcInv = context.getSnapshot().getInventory(srcInventoryPos, srcSide);
-			if (srcInv == null)
+		for (FlowItemBuffer.BufferedItem incomingItem : inputBuffer.getItems()) {
+			ItemStack incoming = incomingItem.stack();
+			if (incoming.isEmpty())
 				continue;
 
+			if (!matchesFilter(this, incoming)) {
+				outputBuffer.add(incomingItem.srcPos(), incomingItem.srcSlot(), incomingItem.srcSide(),
+						incoming.copy());
+				continue;
+			}
+
+			int remainingToDeposit = incoming.getCount();
+
 			for (Direction tgtSide : activeTgtSides) {
+				if (remainingToDeposit <= 0)
+					break;
+
 				var tgtInv = context.getSnapshot().getInventory(tgtInventoryPos, tgtSide);
 				if (tgtInv == null)
 					continue;
 
-				java.util.List<Integer> sortedSrcSlots = new java.util.ArrayList<>(srcInv.slots().keySet());
-				java.util.Collections.sort(sortedSrcSlots);
+				List<Integer> sortedTgtSlots = new ArrayList<>(tgtInv.slots().keySet());
+				Collections.sort(sortedTgtSlots);
 
-				java.util.List<Integer> sortedTgtSlots = new java.util.ArrayList<>(tgtInv.slots().keySet());
-				java.util.Collections.sort(sortedTgtSlots);
+				for (int tgtSlot : sortedTgtSlots) {
+					if (remainingToDeposit <= 0)
+						break;
 
-				for (int srcSlot : sortedSrcSlots) {
-					dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.SlotSnapshot srcEntry = srcInv.slots().get(srcSlot);
-					ItemStack srcStack = srcEntry.stack();
-					if (srcStack.isEmpty()) {
+					ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
+					ItemStack tgtStack = tgtEntry.stack();
+
+					if (this.getTargetSlot() != -1 && this.getTargetSlot() != tgtSlot) {
 						continue;
 					}
 
-					if (source.getTargetSlot() != -1 && source.getTargetSlot() != srcSlot) {
+					int mainTgtSlot = tgtEntry.mainSlotIndex();
+					if (!this.isSlotEnabled(tgtSide, mainTgtSlot)) {
 						continue;
 					}
 
-					int mainSrcSlot = srcEntry.mainSlotIndex();
-					if (!source.isSlotEnabled(srcSide, mainSrcSlot)) {
-						continue;
-					}
-
-					if (!matchesFilter(source, srcStack)) {
-						continue;
-					}
-
-					int totalInSource = 0;
-					for (var entry : srcInv.slots().values()) {
-						if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
-							totalInSource += entry.stack().getCount();
+					int totalInTarget = 0;
+					for (var entry : tgtInv.slots().values()) {
+						if (ItemStack.isSameItemSameComponents(incoming, entry.stack())) {
+							totalInTarget += entry.stack().getCount();
 						}
 					}
-					// Deduct virtual extractions already scheduled for this source block [3]
-					int plannedExtractions = virtualExtractions.getOrDefault(srcInventoryPos, java.util.Map.of())
-							.getOrDefault(srcStack.getItem(), 0);
-					totalInSource -= plannedExtractions;
 
-					int srcLimit = source.getFilterLimit(srcStack);
-					int srcRemaining = srcStack.getCount();
+					int tgtLimit = this.getFilterLimit(incoming);
+					int maxToDeposit = incoming.getMaxStackSize();
 
-					// Apply Whitelist / Blacklist Input limits [3]
-					if (source.isWhitelist()) {
-						if (srcLimit > 0) {
-							int alreadyGrabbed = grabbedCounts.getOrDefault(srcStack.getItem(), 0);
-							int remainingGrabLimit = srcLimit - alreadyGrabbed;
-							if (remainingGrabLimit <= 0) {
+					if (this.isWhitelist()) {
+						if (tgtLimit > 0) {
+							maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
+							if (maxToDeposit <= 0) {
 								continue;
 							}
-							srcRemaining = Math.min(srcRemaining, remainingGrabLimit);
 						}
 					} else {
-						if (srcLimit > 0) {
-							int availableOverLimit = totalInSource - srcLimit;
-							if (availableOverLimit <= 0) {
+						if (tgtLimit > 0) {
+							maxToDeposit = Math.max(0, remainingToDeposit - tgtLimit);
+							if (maxToDeposit <= 0) {
 								continue;
 							}
-							srcRemaining = Math.min(srcRemaining, availableOverLimit);
 						}
 					}
 
-					for (int tgtSlot : sortedTgtSlots) {
-						if (srcRemaining <= 0) {
-							break;
-						}
+					boolean canInsert = false;
+					int maxInsertable = 0;
+					int actualLimit = Math.min(tgtEntry.slotLimit(), maxToDeposit);
 
-						dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
-						ItemStack tgtStack = tgtEntry.stack();
-
-						if (target.getTargetSlot() != -1 && target.getTargetSlot() != tgtSlot) {
-							continue;
-						}
-
-						int mainTgtSlot = tgtEntry.mainSlotIndex();
-						if (!target.isSlotEnabled(tgtSide, mainTgtSlot)) {
-							continue;
-						}
-
-						if (!matchesFilter(target, srcStack)) {
-							continue;
-						}
-
-						int totalInTarget = 0;
-						for (var entry : tgtInv.slots().values()) {
-							if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
-								totalInTarget += entry.stack().getCount();
-							}
-						}
-						// Add virtual additions already scheduled for this target block [3]
-						int plannedAdditions = virtualAdditions.getOrDefault(tgtInventoryPos, java.util.Map.of())
-								.getOrDefault(srcStack.getItem(), 0);
-						totalInTarget += plannedAdditions;
-
-						int tgtLimit = target.getFilterLimit(srcStack);
-						int maxToDeposit = srcStack.getMaxStackSize();
-
-						// Apply Whitelist / Blacklist Output limits [3]
-						if (target.isWhitelist()) {
-							if (tgtLimit > 0) {
-								maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
-								if (maxToDeposit <= 0) {
-									continue;
-								}
-							}
-						} else {
-							if (tgtLimit > 0) {
-								// Correctly evaluate the blacklist limit against our available buffer count [3]
-								maxToDeposit = Math.max(0, srcRemaining - tgtLimit);
-								if (maxToDeposit <= 0) {
-									continue;
-								}
-							}
-						}
-
-						boolean canInsert = false;
-						int maxInsertable = 0;
-
-						int actualLimit = Math.min(tgtEntry.slotLimit(), maxToDeposit);
-
-						if (tgtStack.isEmpty()) {
+					if (tgtStack.isEmpty()) {
+						canInsert = true;
+						maxInsertable = actualLimit;
+					} else if (ItemStack.isSameItemSameComponents(incoming, tgtStack)) {
+						int remainingSpace = actualLimit - tgtStack.getCount();
+						if (remainingSpace > 0) {
 							canInsert = true;
-							maxInsertable = actualLimit;
-						} else if (ItemStack.isSameItemSameComponents(srcStack, tgtStack)) {
-							int remainingSpace = actualLimit - tgtStack.getCount();
-							if (remainingSpace > 0) {
-								canInsert = true;
-								maxInsertable = remainingSpace;
-							}
+							maxInsertable = remainingSpace;
 						}
+					}
 
-						if (canInsert) {
-							int amountToTransfer = Math.min(srcRemaining, maxInsertable);
-							if (amountToTransfer > 0) {
-								boolean success = context.tryWriteTask(srcInventoryPos, srcSlot,
-										srcSide, tgtInventoryPos, tgtSlot, tgtSide, srcStack, amountToTransfer);
-								if (success) {
-									if (tgtStack.isEmpty()) {
-										ItemStack newTgt = srcStack.copy();
-										newTgt.setCount(amountToTransfer);
-										tgtInv.slots().put(tgtSlot, new dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
-												tgtEntry.slotLimit(), mainTgtSlot));
-									} else {
-										tgtStack.grow(amountToTransfer);
-									}
-									srcStack.shrink(amountToTransfer);
-									srcRemaining -= amountToTransfer;
-									
-									grabbedCounts.put(srcStack.getItem(), grabbedCounts.getOrDefault(srcStack.getItem(), 0) + amountToTransfer);
-
-									// Register virtual extraction [3]
-									virtualExtractions.computeIfAbsent(srcInventoryPos, k -> new java.util.HashMap<>())
-											.put(srcStack.getItem(), virtualExtractions.computeIfAbsent(srcInventoryPos, k -> new java.util.HashMap<>()).getOrDefault(srcStack.getItem(), 0) + amountToTransfer);
-
-									// Register virtual addition [3]
-									virtualAdditions.computeIfAbsent(tgtInventoryPos, k -> new java.util.HashMap<>())
-											.put(srcStack.getItem(), virtualAdditions.computeIfAbsent(tgtInventoryPos, k -> new java.util.HashMap<>()).getOrDefault(srcStack.getItem(), 0) + amountToTransfer);
+					if (canInsert) {
+						int amountToTransfer = Math.min(remainingToDeposit, maxInsertable);
+						if (amountToTransfer > 0) {
+							boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
+									incomingItem.srcSide(), tgtInventoryPos, tgtSlot, tgtSide, incoming,
+									amountToTransfer);
+							if (success) {
+								if (tgtStack.isEmpty()) {
+									ItemStack newTgt = incoming.copy();
+									newTgt.setCount(amountToTransfer);
+									tgtInv.slots().put(tgtSlot, new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
+											tgtEntry.slotLimit(), mainTgtSlot));
+								} else {
+									tgtStack.grow(amountToTransfer);
 								}
+								incoming.shrink(amountToTransfer);
+								remainingToDeposit -= amountToTransfer;
 							}
 						}
 					}
 				}
+			}
+
+			if (remainingToDeposit > 0) {
+				ItemStack remainingStack = incoming.copy();
+				remainingStack.setCount(remainingToDeposit);
+				outputBuffer.add(incomingItem.srcPos(), incomingItem.srcSlot(), incomingItem.srcSide(), remainingStack);
 			}
 		}
 	}
@@ -513,10 +583,10 @@ public class ItemTransferComponent extends AbstractFlowComponent
 	}
 
 	@Override
-	public void loadData(net.minecraft.nbt.CompoundTag compoundTag) {
+	public void loadData(CompoundTag compoundTag) {
 		var codec = isInput ? ItemTransferComponent.INPUT_CODEC : ItemTransferComponent.OUTPUT_CODEC;
-		codec.codec().parse(net.minecraft.nbt.NbtOps.INSTANCE, compoundTag).resultOrPartial(
-				err -> dta.sfmflow.SFMFlow.LOGGER.error("Failed to parse item transfer component data: {}", err))
+		codec.codec().parse(NbtOps.INSTANCE, compoundTag)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse item transfer component data: {}", err))
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
 					this.inventoryId = decoded.getInventoryId();

@@ -3,10 +3,13 @@ package dta.sfmflow.block.entity;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -15,29 +18,39 @@ import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.api.flowchart.Flowchart;
+import dta.sfmflow.api.variable.InventoryGroupVariable;
+import dta.sfmflow.api.variable.ItemFilterVariable;
+import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.common.network.PhysicalNetwork;
 import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
 import dta.sfmflow.util.ConnectionBlockType;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
+import dta.sfmflow.kernel.FlowExecutionKernel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.NbtIo;
+import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -48,17 +61,15 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraft.world.item.ItemStack;
-import net.neoforged.neoforge.capabilities.Capabilities;
-import net.neoforged.neoforge.items.ItemHandlerHelper;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Backing BlockEntity class for the Manager block [3]. Stores layout settings,
- * flowchart canvas data, and delegates scans to standalone network models [3].
+ * Backing BlockEntity class for the Manager block [3]. Synchronously tracks
+ * loaded instances in a copy-on-write registry for profiling [3].
  */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
-	private Flowchart flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 	protected final ContainerData data;
 	private int commandCount = 0;
 	private boolean needsRefresh = false;
@@ -68,27 +79,35 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private boolean loadedExternal = false;
 
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
-
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
 
-	private final List<dta.sfmflow.api.variable.InventoryGroupVariable> groupVariables = new java.util.ArrayList<>();
-	private final List<dta.sfmflow.api.variable.ItemFilterVariable> filterVariables = new java.util.ArrayList<>();
+	private final List<InventoryGroupVariable> groupVariables = new ArrayList<>();
+	private final List<ItemFilterVariable> filterVariables = new ArrayList<>();
 
-	public List<dta.sfmflow.api.variable.InventoryGroupVariable> getGroupVariables() {
+	// Thread-safe collection tracking active server-side block entity instances [3]
+	private static final List<ManagerBlockEntity> ACTIVE_MANAGERS = new CopyOnWriteArrayList<>();
+
+	private transient long rollingExecutionTimeNs = 0;
+	private transient int rollingExecutedTasks = 0;
+	private transient int rollingTicks = 0;
+	private transient int planningBreakerTrips = 0;
+
+	public List<InventoryGroupVariable> getGroupVariables() {
 		return this.groupVariables;
 	}
 
-	public List<dta.sfmflow.api.variable.ItemFilterVariable> getFilterVariables() {
+	public List<ItemFilterVariable> getFilterVariables() {
 		return this.filterVariables;
 	}
 
 	/**
-	 * Instantiates a new Manager block entity and binds synchronized container
-	 * variables [3].
-	 *
-	 * @param pos        block position coordinates [3]
-	 * @param blockState block state properties [3]
+	 * Retrieves an unmodifiable view of all active loaded server manager block
+	 * entities [3].
 	 */
+	public static List<ManagerBlockEntity> getActiveManagers() {
+		return ACTIVE_MANAGERS;
+	}
+
 	public ManagerBlockEntity(BlockPos pos, BlockState blockState) {
 		super(ModBlockEntities.MANAGER_BE.get(), pos, blockState);
 
@@ -124,15 +143,42 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		return this.executionBuffer;
 	}
 
-	/**
-	 * Ticking loop driving pathfinder scanning sweeps on the physical server level
-	 * [3]. Upgraded to evaluate timer triggers on every tick, and trigger
-	 * block-entity updates immediately upon scan completions [3].
-	 *
-	 * @param pLevel      world level instance [3]
-	 * @param pBlockPos   manager coordinates [3]
-	 * @param pBlockState manager block state [3]
-	 */
+	public double getAverageExecutionTimeUs() {
+		if (rollingTicks == 0)
+			return 0.0;
+		return (rollingExecutionTimeNs / (double) rollingTicks) / 1000.0;
+	}
+
+	public double getAverageTasksPerTick() {
+		if (rollingTicks == 0)
+			return 0.0;
+		return rollingExecutedTasks / (double) rollingTicks;
+	}
+
+	public int getBufferBacklog() {
+		return (int) (this.executionBuffer.getWriteSequence() - this.executionBuffer.getReadSequence());
+	}
+
+	public int getBreakerTrips() {
+		return this.planningBreakerTrips;
+	}
+
+	public void incrementBreakerTrips() {
+		this.planningBreakerTrips++;
+	}
+
+	private void updateProfiling(long elapsedNs, int tasksExecuted) {
+		this.rollingExecutionTimeNs += elapsedNs;
+		this.rollingExecutedTasks += tasksExecuted;
+		this.rollingTicks++;
+
+		if (this.rollingTicks >= 100) {
+			this.rollingExecutionTimeNs /= 2;
+			this.rollingExecutedTasks /= 2;
+			this.rollingTicks /= 2;
+		}
+	}
+
 	public void tick(Level pLevel, BlockPos pBlockPos, BlockState pBlockState) {
 		if (pLevel != null && !pLevel.isClientSide()) {
 			if (this.isFirstTick) {
@@ -153,74 +199,45 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				}
 			}
 
-			// Synchronously poll and execute published tasks from the lock-free ring buffer
-			// [3]
-			this.executionBuffer.pollAndExecute(task -> {
-				// Query capabilities with side-specific directions (furnaces, machines, etc.)
-				// [3]
-				var source = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getSourcePos(),
-						task.getSourceSide());
-				var target = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getTargetPos(),
-						task.getTargetSide());
+			long maxTimeNs = ServerConfig.MAX_EXECUTION_BUDGET_US.get() * 1000L;
+			int[] tasksRan = new int[1];
+			long startTime = System.nanoTime();
 
-				if (source == null) {
-					source = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getSourcePos(), null);
+			this.executionBuffer.pollAndExecuteThrottled(task -> {
+				var executor = FlowCapabilityRegistry.getTransfer(task.getCapabilityId());
+				if (executor != null) {
+					executor.execute(pLevel, task.getSourcePos(), task.getSourceSide(), task.getTargetPos(),
+							task.getTargetSide(), task.getTaskParams());
+					tasksRan[0]++;
 				}
-				if (target != null) {
-					target = pLevel.getCapability(Capabilities.ItemHandler.BLOCK, task.getTargetPos(), null);
-				}
+			}, maxTimeNs);
 
-				if (source != null && target != null) {
-					ItemStack simExtracted = source.extractItem(task.getSourceSlot(), task.getCount(), true);
-					if (ItemStack.isSameItemSameComponents(simExtracted, task.getItem())) {
-						ItemStack targetRemaining;
-						if (task.getTargetSlot() != -1) {
-							targetRemaining = target.insertItem(task.getTargetSlot(), simExtracted, true);
-						} else {
-							targetRemaining = ItemHandlerHelper.insertItemStacked(target, simExtracted, true);
-						}
+			long elapsed = System.nanoTime() - startTime;
+			updateProfiling(elapsed, tasksRan[0]);
 
-						int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
-
-						if (realTransferCount > 0) {
-							ItemStack realExtracted = source.extractItem(task.getSourceSlot(), realTransferCount,
-									false);
-							if (task.getTargetSlot() != -1) {
-								target.insertItem(task.getTargetSlot(), realExtracted, false);
-							} else {
-								ItemHandlerHelper.insertItemStacked(target, realExtracted, false);
-							}
-						}
-					}
-				}
-			});
-
-			// Symmetrical timer evaluation: gather all elapsed interval triggers [3]
 			List<UUID> activeTriggers = new ArrayList<>();
 			long currentTime = pLevel.getGameTime();
 			for (var comp : this.getFlowComponents().values()) {
-				if (comp instanceof dta.sfmflow.flowcomponents.IntervalTriggerComponent trigger) {
-					long elapsed = currentTime - trigger.getLastExecutionTick();
+				if (comp instanceof IntervalTriggerComponent trigger) {
+					long elapsedTrigger = currentTime - trigger.getLastExecutionTick();
 
-					if (elapsed < 0) {
+					if (elapsedTrigger < 0) {
 						trigger.setLastExecutionTick(currentTime);
-					} else if (elapsed >= trigger.getTotalTicks()) {
+					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
 						trigger.setLastExecutionTick(currentTime);
 						activeTriggers.add(trigger.getId());
 					}
 				}
 			}
 
-			// Only schedule planning runs if active triggers have actually elapsed [3]
 			if (!activeTriggers.isEmpty()) {
-				var snapshot = dta.sfmflow.api.execution.ThreadSafeInventorySnapshot.create(this);
-				dta.sfmflow.kernel.FlowExecutionKernel.submitTask(this, snapshot, activeTriggers);
+				var snapshot = ThreadSafeInventorySnapshot.create(this);
+				FlowExecutionKernel.submitTask(this, snapshot, activeTriggers);
 			}
 
-			// Sync to client dynamically whenever physical cable topology changes [3]
 			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
 			if (scanned) {
-				this.setChanged(); // Force immediate client-side synchronizations! [3]
+				this.setChanged();
 			}
 		}
 	}
@@ -255,11 +272,24 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void onLoad() {
 		super.onLoad();
 		if (this.level != null && !this.level.isClientSide()) {
+			ACTIVE_MANAGERS.add(this); // Statically register loaded block entity [3]
 			if (!this.loadedExternal) {
 				loadExternalData();
 			}
 			updateInventories();
 		}
+	}
+
+	@Override
+	public void onChunkUnloaded() {
+		super.onChunkUnloaded();
+		ACTIVE_MANAGERS.remove(this); // Unregister when chunk unloads [3]
+	}
+
+	@Override
+	public void setRemoved() {
+		super.setRemoved();
+		ACTIVE_MANAGERS.remove(this); // Unregister when block is broken/removed [3]
 	}
 
 	@Override
@@ -269,13 +299,12 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.putUUID("ManagerId", this.managerId);
 
-		// Synchronously write flowchart data externally to disk [3]
 		if (this.level != null && !this.level.isClientSide()) {
 			saveExternalData();
 		}
 
 		PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
-		java.util.Collection<BlockPos> positions = map.getAllPositions();
+		Collection<BlockPos> positions = map.getAllPositions();
 		long[] flatPosArray = new long[positions.size()];
 		int idx = 0;
 		for (BlockPos mappedPos : positions) {
@@ -283,7 +312,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.putLongArray("ScannedCablePositions", flatPosArray);
 
-		// Serialize scanned inventories list to synchronize targets dynamically to the client [3]
 		ListTag invList = new ListTag();
 		for (ConnectionBlock inv : this.physicalNetwork.getScannedInventories()) {
 			CompoundTag invTag = new CompoundTag();
@@ -293,7 +321,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 			ListTag typeList = new ListTag();
 			for (ConnectionBlockType type : inv.getTypes()) {
-				typeList.add(net.minecraft.nbt.StringTag.valueOf(type.name()));
+				typeList.add(StringTag.valueOf(type.name()));
 			}
 			invTag.put("types", typeList);
 			invList.add(invTag);
@@ -313,22 +341,21 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			this.managerId = UUID.randomUUID();
 		}
 
-		// Backward-compatibility upgrade: if old chunk has flowchart data, read it directly [3]
 		if (pTag.contains("flowchart")) {
 			try {
-				this.flowchart = Flowchart.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("flowchart"))
+				this.flowchart = Flowchart.CODEC.parse(NbtOps.INSTANCE, pTag.get("flowchart"))
 						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-						.orElseGet(() -> new Flowchart(new java.util.HashMap<>(), new ArrayList<>()));
+						.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
 				this.loadedExternal = true;
 			} catch (Exception e) {
 				SFMFlow.LOGGER.error(
 						"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
 						e);
-				this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 			}
 		} else if (this.level == null || this.level.isClientSide()) {
 			if (this.flowchart == null) {
-				this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 			}
 		}
 
@@ -341,10 +368,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			}
 		}
 
-		// Backward-compatibility upgrade: variables [3]
 		if (pTag.contains("GroupVariables")) {
-			dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
-					.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("GroupVariables"))
+			InventoryGroupVariable.CODEC.codec().listOf().parse(NbtOps.INSTANCE, pTag.get("GroupVariables"))
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
 					.ifPresent(list -> {
 						this.groupVariables.clear();
@@ -353,8 +378,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					});
 		}
 		if (pTag.contains("FilterVariables")) {
-			dta.sfmflow.api.variable.ItemFilterVariable.CODEC.codec().listOf()
-					.parse(net.minecraft.nbt.NbtOps.INSTANCE, pTag.get("FilterVariables"))
+			ItemFilterVariable.CODEC.codec().listOf().parse(NbtOps.INSTANCE, pTag.get("FilterVariables"))
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
 					.ifPresent(list -> {
 						this.filterVariables.clear();
@@ -363,7 +387,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					});
 		}
 
-		// Parse and cache the synchronized scanned inventories list on client [3]
 		if (pTag.contains("ScannedInventories")) {
 			ListTag invList = pTag.getList("ScannedInventories", Tag.TAG_COMPOUND);
 			List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
@@ -521,17 +544,15 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		CompoundTag tag = super.getUpdateTag(registries);
 		this.saveAdditional(tag, registries);
 
-		Flowchart.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.flowchart)
+		Flowchart.CODEC.encodeStart(NbtOps.INSTANCE, this.flowchart)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
 				.ifPresent(nbt -> tag.put("flowchart", nbt));
 
-		dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
-				.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.groupVariables)
+		InventoryGroupVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.groupVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
 				.ifPresent(nbt -> tag.put("GroupVariables", nbt));
 
-		dta.sfmflow.api.variable.ItemFilterVariable.CODEC.codec().listOf()
-				.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.filterVariables)
+		ItemFilterVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.filterVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 				.ifPresent(nbt -> tag.put("FilterVariables", nbt));
 
@@ -563,11 +584,10 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		this.level.players().stream()
 				.filter(player -> player.containerMenu instanceof ManagerMenu menu
 						&& menu.getManagerBlockEntity().getBlockPos().equals(this.worldPosition))
-				.forEach(player -> net.neoforged.neoforge.network.PacketDistributor
-						.sendToPlayer((net.minecraft.server.level.ServerPlayer) player, packet));
+				.forEach(player -> PacketDistributor.sendToPlayer((ServerPlayer) player, packet));
 	}
 
-	public void broadcastConnectionsUpdate(dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket packet) {
+	public void broadcastConnectionsUpdate(SyncConnectionsPacket packet) {
 		if (this.level == null || this.level.isClientSide()) {
 			return;
 		}
@@ -575,8 +595,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		this.level.players().stream()
 				.filter(player -> player.containerMenu instanceof ManagerMenu menu
 						&& menu.getManagerBlockEntity().getBlockPos().equals(this.worldPosition))
-				.forEach(player -> net.neoforged.neoforge.network.PacketDistributor
-						.sendToPlayer((net.minecraft.server.level.ServerPlayer) player, packet));
+				.forEach(player -> PacketDistributor.sendToPlayer((ServerPlayer) player, packet));
 	}
 
 	private long[] flatPosOrdinals(long[] arr) {
@@ -588,7 +607,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	}
 
 	private void saveExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null || this.level.getServer() == null) {
+		if (this.level == null || this.level.isClientSide() || this.managerId == null
+				|| this.level.getServer() == null) {
 			return;
 		}
 		try {
@@ -598,17 +618,15 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			Path filePath = modDir.resolve(this.managerId.toString() + ".dat");
 
 			CompoundTag dataTag = new CompoundTag();
-			Flowchart.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.flowchart)
+			Flowchart.CODEC.encodeStart(NbtOps.INSTANCE, this.flowchart)
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
 					.ifPresent(nbt -> dataTag.put("flowchart", nbt));
 
-			dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
-					.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.groupVariables)
+			InventoryGroupVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.groupVariables)
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
 					.ifPresent(nbt -> dataTag.put("GroupVariables", nbt));
 
-			dta.sfmflow.api.variable.ItemFilterVariable.CODEC.codec().listOf()
-					.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this.filterVariables)
+			ItemFilterVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.filterVariables)
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt));
 
@@ -621,7 +639,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	}
 
 	private void loadExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null || this.level.getServer() == null) {
+		if (this.level == null || this.level.isClientSide() || this.managerId == null
+				|| this.level.getServer() == null) {
 			return;
 		}
 		try {
@@ -637,21 +656,25 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				if (dataTag != null) {
 					if (dataTag.contains("flowchart")) {
 						try {
-							this.flowchart = Flowchart.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, dataTag.get("flowchart"))
-									.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-									.orElseGet(() -> new Flowchart(new java.util.HashMap<>(), new ArrayList<>()));
+							this.flowchart = Flowchart.CODEC.parse(NbtOps.INSTANCE, dataTag.get("flowchart"))
+									.resultOrPartial(
+											err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
+									.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
 						} catch (Exception e) {
-							SFMFlow.LOGGER.error("CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!", e);
-							this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+							SFMFlow.LOGGER.error(
+									"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
+									e);
+							this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 						}
 					} else {
-						this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+						this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 					}
 
 					if (dataTag.contains("GroupVariables")) {
-						dta.sfmflow.api.variable.InventoryGroupVariable.CODEC.codec().listOf()
-								.parse(net.minecraft.nbt.NbtOps.INSTANCE, dataTag.get("GroupVariables"))
-								.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
+						InventoryGroupVariable.CODEC.codec().listOf()
+								.parse(NbtOps.INSTANCE, dataTag.get("GroupVariables"))
+								.resultOrPartial(
+										err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
 								.ifPresent(list -> {
 									this.groupVariables.clear();
 									this.groupVariables.addAll(list);
@@ -659,9 +682,9 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					}
 
 					if (dataTag.contains("FilterVariables")) {
-						dta.sfmflow.api.variable.ItemFilterVariable.CODEC.codec().listOf()
-								.parse(net.minecraft.nbt.NbtOps.INSTANCE, dataTag.get("FilterVariables"))
-								.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
+						ItemFilterVariable.CODEC.codec().listOf().parse(NbtOps.INSTANCE, dataTag.get("FilterVariables"))
+								.resultOrPartial(
+										err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
 								.ifPresent(list -> {
 									this.filterVariables.clear();
 									this.filterVariables.addAll(list);
@@ -669,18 +692,19 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					}
 				}
 			} else {
-				this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 			}
 		} catch (Exception e) {
 			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
-			this.flowchart = new Flowchart(new java.util.HashMap<>(), new ArrayList<>());
+			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 		}
 		this.commandCount = this.flowchart.components().size();
 		this.loadedExternal = true;
 	}
 
 	public void deleteExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null || this.level.getServer() == null) {
+		if (this.level == null || this.level.isClientSide() || this.managerId == null
+				|| this.level.getServer() == null) {
 			return;
 		}
 		try {

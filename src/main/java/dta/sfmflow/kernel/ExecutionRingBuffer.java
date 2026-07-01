@@ -2,10 +2,10 @@ package dta.sfmflow.kernel;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import java.util.concurrent.atomic.AtomicLong;
-
+import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
  * High-performance Disruptor-style circular queue for thread-safe pipeline
@@ -22,8 +22,6 @@ public final class ExecutionRingBuffer {
 
 	/**
 	 * Instantiates the buffer and pre-allocates recyclable execution frames [3].
-	 *
-	 * @param size requested buffer capacity, rounded to the next power of two [3]
 	 */
 	public ExecutionRingBuffer(int size) {
 		this.bufferSize = findNextPowerOfTwo(size);
@@ -35,12 +33,27 @@ public final class ExecutionRingBuffer {
 	}
 
 	/**
-	 * Attempts to claim a buffer slot and populate a task frame safely [3]. Returns
-	 * false if the queue is full or the reader is still accessing the slot [3].
+	 * Retrieves the current write sequence index [3].
 	 *
-	 * @return true if successfully published [3]
+	 * @return write index atomic long value [3]
 	 */
-	public boolean tryWrite(BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, ItemStack stack, int amount) {
+	public long getWriteSequence() {
+		return this.writeSequence.get();
+	}
+
+	/**
+	 * Retrieves the current read sequence index [3].
+	 *
+	 * @return read index atomic long value [3]
+	 */
+	public long getReadSequence() {
+		return this.readSequence.get();
+	}
+
+	/**
+	 * Attempts to claim a buffer slot and populate a task frame safely [3].
+	 */
+	public boolean tryWrite(ResourceLocation capabilityId, BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, Object params) {
 		long currentWrite = writeSequence.get();
 		long currentRead = readSequence.get();
 
@@ -55,22 +68,25 @@ public final class ExecutionRingBuffer {
 			return false; // Reader has not completed reading this slot [3]
 		}
 
-		task.set(src, srcSlot, srcSide, dest, destSlot, destSide, stack, amount);
+		task.set(capabilityId, src, srcSlot, srcSide, dest, destSlot, destSide, params);
 		writeSequence.incrementAndGet();
 		return true;
 	}
 
 	/**
-	 * Polls the ring buffer sequentially, executing available task frames and
-	 * recycling slots [3].
-	 *
-	 * @param taskConsumer executing task lambda receiver [3]
+	 * Polls the ring buffer sequentially up to a given time budget (in nanoseconds) [3].
+	 * Un-executed tasks naturally remain in the circular buffer to be processed on subsequent ticks [3].
 	 */
-	public void pollAndExecute(java.util.function.Consumer<ExecutionTask> taskConsumer) {
+	public void pollAndExecuteThrottled(Consumer<ExecutionTask> taskConsumer, long maxTimeNs) {
 		long currentWrite = writeSequence.get();
 		long currentRead = readSequence.get();
+		long startTime = System.nanoTime();
 
 		while (currentRead < currentWrite) {
+			if (System.nanoTime() - startTime >= maxTimeNs) {
+				break; // Budget exhausted; remaining tasks stay in queue until next tick [3]
+			}
+
 			int index = (int) ((currentRead + 1) & mask);
 			ExecutionTask task = buffer[index];
 

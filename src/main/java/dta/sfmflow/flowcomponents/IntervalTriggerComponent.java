@@ -6,6 +6,9 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.api.component.AbstractTriggerComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.execution.FlowchartPlanningContext;
+import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import net.minecraft.network.chat.Component;
 
@@ -114,16 +117,16 @@ public class IntervalTriggerComponent extends AbstractTriggerComponent
   }
 
   @Override
-  public FlowComponentType getType()
-   {
-    return FlowComponentType.INTERVAL_TRIGGER.get();
-   }
+  public FlowComponentType getType() {
+      // Change from FlowComponentType.INTERVAL_TRIGGER to VanillaSFMFlowPlugin.INTERVAL_TRIGGER
+      return VanillaSFMFlowPlugin.INTERVAL_TRIGGER.get();
+  }
 
   @Override
   public void loadData(net.minecraft.nbt.CompoundTag compoundTag)
    {
     IntervalTriggerComponent.CODEC.codec().parse(net.minecraft.nbt.NbtOps.INSTANCE, compoundTag)
-        .resultOrPartial(err -> dta.sfmflow.SFMFlow.LOGGER.error("Failed to parse interval trigger data: {}", err))
+        .resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse interval trigger data: {}", err))
         .ifPresent(decoded -> {
             this.setBaseProperties(decoded.getBaseProperties());
             this.setTimeUnit(decoded.getTimeUnit());
@@ -142,7 +145,7 @@ public class IntervalTriggerComponent extends AbstractTriggerComponent
    }
   
   @Override
-	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
+	public void plan(FlowchartPlanningContext context) {
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId())) {
 				context.enqueue(conn.getTargetComponentId());

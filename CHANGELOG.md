@@ -1,15 +1,27 @@
 6-30-2026
 
-### [Added]
+###[Added]
+* Modular Plugin API: Introduced a backend plugin system (ISFMFlowPlugin / ISFMFlowClientPlugin) that allows third-party developers to register custom flowchart nodes, settings panels, and capabilities side-safely.
+* Extensible Network Capabilities: Rewrote the network routing system to support custom capabilities (FlowCapability). Cable networks can now support fluid, energy, or chemical transfer integrations seamlessly in the future.
+* Flowchart Wire Buffers: Connection wires now virtually queue items (FlowItemBuffer) as they travel along S-curves, preserving their source block coordinate metadata for downstream evaluation.
+* Server Diagnostic Profiler: Added a /sfmflow profile command for administrators to audit active Manager blocks, displaying performance execution times, queued backlog counts, and click-to-teleport actions.
+* Execution Time Budgets: Added a configurable execution time budget (limits.maxExecutionBudgetUs, defaulting to 1000 microseconds) to clamp the time spent executing transfers per tick, protecting server performance.
 * External Data Storage: Flowchart layouts and configurations are now stored in dedicated .dat files within the world save folder (<world_folder>/sfmflow/managers/) instead of inside the block's NBT. This mitigates chunk NBT bloating, reduces save overhead,     and keeps world save sizes stable.
 * Automated Save Cleanup: When a Machine Inventory Manager block is broken, its corresponding external save file is automatically deleted from disk to prevent unreferenced data buildup.
 
-### [Changed]
+###[Changed]
+
+* Modular Core Layout: Decoupled built-in triggers and transfers, registering them through the new Vanilla plugin modules.
+* API Promoted Widgets: Elevated BlockPreview3DWidget, InventorySelectorWidget, and ItemFilterWidget to public API packages for developers to reuse.
 * Storage Architecture: Loading and saving processes now fetch layout data asynchronously from the filesystem once the world is loaded.
 * Initial Client Synchronization: Data-sync tags continue to package layouts dynamically on chunk load to ensure visual flowchart canvases update immediately when logging in.
 
 ###[Fixed]
 * Backward Compatibility: Legacy worlds storing layout data directly inside chunk NBT are automatically parsed, loaded, and migrated to the new external format upon first load.
+
+###[Removed]
+* Hardcoded Routines: Removed hardcoded item handler operations from the manager block entity's ticking loop in favor of the registry-backed capability executor loops.
+
 
 6-29-2026
 
