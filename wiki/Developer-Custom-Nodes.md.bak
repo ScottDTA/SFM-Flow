@@ -18,8 +18,8 @@ Choose the inheritance structure that matches your custom component's functional
                              └───► Custom Input, Output, Logic, or Variable Nodes
 ```
 
-*   **`AbstractFlowComponent`**: The core API blueprint. Provides position tracking, dynamic sizing calculations, categorization offsets, and NBT loading/saving interfaces.
-*   **`AbstractTriggerComponent`**: A specialized trigger extension. It automatically sets output properties (`hasOutputNodes = true` and `numOutputs = 1`), establishing the standard single logic execution node pin.
+*   **`AbstractFlowComponent`**: The core API blueprint. Provides position tracking, dimensions, category configurations, and NBT loading/saving interfaces.
+*   **`AbstractTriggerComponent`**: A specialized trigger extension. It configures single-output properties (`hasOutputNodes = true` and `numOutputs = 1`) out of the box.
 
 ---
 
@@ -55,7 +55,7 @@ public void loadData(CompoundTag compoundTag) {
     super.loadData(compoundTag);
     // Deserialize custom component settings
     this.targetSlot = compoundTag.getInt("TargetSlot");
-    this.matchDamage = compoundTag.getBoolean("MatchDamage");
+    this.matchDamage = compoundTag.putBoolean("MatchDamage");
 }
 ```
 
@@ -75,7 +75,7 @@ The superclass `AbstractFlowComponent` automatically manages the following spati
 
 ## Active Configuration Controls (Maximized Panels)
 
-When a node is maximized, its panel renders interactive controls. To configure settings and sync changes cleanly between the client and server without causing lag spikes, follow these guidelines:
+When a node is maximized, its panel renders interactive controls. To configure settings and sync changes cleanly between the client and server, follow these guidelines:
 
 ### 1. Integrating Vanilla UI Controls (`ApiWidgetAdapter`)
 If your maximized panel uses standard Minecraft UI components (such as buttons, text inputs, sliders, or checkbox controls), wrap them inside the public client wrapper `dta.sfmflow.api.client.widget.ApiWidgetAdapter<T>`:
@@ -108,8 +108,8 @@ public class CustomAddonPanelWidget extends AbstractFlowWidget {
 }
 ```
 *Benefits of `ApiWidgetAdapter`*:
-*   **Coordinate Delegation**: Automatically updates the absolute screen position of the wrapped vanilla widget when you drag its parent node across the canvas.
-*   **Input Focus & Bypassing**: Correctly routes mouse clicks, drags, releases, keypresses, and scrolling down to the vanilla widget, bypassing standard container screen slot-drag behaviors that would otherwise intercept and block input.
+*   **Coordinate Delegation**: Updates the absolute screen position of the wrapped vanilla widget when dragging its parent node across the canvas.
+*   **Input Focus Routing**: Correctly routes mouse clicks, drags, releases, keypresses, and scrolling down to the vanilla widget, avoiding potential input interception from container slot drag handlers.
 
 ---
 
@@ -130,6 +130,6 @@ private void saveSettingsToServer() {
 ```
 
 #### Network Optimization Tip:
-To avoid sending too many packets and causing desyncs or server lag during active drag operations (such as sliding a duration bar):
+To prevent network bottlenecks and desynchronization loops during continuous operations (such as sliding a duration bar):
 *   **Do not** send `SaveComponentSettings` on every pixel change in your slider drag method (`applyValue()`).
-*   **Only** dispatch the packet when the user *releases* the mouse button (`mouseReleased`) or performs a discrete step change like a mouse scroll wheel click (`mouseScrolled`).
+*   **Only** dispatch the packet when the user releases the mouse button (`mouseReleased`) or performs a discrete step change via scroll events (`mouseScrolled`).

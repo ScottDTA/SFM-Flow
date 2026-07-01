@@ -20,7 +20,7 @@ All flowchart node definitions must be registered with the custom NeoForge regis
 *   **Registry Key**: `FlowComponentType.REGISTRY_KEY` (Points to `sfmflow:flow_component_type`).
 *   **Deferred Register Helper**: `FlowComponentType.COMPONENT_TYPES`.
 *   **Core Registry Reference**: `FlowComponentType.REGISTRY`.
-*   **Built-in Elements**: `FlowComponentType.INTERVAL_TRIGGER` registers the periodic trigger component (`sfmflow:interval_trigger`), replacing the legacy unspecialized `trigger` entry.
+*   **Built-in Elements**: `FlowComponentType.INTERVAL_TRIGGER` registers the periodic trigger component (`sfmflow:interval_trigger`), replacing any legacy unspecialized trigger entries.
 
 ---
 
@@ -29,7 +29,7 @@ All flowchart node definitions must be registered with the custom NeoForge regis
 To introduce a custom component type, define a component class extending the API's `AbstractFlowComponent` (or `AbstractTriggerComponent` for trigger nodes) and link it through your addon registry.
 
 ### Step 1: Component Instance Class
-If you are developing a starting trigger node, extend `dta.sfmflow.api.component.AbstractTriggerComponent` to inherit the single-output node boilerplate configurations:
+If you are developing a starting trigger node, extend `dta.sfmflow.api.component.AbstractTriggerComponent` to inherit the single-output node configuration layouts:
 
 ```java
 package com.example.addon.components;

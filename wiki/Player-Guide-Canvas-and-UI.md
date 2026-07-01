@@ -1,6 +1,6 @@
 # Canvas and Workspace Layout
 
-The Manager Block features an interactive flowchart design space. You can arrange components, adjust rendering depths, and clone or delete elements directly on the canvas.
+The Manager Block features a standardized compact flowchart workspace. You can arrange components, connect execution paths, and configure deep internal settings through centered overlay panels.
 
 ---
 
@@ -10,7 +10,7 @@ The interface uses a category-based sliding hover submenu overlay system, keepin
 
 ```
  0,0  ┌──────────────────────────────────────────────────────────────┐
-      │[ ]  [D] [C] (X:22, Y:4) Utility Hotzones                     │
+      │[ ]  (X:4, Y:4) Sidebar Category Buttons                      │
       │[T]  ┌──────────────────────────────────────────────────────┐ │
       │[I]  │ (X:22, Y:4)                                          │ │
       │[O]  │                                                      │ │
@@ -33,17 +33,16 @@ All flowchart nodes are physically confined within the viewport boundary box. Dr
 
 ---
 
-## Adaptive GUI Scaling
-To prevent UI clipping and overlapping on smaller displays, SFM-Flow implements adaptive scaling. If the window dimensions drop below the minimum required resolution (`512x256` pixels), the screen automatically reduces the game's GUI scale. When the interface is closed, your original GUI scale configuration is restored.
-
----
-
-## Layering & Hardware Depth Testing
-
-To prevent rendering errors where text, visual connectors, or selection submenus on lower layers bleed through higher elements, SFM-Flow utilizes hardware OpenGL depth testing:
-
-*   **Z-Layer Sorting**: Clicking on a container automatically brings it to the top visual layer. The client assigns a higher layering rank (`zLevel`) and translates the rendering matrix along the Z-axis by `zLevel * 10.0F`.
-*   **Instant Depth Flushing**: Each node container flushes its visual command batch to write directly to the GPU's hardware depth buffer before rendering adjacent elements. This helps maintain clean visual boundaries between overlapping components.
+## Standardized Compact Node Sizing
+To maintain a high layout density, all nodes on the canvas are locked to compact viewing dimensions:
+*   **Compact Node Background** (`64x20px`): Renders with color-gradient masks based on custom user color configuration choices.
+    *   *Texture File*: ![Minimized Component BG](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/component_min_bg.png)
+*   **Interactive Node Sub-Widgets**:
+    *   **Move Handle** (`6x6px`): Drag to reposition the node.
+        *   *Texture File*: ![Move Button](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/move_button.png)
+    *   **Logic Input Connection Node** (`6x6px` button bounds, `6x12px` texture sheet): Located on the top edge of input-capable components. Uses flipped textures.
+    *   **Logic Output Connection Node** (`6x6px` button bounds, `6x12px` texture sheet): Located on the bottom edge of output-capable components.
+        *   *Texture File*: ![Output Node](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/output_node.png)
 
 ---
 
@@ -69,63 +68,42 @@ Hovering over any of these buttons opens a sliding submenu overlay aligned to th
 
 ---
 
-### 2. Category Hover Submenu Overlays
-When open, these sliding menus provide an active subgrid containing match-filtered spawner widgets:
-
-*   **Visual Structure**: Features a custom 9-slice scaled border background (`submenu_bg.png`):
-    ![Submenu BG](../src/main/resources/assets/sfmflow/textures/gui/submenu_bg.png)
-*   **Title Label**: Centered and dynamically scaled using automated text-ellipsis. Large titles scale down to a minimum of 40% scale factor (`0.4F`) to prevent clipping.
-*   **Subgrid & Columns**: Sized dynamically from 1 to 4 columns wide depending on the count of active registered nodes.
-*   **Scrolling System**: If a category holds more than 16 elements (exceeding a height of 56px), an interactive scrollbar is displayed on the right edge of the submenu:
-    *   *Scroll track color*: Dark translucent (`0x40000000`)
-    *   *Scroll thumb color*: Light gray (`0xFF8B8B8B`)
-    *   Use your mouse scroll wheel over the submenu area to scroll vertically.
-*   **Spawner Creation**: Hovering over any cell in the subgrid displays its translated display tooltip. Left-clicking on a cell spawns that node directly onto the canvas layout.
+### 2. Output and Input Wire Connections
+To connect two nodes:
+1.  Left-click and hold your mouse over a bottom **Output Pin** of a source node.
+2.  Drag the cursor to a top **Input Pin** of a destination node.
+3.  Release the mouse button to draw a Bezier connection wire.
+4.  *To delete a connection*: Hold `Shift` and left-click anywhere along the connection curve.
 
 ---
 
-### 3. Header Utility Hotzones
-Repositioning an active canvas node over either utility button and releasing the mouse click triggers specific actions:
-*   `[D]` **Delete Hotzone**: Located at coordinates `X:22`, `Y:4`. Purges the node and any associated network wire connections.
-    *   *Icon*: ![Delete Button](../src/main/resources/assets/sfmflow/textures/gui/menu_buttons/delete_button.png)
-*   `[C]` **Copy Hotzone**: Located at coordinates `X:38`, `Y:4`. Clones the target node along with its internal settings, offsetting the copy by `+10px` on both axes to prevent direct overlapping.
-    *   *Icon*: ![Copy Button](../src/main/resources/assets/sfmflow/textures/gui/menu_buttons/copy_button.png)
+### 3. Context Dropdown Menu (Right-Click)
+Right-clicking any node on the canvas opens a compact context menu (`DropdownMenuWidget` scaled at 66%) providing these actions:
+*   **Rename Node**: Opens a text modal to assign a custom nickname.
+*   **Node Color**: Opens a symmetrical 16-color palette to apply custom gradient color masks to the node.
+*   **Settings**: Opens the node's parameters configuration overlay.
+*   **Copy Node**: Clones the node and its settings, offset by `+10px`.
+*   **Delete Node**: Deletes the node and any connected wires.
 
 ---
 
-## Active Configuration Controls (Maximized Nodes)
+### 4. Double-Click & Centered Settings Overlays
+Double-clicking a node instantly opens its symmetrically centered **Settings Overlay** (`NodeSettingsOverlay`). This action dims the background canvas, focusing your interactions:
 
-When a component is expanded/maximized, its panel populates with interactive configuration controls. For example, expanding the periodic **Interval Trigger** node displays:
-
-1.  **Time Unit Cycle Button**: Selects between `Ticks`, `Seconds`, or `Minutes` as the base duration scale. Clicking this button updates the time unit and scales the adjacent slider boundaries.
-2.  **Duration Slider**: Click and drag this slider to configure the periodic execution interval.
-    *   *Ticks range*: Clamped between `minIntervalTicks` (default `4`) and `100` ticks.
-    *   *Seconds/Minutes range*: Clamped between `1` and `60` units.
-    *   *Alternate Control*: Hover over the slider and use your mouse scroll wheel to increment or decrement the duration value precisely by `1` unit steps.
-
----
-
-## Node Geometry Sizing
-
-Nodes change dimensions based on whether they are minimized or maximized:
-
-*   **Minimized Node Background** (`64x20px`): Used for compact viewing.
-    *   *Texture File*: ![Minimized Component BG](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/component_min_bg.png)
-*   **Maximized Node Background** (`124x152px`): Expands the component to configure deeper internal settings.
-    *   *Texture File*: ![Maximized Component BG](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/component_max_bg.png)
-*   **Interactive Node Sub-Widgets**:
-    *   **Move Handle** (`6x6px`): Drag to reposition the node.
-        *   *Texture File*: ![Move Button](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/move_button.png)
-    *   **Toggle Expansion Arrow** (`11x12px` button bounds, `11x24px` texture sheet): Located on the top-right of a node. Click to minimize or maximize.
-        *   *Texture File*: ![Toggle Button](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/open_close_button.png)
-    *   **Logic Output Connection Node** (`6x6px` button bounds, `6x12px` texture sheet): Located on the bottom edge of output-capable components.
-        *   *Texture File*: ![Output Node](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/output_node.png)
+*   **Interval Trigger Settings Overlay**:
+    *   *Time Unit Cycle Button*: Toggles between `Ticks`, `Seconds`, or `Minutes` as the base duration scale.
+    *   *Duration Slider*: Set the periodic trigger rate. Sliding is silent for a smoother feel. Hover and use the scroll wheel to adjust by `1` unit increments.
+*   **Item Transfer Settings Overlay**:
+    *   *Inventory Selector List*: A scrollable list showing all connected inventory blocks on your network, displaying their block names, icons, and precise coordinates.
+    *   *3D Block Preview*: Renders a 3D isometric view of the targeted inventory and neighboring blocks. Hold **Right-click and drag** to orbit/rotate. **Left-click** any of the three visible faces to toggle whether the Manager should access items from that face.
+    *   *Slot Layout Configurator*: **Shift-Left-click** any face in the 3D preview to open this modal. Active slots are outlined in neon green, inactive in red, and unaccessible/blocked slots are grayed out with a red X. The layouts are custom-styled to match furnaces, hoppers, crafters, brewing stands, droppers, and dispensers.
+    *   *Item Filter Widget*: Toggles Whitelist/Blacklist modes and exposes a 1x12 ghost slot grid where you can drag and drop items from your player inventory to filter operations.
 
 ---
 
 ## Connector Spacing Offsets
 
-The horizontal layout spacing of output pins dynamically adjusts according to the number of output paths (1 to 5):
+The horizontal layout spacing of pins dynamically adjusts according to the number of input/output paths (1 to 5):
 
 ```
   Minimized Layout (Base Width: 64px)
@@ -135,14 +113,5 @@ The horizontal layout spacing of output pins dynamically adjusts according to th
   │ 3 Nodes: [4]        [29]        [54]                   │
   │ 4 Nodes: [5]   [21]      [37]   [53]                   │
   │ 5 Nodes: [3]  [16]  [29]  [42]  [55]                   │
-  └────────────────────────────────────────────────────────┘
-
-  Maximized Layout (Base Width: 124px)
-  ┌────────────────────────────────────────────────────────┐
-  │ 1 Node:  [59]                                          │
-  │ 2 Nodes: [31]                   [87]                   │
-  │ 3 Nodes: [14]                   [59]                   [104]  │
-  │ 4 Nodes: [14]         [44]                [74]         [104]  │
-  │ 5 Nodes: [12]      [35]         [59]          [83]     [106]  │
   └────────────────────────────────────────────────────────┘
 ```

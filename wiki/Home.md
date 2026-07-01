@@ -1,18 +1,18 @@
 # SFM-Flow Wiki
 
-Welcome to the official wiki for **SFM-Flow** (`sfmflow`), a flowchart-based automation mod built for NeoForge 1.21.1.
+Welcome to the official wiki for **SFM-Flow** (`sfmflow`), a high-performance flowchart-based automation mod built for NeoForge 1.21.1.
 
-SFM-Flow provides an interactive logic workspace where you can visually arrange automation routines, connect blocks and cables, and manage network resources.
+SFM-Flow provides a visual logic design canvas where you can configure and arrange automation routines, connect blocks, and manage resources over a physical network.
 
 ---
 
 ## Workspace Architecture
 
 ```
-        [ Cable Network ] ───► [ Capabilities (Item/Fluid/Energy) ]
+        [ Cable Network ] ───► [ Dynamic Capabilities (FlowCapabilityRegistry) ]
                │
                ▼
-  [ Machine Inventory Manager ] ───► [ Graphic Canvas Viewport ]
+  [ Machine Inventory Manager ] ───► [ Symmetrically Centered Settings Overlays ]
 ```
 
 ---
@@ -22,10 +22,10 @@ SFM-Flow provides an interactive logic workspace where you can visually arrange 
 The wiki is organized into two primary tracks based on your needs:
 
 ### 1. Player & Automator Guides
-*   **[Machine Inventory Manager](Player-Guide-Manager-Block.md)**: Details the physical manager block, crafting recipes, cable network limits, and supported integration capabilities.
-*   **[Canvas and Workspace Layout](Player-Guide-Canvas-and-UI.md)**: Explains coordinate boundaries (X:22–508, Y:4–240), layer ordering, adaptive GUI scaling, and component layout dimensions.
+*   **[Machine Inventory Manager & Blocks](Player-Guide-Manager-Block.md)**: Details the physical manager block, crafting recipes, cables, observers, hatches, card clusters, and server performance limits.
+*   **[Canvas and Workspace Layout](Player-Guide-Canvas-and-UI.md)**: Explains the standardized compact canvas boundaries, input/output node spacing, context dropdown menus, symmetrically centered settings overlays, 3D block previews, and slot layouts.
 
 ### 2. Developer & Addon Creator API (under `dta.sfmflow.api`)
-*   **[API and Component Registries](Developer-API-Overview.md)**: Learn how to register custom flowchart components and bind client-side properties (including vertically-stacked 14x28 icon sheets) using SFM-Flow's `flow_component_type` custom registry and `FlowClientRegistry`.
-*   **[Creating Custom Nodes](Developer-Custom-Nodes.md)**: Implement the custom `AbstractFlowComponent` or `AbstractTriggerComponent` lifecycles, handle serialization (NBT data), manage widget synchronization with `SaveComponentSettings`, and wrap vanilla UI controls via `ApiWidgetAdapter`.
-*   **[Network Protocol and UI Rendering](Developer-Network-and-Sync.md)**: Explore the underlying packet-handling architecture, coordinate synchronization rules, hardware Z-buffer layering, and client-side container layout rendering with `AbstractFlowWidget` and `FlowWidgetText`.
+*   **[API and Component Registries](Developer-API-Overview.md)**: Learn how to register custom flowchart components using the fluent `FlowComponentBuilder`, integrate with the logical plugin system, map client visual properties, and extend dynamic capabilities.
+*   **[Creating Custom Nodes](Developer-Custom-Nodes.md)**: Implement custom component classes utilizing the Mojaang Codec serialization system, configure BaseProperties NBT wrappers, design client settings widgets, and adapt vanilla components with `ApiWidgetAdapter`.
+*   **[Network Protocol and UI Rendering](Developer-Network-and-Sync.md)**: Explore the asynchronous execution kernel, ring buffers, circuit breakers, client delta strategy routing, gradient blitting, 3D viewport rendering, and scissor masking.

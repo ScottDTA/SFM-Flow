@@ -34,7 +34,7 @@ The Machine Inventory Manager is constructed in a standard crafting table using 
 
 ## Network Scanning & Performance Limits
 
-Whenever the block is placed, removed, or receives adjacent block updates, it initiates a breadth-first search (BFS) scan of adjacent cables and containers. To prevent server performance issues, this scanning process respects several configurable bounds managed via server-side configuration file (`sfmflow-server.toml`):
+Whenever the block is placed, removed, or receives adjacent block updates, it initiates a breadth-first search (BFS) scan of adjacent cables and containers. To preserve server stability and performance, this scanning process respects several configurable bounds managed via the server-side configuration file (`sfmflow-server.toml`):
 
 ### Server-Safe Performance Constraints
 
@@ -58,9 +58,9 @@ Whenever the block is placed, removed, or receives adjacent block updates, it in
 
 ## Integration Capability Support
 
-During a network scan, the Manager queries block capabilities on discovered containers. The following handlers are automatically registered:
+During a network scan, the Manager queries block capabilities on discovered containers. The following handlers are supported:
 
 1.  **Item Storage**: Detects chest blocks and automated machine inventories (`Capabilities.ItemHandler.BLOCK`).
 2.  **Fluid Storage**: Detects tanks and pipes (`Capabilities.FluidHandler.BLOCK`).
 3.  **Forge Energy (FE)**: Detects energy cells and power generators (`Capabilities.EnergyStorage.BLOCK`).
-4.  **Mekanism Chemical Handlers**: If Mekanism is present, the scanner checks the custom chemical capability (`mekanism:chemical_handler`) for gases, slurries, and infusions.
+4.  **Mekanism Chemical Handlers**: If Mekanism is present, the scanner checks the custom chemical capability (`mekanism:chemical_handler`) for gases, slurries, and infusions using SFM-Flow's built-in compatibility bridge.

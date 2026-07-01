@@ -6,7 +6,7 @@ SFM-Flow synchronizes flowchart logic between clients and the server using dedic
 
 ## Network Payloads
 
-Custom payloads are processed on the main server thread using NeoForge's custom network packets:
+Custom payloads are processed on the main server thread using NeoForge's network system:
 
 ```
   [ Client UI Drag ] ───► sends ComponentMoved Packet ───► [ Server Work Queue ]
@@ -17,14 +17,14 @@ Custom payloads are processed on the main server thread using NeoForge's custom 
 ```
 
 ### 1. `ComponentMoved` (Serverbound)
-Dispatched whenever a user drags a node across the canvas viewport. It updates position coordinates and Z-level visual layers on the server.
+Dispatched when dragging a node across the canvas viewport. It updates position coordinates and Z-level visual layers on the server.
 *   **Payload Fields**:
     *   `pos`: `BlockPos` (The coordinates of the active Manager block).
     *   `entries`: `List<ComponentMoved.Entry>` (A list of visual coordinate entries for all active nodes on the canvas).
     *   `draggedId`: `UUID` (The UUID of the node that was actively dragged).
 
 ### 2. `ManagerMenuButtonClick` (Serverbound)
-Sent when a button is clicked on the workspace interface. This includes copying, deleting, resizing, and dynamically spawning nodes.
+Sent when a button is clicked on the workspace interface. This handles copying, deleting, resizing, and dynamically spawning nodes.
 *   **Payload Fields**:
     *   `containerId`: `int` (The ID of the active container menu).
     *   `buttonType`: `MenuButtonType` (The type of menu action or workspace creation requested).
@@ -35,7 +35,7 @@ Sent when a button is clicked on the workspace interface. This includes copying,
 
 ## Client Screen Updates
 
-When a manager block entity changes on the server, the server transmits packet updates to nearby clients. Clients process these updates via `ClientPacketHelper`:
+When a manager block entity changes on the server, the server transmits block packet updates to nearby clients. Clients process these updates via `ClientPacketHelper`:
 
 ```java
 public static void refreshManagerScreen(ManagerBlockEntity be) {
@@ -48,10 +48,25 @@ public static void refreshManagerScreen(ManagerBlockEntity be) {
 }
 ```
 
-This method deletes old widget elements from the screen and parses updated coordinates to construct new `FlowWidgetContainer` instances on the client interface.
+This method cleans up old widget elements from the screen and parses updated coordinates to construct fresh `FlowWidgetContainer` instances on the client interface.
 
-### Depth Sorting (Z-Level)
-To draw overlapping nodes correctly, the rendering loop sorts the active components using their depth index (`zLevel`):
+### Depth Sorting (Z-Level) and Hardware Layering
+To draw overlapping nodes correctly, the rendering loop sorts active components using their depth index (`zLevel`), translates them along the Z-axis, and flushes the buffer:
+
+```java
+// Inside FlowWidgetContainer's rendering path:
+guiGraphics.pose().pushPose();
+guiGraphics.pose().translate(0.0F, 0.0F, this.getZ() * 10.0F);
+
+super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
+
+// Forces a buffer flush to apply the depth writing step instantly
+guiGraphics.flush();
+
+guiGraphics.pose().popPose();
+```
+
+The sorting is resolved during widget compilation:
 
 ```java
 private void buildComponents(int x, int y) {
@@ -116,7 +131,6 @@ public class CustomAddonPanelWidget extends AbstractFlowWidget {
     @Override
     protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         if (this.visible) {
-            // Render the sub-widgets and labels cleanly
             this.centeredHeaderLabel.render(guiGraphics, mouseX, mouseY, partialTick);
         }
     }
@@ -127,10 +141,10 @@ public class CustomAddonPanelWidget extends AbstractFlowWidget {
 
 ## Advanced UI Rendering in the Category Hover Submenu
 
-Addon creators can integrate custom elements into the category navigation layout. The `CategoryHoverSubmenu` uses several advanced rendering strategies to construct sliding node overlays:
+Addon creators can integrate custom elements into the category navigation layout. The `CategoryHoverSubmenu` uses several strategies to construct sliding node overlays:
 
 ### 1. 9-Slice Background Stretching
-The submenu background relies on `submenu_bg.png` (`22x22px` texture sheet). It stretches midsections to fit variable grids while maintaining crisp `6px` border corners:
+The submenu background relies on `submenu_bg.png` (`22x22px` texture sheet). It stretches midsections to fit variable grids while maintaining `6px` border corners:
 
 ```
   Source Sheet (22x22px)                  9-Slice Scaling Formula

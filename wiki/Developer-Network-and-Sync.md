@@ -1,192 +1,105 @@
 # Network Protocol and UI Rendering
 
-SFM-Flow synchronizes flowchart logic between clients and the server using dedicated custom network payloads and decoupled client widgets.
+This guide outlines SFM-Flow's asynchronous execution kernel, ring buffer pipelines, clientbound delta strategy synchronization, and advanced UI rendering systems.
 
 ---
 
-## Network Payloads
+## Asynchronous Execution Kernel & Ring Buffer
 
-Custom payloads are processed on the main server thread using NeoForge's network system:
+SFM-Flow runs flowchart evaluations on an asynchronous daemon thread pool to prevent main-thread ticks from dropping. 
 
 ```
-  [ Client UI Drag ] ───► sends ComponentMoved Packet ───► [ Server Work Queue ]
-                                                                   │
-                                                           Updates Positions
-                                                                   │
-                                                       Triggers Block Update
+  [ Trigger Tick ] ───► ThreadSafeInventorySnapshot ───► FlowchartPlanningTask (Off-Thread)
+                                                                    │
+                                                         ExecutionRingBuffer (O(1))
+                                                                    │
+                                                       pollAndExecuteThrottled (Main-Thread)
 ```
 
-### 1. `ComponentMoved` (Serverbound)
-Dispatched when dragging a node across the canvas viewport. It updates position coordinates and Z-level visual layers on the server.
-*   **Payload Fields**:
-    *   `pos`: `BlockPos` (The coordinates of the active Manager block).
-    *   `entries`: `List<ComponentMoved.Entry>` (A list of visual coordinate entries for all active nodes on the canvas).
-    *   `draggedId`: `UUID` (The UUID of the node that was actively dragged).
-
-### 2. `ManagerMenuButtonClick` (Serverbound)
-Sent when a button is clicked on the workspace interface. This handles copying, deleting, resizing, and dynamically spawning nodes.
-*   **Payload Fields**:
-    *   `containerId`: `int` (The ID of the active container menu).
-    *   `buttonType`: `MenuButtonType` (The type of menu action or workspace creation requested).
-    *   `pos`: `BlockPos` (The coordinates of the active Manager block).
-    *   `componentId`: `UUID` (The target component's UUID).
+1.  **Inventory Snapshot**: Evaluated strictly on the main server thread to prevent concurrency collisions, creating a deep copy snapshot (`ThreadSafeInventorySnapshot`) of connected inventories, including side-specific slot mappings.
+2.  **Off-Thread Planning**: `FlowExecutionKernel` submits the planning task to run asynchronously. It processes nodes through a 1ms cooperative time-budget slice.
+3.  **Circuit Breaker Protection**: If a flowchart exceeds a `1000-node` traversal threshold (e.g. from an infinite recursion loop), the circuit breaker trips, incrementing `planningBreakerTrips` and canceling the planning task to safeguard server stability.
+4.  **Recyclable Ring Buffer**: Evaluated commands write to a Power-of-Two `ExecutionRingBuffer`. Standard bitwise masks are utilized instead of modulo operations to guarantee $O(1)$ garbage-free writes.
+5.  **Main Thread Handoff**: Main server thread polls the ring buffer via `pollAndExecuteThrottled` to dispatch capability tasks within a microsecond budget (`maxExecutionBudgetUs`).
 
 ---
 
-## Client Screen Updates
+## Network Synchronization & Client Delta Strategy
 
-When a manager block entity changes on the server, the server transmits block packet updates to nearby clients. Clients process these updates via `ClientPacketHelper`:
+SFM-Flow uses clientbound delta packets to surgically sync specific visual adjustments rather than re-transmitting entire canvas hierarchies.
+
+### Polymorphic Delta Types (`SyncComponentDeltaPacket`)
+Sent S2C when node parameters or layouts are altered:
+*   `MOVE`: Synchronizes relative canvas coordinates and sorting layers.
+*   `NAME_COLOR`: Updates custom name strings and gradient color masks.
+*   `SETTINGS`: Saves and applies serialized component codecs configurations.
+*   `ADD`: Dynamically instantiates a newly spawned node on the client interface.
+*   `REMOVE`: Deletes a node and any of its associated wires on the client.
+
+### Client Delta Strategy Routing (`IDeltaStrategy`)
+Clientbound delta packets are routed through pre-registered strategy handlers (`ClientDeltaRegistry`), preventing redundant screen rebuilds:
 
 ```java
-public static void refreshManagerScreen(ManagerBlockEntity be) {
-    Minecraft mc = Minecraft.getInstance();
-    if (mc.screen instanceof ManagerScreen activeScreen) {
-        if (activeScreen.getMenu().getManagerBlockEntity().getBlockPos().equals(be.getBlockPos())) {
-            activeScreen.refreshWidgetLayout();
-        }
+// Client-side strategy handler for MOVE events
+STRATEGIES.put(DeltaType.MOVE, (screen, packet, localComponent) -> {
+    if (localComponent != null && packet.data() != null) {
+        localComponent.setX(packet.data().getInt("x"));
+        localComponent.setY(packet.data().getInt("y"));
+        localComponent.setZ(packet.data().getInt("z"));
+        // Surgically updates container widget positions instantly
     }
-}
+});
 ```
 
-This method cleans up old widget elements from the screen and parses updated coordinates to construct fresh `FlowWidgetContainer` instances on the client interface.
+---
 
-### Depth Sorting (Z-Level) and Hardware Layering
-To draw overlapping nodes correctly, the rendering loop sorts active components using their depth index (`zLevel`), translates them along the Z-axis, and flushes the buffer:
+## Advanced UI Rendering Systems
+
+### 1. Vertex-Colored Gradient Blitting (`GradientBlitUtil`)
+Visual compact cards use vertex-colored blitting to render subtle, blended gradients directly over node backgrounds (`component_min_bg.png`):
 
 ```java
-// Inside FlowWidgetContainer's rendering path:
+// Mixes 75% of mask color with 25% white to keep text readable
+float mixedR = (r * 0.75F) + 0.25F;
+float topR = Math.min(1.0F, mixedR * 1.15F); // Shaded top gradient
+float botR = Math.min(1.0F, mixedR * 0.75F); // Shaded bottom gradient
+
+// Draw quad vertices with vertical color transitions
+bufferBuilder.addVertex(matrix, x, y, 0.0F).setUv(minU, minV).setColor(topR, topG, topB, 1.0F);
+bufferBuilder.addVertex(matrix, x, y + height, 0.0F).setUv(minU, maxV).setColor(botR, botG, botB, 1.0F);
+```
+
+### 2. Bezier Wire Rendering (`VectorWireRenderer`)
+Connection wires between top input pins and bottom output pins are drawn as smooth, orthogonal cubic Bezier curves (S-curves) using flat $0.0\text{F}$ matrix translations to render directly on the background canvas:
+
+$$\mathbf{B}(t) = (1-t)^3\mathbf{P}_0 + 3(1-t)^2t\mathbf{P}_1 + 3(1-t)t^2\mathbf{P}_2 + t^3\mathbf{P}_3, \quad t \in [0, 1]$$
+
+Where:
+*   $\mathbf{P}_0$: Source Output Pin coordinate.
+*   $\mathbf{P}_1$: Outbound control anchor point ($\mathbf{P}_0$ translated down along the Y-axis by a calculated deltaY).
+*   $\mathbf{P}_2$: Inbound control anchor point ($\mathbf{P}_3$ translated up along the Y-axis by deltaY).
+*   $\mathbf{P}_3$: Destination Input Pin coordinate.
+
+### 3. OpenGL Hardware Scissor Masking
+To prevent scrolling card selections or submenus from rendering outside their panels, hardware scissors crop rendering operations:
+
+```java
+// Clamp rendering within list coordinates boundaries
+guiGraphics.enableScissor(listX, listY, listX + 260, listY + 18);
+// Render items...
+guiGraphics.flush(); // Flush draws before disabling scissor mask
+guiGraphics.disableScissor();
+```
+
+### 4. Hardware Depth Testing & Layering
+To render overlapping nodes cleanly, the rendering loop translates the projection matrix by `getZ() * 1.0F` and flushes the buffer source:
+
+```java
 guiGraphics.pose().pushPose();
-guiGraphics.pose().translate(0.0F, 0.0F, this.getZ() * 10.0F);
+guiGraphics.pose().translate(0.0F, 0.0F, this.getZ() * 1.0F);
 
 super.renderWidget(guiGraphics, mouseX, mouseY, partialTick);
-
-// Forces a buffer flush to apply the depth writing step instantly
-guiGraphics.flush();
+guiGraphics.flush(); // Flushes batch immediately to write to hardware depth buffer
 
 guiGraphics.pose().popPose();
-```
-
-The sorting is resolved during widget compilation:
-
-```java
-private void buildComponents(int x, int y) {
-    List<FlowWidgetContainer> componentContainers = new ArrayList<>();
-    
-    for (AbstractFlowComponent component : this.getMenu().getManagerBlockEntity().getFlowComponents().values()) {
-        FlowWidgetContainer componentContainer = new FlowWidgetContainer(this, component, x, y);
-        componentContainers.add(componentContainer);
-    }
-    
-    // Sort ascending to render lower elements first
-    componentContainers.sort(Comparator.comparing(FlowWidgetContainer::getZ));
-
-    for (FlowWidgetContainer container : componentContainers) {
-        this.addRenderableWidget(container);
-    }
-}
-```
-
----
-
-## Custom UI Element Extensions (`AbstractFlowWidget`)
-
-For creating custom client-side sub-panels, text fields, or sliders inside your expanded node, extend the public client API widget base class:
-`dta.sfmflow.api.client.widget.AbstractFlowWidget`
-
-This widget handles nested rendering ticks, sound dispatching configurations, hovering checks, and automatic hierarchical position shifts.
-
-### Custom Rendering Typography (`FlowWidgetText`)
-For text rendering tasks, the API includes `dta.sfmflow.api.client.widget.FlowWidgetText` as a public client-side widget class. Developers can instantiate it inside their panels to leverage optional text centering, custom matrix scale translations, and automated ellipsis truncation for long localized text values:
-
-```java
-package com.example.addon.client.gui;
-
-import dta.sfmflow.api.client.widget.AbstractFlowWidget;
-import dta.sfmflow.api.client.widget.FlowWidgetText;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-
-public class CustomAddonPanelWidget extends AbstractFlowWidget {
-    
-    private final FlowWidgetText centeredHeaderLabel;
-
-    public CustomAddonPanelWidget(Font font, int x, int y, int width, int height) {
-        super(x, y, width, height, Component.empty());
-        
-        // Instantiate a center-aligned text label running at 80% scale factor
-        this.centeredHeaderLabel = new FlowWidgetText(
-            font, 
-            x + 4, 
-            y + 4, 
-            width - 8, 
-            10, 
-            Component.translatable("gui.addon.panel.header"), 
-            0.8F, 
-            true // Centered horizontal alignment
-        );
-        this.children.add(centeredHeaderLabel);
-    }
-
-    @Override
-    protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        if (this.visible) {
-            this.centeredHeaderLabel.render(guiGraphics, mouseX, mouseY, partialTick);
-        }
-    }
-}
-```
-
----
-
-## Advanced UI Rendering in the Category Hover Submenu
-
-Addon creators can integrate custom elements into the category navigation layout. The `CategoryHoverSubmenu` uses several strategies to construct sliding node overlays:
-
-### 1. 9-Slice Background Stretching
-The submenu background relies on `submenu_bg.png` (`22x22px` texture sheet). It stretches midsections to fit variable grids while maintaining `6px` border corners:
-
-```
-  Source Sheet (22x22px)                  9-Slice Scaling Formula
-  ┌───┬──────────┬───┐              ┌──────────┬──────────────┬──────────┐
-  │   │  Stretch │   │ 6px Corner   │  Corner  │ Stretched    │  Corner  │
-  │   │  (10px)  │   │              ├──────────┼──────────────┼──────────┤
-  ├───┼──────────┼───┤              │          │              │          │
-  │ S │  Center  │ S │ 10px Mid     │Stretched │ Stretched    │Stretched │
-  │ t │  Stretch │ t │              │          │              │          │
-  ├───┼──────────┼───┤              ├──────────┼──────────────┼──────────┤
-  │   │  Stretch │   │ 6px Corner   │  Corner  │ Stretched    │  Corner  │
-  └───┴──────────┴───┘              └──────────┴──────────────└──────────┘
-```
-
-### 2. Centered Typography and Scaled Centering
-Menu titles are generated using `FlowWidgetText` instances with horizontal alignment centering. If localized names exceed the horizontal viewport boundaries, typography scales dynamically down to a minimum of 40% scale factor (`0.4F`) before applying truncation ellipses:
-
-```java
-int availableScaledWidth = (int) (getWidth() / scale);
-int titleWidth = font.width(getMessage());
-
-if (titleWidth <= availableScaledWidth) {
-    int startX = this.centered ? (availableScaledWidth - titleWidth) / 2 : 0;
-    guiGraphics.drawString(font, getMessage(), startX, 0, 4210752, false);		
-} else {
-    int ellipsisWidth = font.width("...");
-    String croppedText = font.getSplitter().plainHeadByWidth(getMessage().getString(), availableScaledWidth - ellipsisWidth, Style.EMPTY);
-    int croppedWidth = font.width(croppedText + "...");
-    int startX = this.centered ? (availableScaledWidth - croppedWidth) / 2 : 0;
-    guiGraphics.drawString(font, croppedText + "...", startX, 0, 4210752, false);
-}
-```
-
-### 3. Hardware Scissor Masking
-Grid items are clamped to a strict visual box to prevent rendering artifacts during scroll offset transitions. Hardware OpenGL scissors restrict the rendering layout coordinates:
-
-```java
-// Limit grid cells to a 56x56 view bounding box
-guiGraphics.enableScissor(getX() + 6, getY() + 18, getX() + 6 + 56, getY() + 18 + 56);
-
-// Render items at offset coordinates
-guiGraphics.blit(props.getIconTexture(), itemX, itemY, 0, vOffset, 14, 14, 14, 28);
-
-guiGraphics.disableScissor();
 ```

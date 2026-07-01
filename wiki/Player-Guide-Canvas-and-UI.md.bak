@@ -33,12 +33,17 @@ All flowchart nodes are physically confined within the viewport boundary box. Dr
 
 ---
 
+## Adaptive GUI Scaling
+To prevent UI clipping and overlapping on smaller displays, SFM-Flow implements adaptive scaling. If the window dimensions drop below the minimum required resolution (`512x256` pixels), the screen automatically reduces the game's GUI scale. When the interface is closed, your original GUI scale configuration is restored.
+
+---
+
 ## Layering & Hardware Depth Testing
 
 To prevent rendering errors where text, visual connectors, or selection submenus on lower layers bleed through higher elements, SFM-Flow utilizes hardware OpenGL depth testing:
 
 *   **Z-Layer Sorting**: Clicking on a container automatically brings it to the top visual layer. The client assigns a higher layering rank (`zLevel`) and translates the rendering matrix along the Z-axis by `zLevel * 10.0F`.
-*   **Instant Depth Flushing**: Each node container immediately flushes its visual command batch to write directly to the GPU's hardware depth buffer before rendering adjacent elements. This guarantees clean boundaries between overlapping components.
+*   **Instant Depth Flushing**: Each node container flushes its visual command batch to write directly to the GPU's hardware depth buffer before rendering adjacent elements. This helps maintain clean visual boundaries between overlapping components.
 
 ---
 
@@ -60,7 +65,7 @@ Positioned along the left sidebar starting at coordinate `X:4`. These represent 
 *   `[U]` **Utility Category** (`Y:84`): Coordinates groups, signage, camouflage, and crafters.
     *   *Icon*: ![Command Group Icon](../src/main/resources/assets/sfmflow/textures/gui/menu_buttons/command_group_button.png)
 
-Hovering over any of these buttons opens a sliding submenu overlay centered on the button's midpoint (`getX() + 7`). Moving your mouse cursor away closes the overlay.
+Hovering over any of these buttons opens a sliding submenu overlay aligned to the button's midpoint (`getX() + 7`). Moving your mouse cursor away closes the overlay.
 
 ---
 
@@ -111,9 +116,9 @@ Nodes change dimensions based on whether they are minimized or maximized:
 *   **Interactive Node Sub-Widgets**:
     *   **Move Handle** (`6x6px`): Drag to reposition the node.
         *   *Texture File*: ![Move Button](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/move_button.png)
-    *   **Toggle Expansion Arrow** (`11x24px`): Located on the top-right of a node. Click to minimize or maximize.
+    *   **Toggle Expansion Arrow** (`11x12px` button bounds, `11x24px` texture sheet): Located on the top-right of a node. Click to minimize or maximize.
         *   *Texture File*: ![Toggle Button](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/open_close_button.png)
-    *   **Logic Output Connection Node** (`6x12px`): Located on the bottom edge of output-capable components.
+    *   **Logic Output Connection Node** (`6x6px` button bounds, `6x12px` texture sheet): Located on the bottom edge of output-capable components.
         *   *Texture File*: ![Output Node](../src/main/resources/assets/sfmflow/textures/gui/flowcomponents/output_node.png)
 
 ---
