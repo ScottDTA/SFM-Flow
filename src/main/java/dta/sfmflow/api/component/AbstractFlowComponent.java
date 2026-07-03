@@ -3,12 +3,21 @@ package dta.sfmflow.api.component;
 import java.util.UUID;
 import java.util.Optional;
 import com.mojang.serialization.Codec;
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+
+import dta.sfmflow.SFMFlow;
+import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.util.Color;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -29,7 +38,7 @@ public abstract class AbstractFlowComponent {
 	 * Codec usage [3]. NBT Purged: Completely removed isOpen, xBeforeOpen, and
 	 * yBeforeOpen fields to match compact specifications [3].
 	 */
-	public record BaseProperties(UUID id, int x, int y, int z, String customName, dta.sfmflow.util.Color colorMask) {
+	public record BaseProperties(UUID id, int x, int y, int z, String customName, Color colorMask) {
 		/**
 		 * MapCodec handling the base flowchart component fields. Fully purged of old
 		 * toggled coordinates [3].
@@ -40,19 +49,19 @@ public abstract class AbstractFlowComponent {
 						Codec.INT.optionalFieldOf("y", -9999).forGetter(BaseProperties::y),
 						Codec.INT.optionalFieldOf("z", 0).forGetter(BaseProperties::z),
 						Codec.STRING.optionalFieldOf("customName", "").forGetter(BaseProperties::customName),
-						dta.sfmflow.util.Color.CODEC.optionalFieldOf("colorMask")
+						Color.CODEC.optionalFieldOf("colorMask")
 								.forGetter(props -> Optional.ofNullable(props.colorMask())))
 				.apply(instance, (id, x, y, z, customName, colorMaskOpt) -> new BaseProperties(id, x, y, z, customName,
 						colorMaskOpt.orElse(Color.WHITE))));
 	}
 
-	public static final Codec<AbstractFlowComponent> CODEC = FlowComponentType.REGISTRY.byNameCodec().partialDispatch(
-			"type", component -> com.mojang.serialization.DataResult.success(component.getType()), typeEntry -> {
+	public static final Codec<AbstractFlowComponent> CODEC = FlowComponentType.REGISTRY.byNameCodec()
+			.partialDispatch("type", component -> DataResult.success(component.getType()), typeEntry -> {
 				if (typeEntry == null) {
-					return com.mojang.serialization.DataResult.error(
+					return DataResult.error(
 							() -> "Flowchart component type identifier key is completely missing from the active registry mapping map grid!");
 				}
-				return com.mojang.serialization.DataResult.success(typeEntry.codec());
+				return DataResult.success(typeEntry.codec());
 			});
 
 	protected UUID id;
@@ -141,8 +150,12 @@ public abstract class AbstractFlowComponent {
 	}
 
 	public CompoundTag saveData(CompoundTag compoundTag) {
-		AbstractFlowComponent.CODEC.encodeStart(net.minecraft.nbt.NbtOps.INSTANCE, this)
-				.resultOrPartial(err -> dta.sfmflow.SFMFlow.LOGGER.error("Failed to encode flow component: {}", err))
+		// Secure setup: obtain the static composite HolderLookup.Provider cleanly [3]
+		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+
+		AbstractFlowComponent.CODEC.encodeStart(ops, this)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flow component: {}", err))
 				.ifPresent(nbt -> {
 					if (nbt instanceof CompoundTag c) {
 						compoundTag.merge(c);
@@ -157,8 +170,12 @@ public abstract class AbstractFlowComponent {
 	}
 
 	public void loadData(CompoundTag compoundTag) {
-		AbstractFlowComponent.CODEC.parse(net.minecraft.nbt.NbtOps.INSTANCE, compoundTag)
-				.resultOrPartial(err -> dta.sfmflow.SFMFlow.LOGGER.error("Failed to decode flow component: {}", err))
+		// Secure setup: obtain the static composite HolderLookup.Provider cleanly [3]
+		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+
+		AbstractFlowComponent.CODEC.parse(ops, compoundTag)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flow component: {}", err))
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
 				});
@@ -244,15 +261,16 @@ public abstract class AbstractFlowComponent {
 	public void setActiveCategory(int category) {
 		this.activeCategory = category;
 	}
-	
+
 	/**
-	 * Executes or plans the logical behavior of this component during a flowchart evaluation sweep [3].
-	 * Custom components can override this to implement custom logic [3].
+	 * Executes or plans the logical behavior of this component during a flowchart
+	 * evaluation sweep [3]. Custom components can override this to implement custom
+	 * logic [3].
 	 *
-	 * @param context the execution context providing safe access to snapshot states and connection queues [3]
+	 * @param context the execution context providing safe access to snapshot states
+	 *                and connection queues [3]
 	 */
-	public void plan(dta.sfmflow.api.execution.FlowchartPlanningContext context) {
+	public void plan(FlowchartPlanningContext context) {
 		// Default implementation: do nothing [3]
-	}	
-	
+	}
 }

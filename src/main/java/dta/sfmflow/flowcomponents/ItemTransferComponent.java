@@ -5,23 +5,38 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import dta.sfmflow.SFMFlow;
+import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
+import dta.sfmflow.api.component.IGhostSlotAware;
 import dta.sfmflow.api.execution.FlowItemBuffer;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
+import dta.sfmflow.item.ModItems;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.LongTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NumericTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
+
 import java.util.Optional;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
@@ -38,7 +53,7 @@ import java.util.Map;
  * slot bitmasks, variable bindings, and custom item quantity limits [3].
  */
 public class ItemTransferComponent extends AbstractFlowComponent
-		implements IFilterable, IInventoryTarget, ISideConfigurable {
+		implements IFilterable, IInventoryTarget, ISideConfigurable, IGhostSlotAware {
 	private final boolean isInput;
 	private int inventoryId = -1;
 	private boolean useAll = true;
@@ -121,8 +136,6 @@ public class ItemTransferComponent extends AbstractFlowComponent
 
 	@Override
 	public FlowComponentType getType() {
-		// Change from FlowComponentType.ITEM_INPUT to VanillaSFMFlowPlugin.ITEM_INPUT
-		// [3]
 		return isInput ? VanillaSFMFlowPlugin.ITEM_INPUT.get() : VanillaSFMFlowPlugin.ITEM_OUTPUT.get();
 	}
 
@@ -254,14 +267,85 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		return filterLimits;
 	}
 
+	/**
+	 * Retrieves the maximum count limit assigned to the specified item stack [3].
+	 * Uses side-safe item equality checks to bypass dynamic component mismatches
+	 * [3].
+	 *
+	 * @param stack the item stack to check [3]
+	 * @return the stack limit, or -1 if unlimited [3]
+	 */
 	public int getFilterLimit(ItemStack stack) {
 		for (int i = 0; i < filterItems.size(); i++) {
 			ItemStack filter = filterItems.get(i);
-			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
+			if (filter != null && !filter.isEmpty() && ItemStack.isSameItem(stack, filter)) {
 				return i < filterLimits.size() ? filterLimits.get(i) : -1;
 			}
 		}
 		return -1;
+	}
+
+	@Override
+	public ItemStack getGhostStack(int index) {
+		if (index >= 0 && index < this.filterItems.size()) {
+			return this.filterItems.get(index);
+		}
+		return ItemStack.EMPTY;
+	}
+
+	@Override
+	public void setGhostStack(int index, ItemStack stack) {
+		if (index >= 0 && index < this.filterItems.size()) {
+			this.filterItems.set(index, stack == null ? ItemStack.EMPTY : stack);
+		}
+	}
+
+	@Override
+	public int getGhostSlotCount() {
+		return 12; // Item transfer component has exactly 12 ghost slots
+	}
+
+	@Override
+	public CompoundTag saveData(CompoundTag compoundTag) {
+		super.saveData(compoundTag);
+		// Direct NBT saving fallback as an exploit and desync shield [3]
+		compoundTag.putInt("inventoryId", this.inventoryId);
+		compoundTag.putBoolean("useAll", this.useAll);
+		compoundTag.putInt("targetSlot", this.targetSlot);
+		compoundTag.putInt("activeSidesMask", this.activeSidesMask);
+
+		ListTag enabledMasksList = new ListTag();
+		for (long mask : this.enabledSlotsMasks) {
+			enabledMasksList.add(LongTag.valueOf(mask));
+		}
+		compoundTag.put("enabledSlotsMasks", enabledMasksList);
+
+		if (this.boundGroupVariableId != null) {
+			compoundTag.putUUID("boundGroupVariableId", this.boundGroupVariableId);
+		}
+		if (this.boundFilterVariableId != null) {
+			compoundTag.putUUID("boundFilterVariableId", this.boundFilterVariableId);
+		}
+		compoundTag.putBoolean("whitelist", this.whitelist);
+
+		var registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+		ListTag itemsList = new ListTag();
+		for (ItemStack stack : this.filterItems) {
+			if (stack != null && !stack.isEmpty()) {
+				itemsList.add(stack.save(registries));
+			} else {
+				itemsList.add(new CompoundTag());
+			}
+		}
+		compoundTag.put("filterItems", itemsList);
+
+		ListTag limitsList = new ListTag();
+		for (int limit : this.filterLimits) {
+			limitsList.add(IntTag.valueOf(limit));
+		}
+		compoundTag.put("filterLimits", limitsList);
+
+		return compoundTag;
 	}
 
 	@Override
@@ -270,7 +354,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			/* STREAMING_CHUNK:Extruding items virtually into output wire */
 			FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 
-			// 1. Carry over any incoming items passed from upstream nodes first [3]
+			// Carry over any incoming items passed from upstream input nodes
 			FlowItemBuffer myInputBuffer = context.getComponentBuffer(this.getId());
 			if (!myInputBuffer.isEmpty()) {
 				for (FlowItemBuffer.BufferedItem item : myInputBuffer.getItems()) {
@@ -278,45 +362,67 @@ public class ItemTransferComponent extends AbstractFlowComponent
 				}
 			}
 
-			// 2. Extract our own configured inventory items into the combined buffer [3]
+			// Extract our own configured inventory items into the combined buffer
 			extractItemsIntoBuffer(context, myOutputBuffer);
 
-			// 3. Always propagate control flow downstream, even if the buffer is empty [3]
-			for (FlowComponentConnections conn : context.getConnections()) {
-				if (conn.getSourceComponentId().equals(this.getId())) {
-					UUID targetId = conn.getTargetComponentId();
-
-					if (!myOutputBuffer.isEmpty()) {
+			// Copy extracted buffer contents onto connected target input buffers
+			// sequentially
+			if (!myOutputBuffer.isEmpty()) {
+				for (FlowComponentConnections conn : context.getConnections()) {
+					if (conn.getSourceComponentId().equals(this.getId())) {
+						UUID targetId = conn.getTargetComponentId();
 						FlowItemBuffer targetInputBuffer = context.getComponentBuffer(targetId);
+
 						for (FlowItemBuffer.BufferedItem item : myOutputBuffer.getItems()) {
 							targetInputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
 						}
+						context.enqueue(targetId);
 					}
-					// Always enqueue the next node to keep the flowchart executing [3]
-					context.enqueue(targetId);
 				}
 			}
 		} else {
 			/* STREAMING_CHUNK:Siphoning items virtually from input wire */
 			FlowItemBuffer myInputBuffer = context.getComponentBuffer(this.getId());
-			FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 
-			// 1. Only attempt depositions if we actually have incoming items to handle [3]
 			if (!myInputBuffer.isEmpty()) {
+				FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 				depositItemsFromBuffer(context, myInputBuffer, myOutputBuffer);
-			}
 
-			// 2. Always propagate any remaining leftovers downstream [3]
-			for (FlowComponentConnections conn : context.getConnections()) {
-				if (conn.getSourceComponentId().equals(this.getId())) {
-					UUID targetId = conn.getTargetComponentId();
-					FlowItemBuffer targetInputBuffer = context.getComponentBuffer(targetId);
+				// Propagate remaining un-deposited leftovers downstream along the connection
+				// lines
+				for (FlowComponentConnections conn : context.getConnections()) {
+					if (conn.getSourceComponentId().equals(this.getId())) {
+						UUID targetId = conn.getTargetComponentId();
+						FlowItemBuffer targetInputBuffer = context.getComponentBuffer(targetId);
 
-					for (FlowItemBuffer.BufferedItem item : myOutputBuffer.getItems()) {
-						targetInputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
+						for (FlowItemBuffer.BufferedItem item : myOutputBuffer.getItems()) {
+							targetInputBuffer.add(item.srcPos(), item.srcSlot(), item.srcSide(), item.stack().copy());
+						}
+						context.enqueue(targetId);
 					}
-					context.enqueue(targetId);
 				}
+			}
+		}
+	}
+
+	private void updateSnapshotCopies(FlowchartPlanningContext context, BlockPos pos, int slot,
+			ItemStack updatedStack) {
+		for (Direction dir : Direction.values()) {
+			var inv = context.getSnapshot().getInventory(pos, dir);
+			if (inv != null) {
+				var slotSnap = inv.slots().get(slot);
+				if (slotSnap != null) {
+					inv.slots().put(slot, new ThreadSafeInventorySnapshot.SlotSnapshot(updatedStack.copy(),
+							slotSnap.slotLimit(), slotSnap.mainSlotIndex()));
+				}
+			}
+		}
+		var nullInv = context.getSnapshot().getInventory(pos, null);
+		if (nullInv != null) {
+			var slotSnap = nullInv.slots().get(slot);
+			if (slotSnap != null) {
+				nullInv.slots().put(slot, new ThreadSafeInventorySnapshot.SlotSnapshot(updatedStack.copy(),
+						slotSnap.slotLimit(), slotSnap.mainSlotIndex()));
 			}
 		}
 	}
@@ -336,7 +442,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			return;
 		}
 
-		java.util.List<Direction> activeSrcSides = new ArrayList<>();
+		List<Direction> activeSrcSides = new ArrayList<>();
 		for (Direction dir : Direction.values()) {
 			if (this.isSideActive(dir)) {
 				activeSrcSides.add(dir);
@@ -372,18 +478,22 @@ public class ItemTransferComponent extends AbstractFlowComponent
 					continue;
 				}
 
-				if (!matchesFilter(this, srcStack)) {
+				// Fixed: matchesFilter updated to use context [3]
+				if (!matchesFilter(context, this, srcStack)) {
 					continue;
 				}
 
 				int totalInSource = 0;
 				for (var entry : srcInv.slots().values()) {
-					if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
+					// Symmetrical Fix: Changed from isSameItemSameComponents to isSameItem to
+					// prevent component count desyncs [3]
+					if (ItemStack.isSameItem(srcStack, entry.stack())) {
 						totalInSource += entry.stack().getCount();
 					}
 				}
 
-				int srcLimit = this.getFilterLimit(srcStack);
+				// Fixed: getFilterLimit updated to use context [3]
+				int srcLimit = this.getFilterLimit(context, this, srcStack);
 				int srcRemaining = srcStack.getCount();
 
 				if (this.isWhitelist()) {
@@ -406,13 +516,20 @@ public class ItemTransferComponent extends AbstractFlowComponent
 				}
 
 				if (srcRemaining > 0) {
+					Item srcItem = srcStack.getItem();
 					ItemStack extracted = srcStack.copy();
 					extracted.setCount(srcRemaining);
+
+					if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+						SFMFlow.LOGGER.info("[SFM-Flow] Extracting Slot {}: Side={}, Count={}, AlreadyGrabbed={}",
+								srcSlot, srcSide, srcRemaining, grabbedCounts.getOrDefault(srcItem, 0));
+					}
+
 					buffer.add(srcInventoryPos, srcSlot, srcSide, extracted);
 
 					srcStack.shrink(srcRemaining);
-					grabbedCounts.put(srcStack.getItem(),
-							grabbedCounts.getOrDefault(srcStack.getItem(), 0) + srcRemaining);
+					updateSnapshotCopies(context, srcInventoryPos, srcSlot, srcStack);
+					grabbedCounts.put(srcItem, grabbedCounts.getOrDefault(srcItem, 0) + srcRemaining);
 				}
 			}
 		}
@@ -447,18 +564,34 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			activeTgtSides.add(null);
 		}
 
+		Map<Item, Integer> alreadyHeldBack = new HashMap<>();
+
 		for (FlowItemBuffer.BufferedItem incomingItem : inputBuffer.getItems()) {
 			ItemStack incoming = incomingItem.stack();
 			if (incoming.isEmpty())
 				continue;
 
-			if (!matchesFilter(this, incoming)) {
+			// Fixed: matchesFilter updated to use context [3]
+			if (!matchesFilter(context, this, incoming)) {
 				outputBuffer.add(incomingItem.srcPos(), incomingItem.srcSlot(), incomingItem.srcSide(),
 						incoming.copy());
 				continue;
 			}
 
 			int remainingToDeposit = incoming.getCount();
+			int tgtLimit = this.getFilterLimit(context, this, incoming);
+
+			// Calculate the max allowable deposit amount once for this entire incoming
+			// stack [3]
+			int allowedDeposit = remainingToDeposit;
+			if (!this.isWhitelist() && tgtLimit > 0) {
+				int held = alreadyHeldBack.getOrDefault(incoming.getItem(), 0);
+				int remainingToHoldBack = Math.max(0, tgtLimit - held);
+				int amountToHoldBack = Math.min(remainingToDeposit, remainingToHoldBack);
+				allowedDeposit = remainingToDeposit - amountToHoldBack;
+
+				alreadyHeldBack.put(incoming.getItem(), held + amountToHoldBack);
+			}
 
 			for (Direction tgtSide : activeTgtSides) {
 				if (remainingToDeposit <= 0)
@@ -489,12 +622,12 @@ public class ItemTransferComponent extends AbstractFlowComponent
 
 					int totalInTarget = 0;
 					for (var entry : tgtInv.slots().values()) {
-						if (ItemStack.isSameItemSameComponents(incoming, entry.stack())) {
+						// Symmetrical Fix: use isSameItem [3]
+						if (ItemStack.isSameItem(incoming, entry.stack())) {
 							totalInTarget += entry.stack().getCount();
 						}
 					}
 
-					int tgtLimit = this.getFilterLimit(incoming);
 					int maxToDeposit = incoming.getMaxStackSize();
 
 					if (this.isWhitelist()) {
@@ -505,11 +638,10 @@ public class ItemTransferComponent extends AbstractFlowComponent
 							}
 						}
 					} else {
-						if (tgtLimit > 0) {
-							maxToDeposit = Math.max(0, remainingToDeposit - tgtLimit);
-							if (maxToDeposit <= 0) {
-								continue;
-							}
+						// Symmetrically use the pre-calculated allowedDeposit count for Blacklist [3]
+						maxToDeposit = allowedDeposit;
+						if (maxToDeposit <= 0) {
+							continue;
 						}
 					}
 
@@ -520,7 +652,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 					if (tgtStack.isEmpty()) {
 						canInsert = true;
 						maxInsertable = actualLimit;
-					} else if (ItemStack.isSameItemSameComponents(incoming, tgtStack)) {
+					} else if (ItemStack.isSameItem(incoming, tgtStack)) { // Symmetrical Fix: use isSameItem [3]
 						int remainingSpace = actualLimit - tgtStack.getCount();
 						if (remainingSpace > 0) {
 							canInsert = true;
@@ -531,6 +663,12 @@ public class ItemTransferComponent extends AbstractFlowComponent
 					if (canInsert) {
 						int amountToTransfer = Math.min(remainingToDeposit, maxInsertable);
 						if (amountToTransfer > 0) {
+							if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+								SFMFlow.LOGGER.info(
+										"[SFM-Flow] Depositing Slot {}: Side={}, Amount={}, RemainingToDeposit={}",
+										tgtSlot, tgtSide, amountToTransfer, remainingToDeposit);
+							}
+
 							boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
 									incomingItem.srcSide(), tgtInventoryPos, tgtSlot, tgtSide, incoming,
 									amountToTransfer);
@@ -540,11 +678,16 @@ public class ItemTransferComponent extends AbstractFlowComponent
 									newTgt.setCount(amountToTransfer);
 									tgtInv.slots().put(tgtSlot, new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
 											tgtEntry.slotLimit(), mainTgtSlot));
+									updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, newTgt);
 								} else {
 									tgtStack.grow(amountToTransfer);
+									updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, tgtStack);
 								}
 								incoming.shrink(amountToTransfer);
 								remainingToDeposit -= amountToTransfer;
+								if (!this.isWhitelist()) {
+									allowedDeposit -= amountToTransfer;
+								}
 							}
 						}
 					}
@@ -559,19 +702,73 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		}
 	}
 
-	private boolean matchesFilter(ItemTransferComponent component, ItemStack stack) {
+	private boolean matchesFilter(FlowchartPlanningContext context, ItemTransferComponent component, ItemStack stack) {
 		if (stack.isEmpty()) {
 			return false;
 		}
 
-		boolean found = false;
+		ItemStack filterItem = null;
 		int limit = -1;
-		for (int i = 0; i < component.getFilterItems().size(); i++) {
-			ItemStack filter = component.getFilterItems().get(i);
-			if (filter != null && !filter.isEmpty() && ItemStack.isSameItemSameComponents(stack, filter)) {
-				found = true;
-				limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
-				break;
+		boolean found = false;
+
+		// 1. Resolve bound variable components placed directly on the flowchart canvas
+		// [3]
+		if (component.getBoundFilterVariableId() != null) {
+			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
+			if (boundComp instanceof AdvancedItemFilterVariableComponent varComp) {
+				filterItem = varComp.getFilterStack();
+				limit = varComp.isUseQuantity() ? varComp.getQuantity() : -1;
+
+				// Symmetrical Fix: Changed from isSameItemSameComponents to isSameItem to
+				// bypass dynamic components mismatches [3]
+				if (filterItem != null && !filterItem.isEmpty() && ItemStack.isSameItem(stack, filterItem)) {
+					found = true;
+				}
+			}
+		} else {
+			// 2. Scan each of the 12 ghost slots, checking for virtual variable cards [3]
+			for (int i = 0; i < component.getFilterItems().size(); i++) {
+				ItemStack filter = component.getFilterItems().get(i);
+				if (filter == null || filter.isEmpty()) {
+					continue;
+				}
+
+				if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) { // Secure
+																													// Check
+																													// Fix
+																													// [3]
+					CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+					if (tag.contains("VariableId")) {
+						UUID varId = tag.getUUID("VariableId");
+						AbstractFlowComponent varComp = context.getComponents().get(varId);
+						if (varComp instanceof AdvancedItemFilterVariableComponent advancedVar) {
+							ItemStack varStack = advancedVar.getFilterStack();
+
+							// Symmetrical Fix: Changed from isSameItemSameComponents to isSameItem to
+							// bypass dynamic components mismatches [3]
+							if (varStack != null && !varStack.isEmpty() && ItemStack.isSameItem(stack, varStack)) {
+								found = true;
+								limit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
+								if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+									SFMFlow.LOGGER.info(
+											"[SFM-Flow] matchesFilter Matched Variable Card: ID={}, Item={}, UseQty={}, Limit={}",
+											varId, stack.getItem().toString(), advancedVar.isUseQuantity(), limit);
+								}
+								break;
+							}
+						} else {
+							if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+								SFMFlow.LOGGER.warn(
+										"[SFM-Flow] matchesFilter: Variable component NOT found in context for ID: {}",
+										varId);
+							}
+						}
+					}
+				} else if (ItemStack.isSameItem(stack, filter)) { // Symmetrical Fix: use isSameItem [3]
+					found = true;
+					limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
+					break;
+				}
 			}
 		}
 
@@ -582,17 +779,76 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		}
 	}
 
+	private int getFilterLimit(FlowchartPlanningContext context, ItemTransferComponent component, ItemStack stack) {
+		if (component.getBoundFilterVariableId() != null) {
+			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
+			if (boundComp instanceof AdvancedItemFilterVariableComponent varComp) {
+				ItemStack filterItem = varComp.getFilterStack();
+
+				// Symmetrical Fix: use isSameItem [3]
+				if (filterItem != null && !filterItem.isEmpty() && ItemStack.isSameItem(stack, filterItem)) {
+					return varComp.isUseQuantity() ? varComp.getQuantity() : -1;
+				}
+			}
+			return -1;
+		}
+
+		for (ItemStack filter : component.getFilterItems()) {
+			if (filter == null || filter.isEmpty())
+				continue;
+
+			if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) { // Secure
+																												// Check
+																												// Fix
+																												// [3]
+				CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+				if (tag.contains("VariableId")) {
+					UUID varId = tag.getUUID("VariableId");
+					AbstractFlowComponent varComp = context.getComponents().get(varId);
+					if (varComp instanceof AdvancedItemFilterVariableComponent advancedVar) {
+						ItemStack varStack = advancedVar.getFilterStack();
+
+						// Symmetrical Fix: use isSameItem [3]
+						if (varStack != null && !varStack.isEmpty() && ItemStack.isSameItem(stack, varStack)) {
+							int resolvedLimit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
+							if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+								SFMFlow.LOGGER.info(
+										"[SFM-Flow] getFilterLimit Resolved Variable Card: ID={}, Item={}, UseQty={}, Limit={}",
+										varId, stack.getItem().toString(), advancedVar.isUseQuantity(), resolvedLimit);
+							}
+							return resolvedLimit;
+						}
+					} else {
+						if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+							SFMFlow.LOGGER.warn(
+									"[SFM-Flow] getFilterLimit: Variable component NOT found in context for ID: {}",
+									varId);
+						}
+					}
+				}
+			} else if (ItemStack.isSameItem(stack, filter)) { // Symmetrical Fix: use isSameItem [3]
+				return component.getFilterLimit(stack);
+			}
+		}
+
+		return -1;
+	}
+
 	@Override
-	public void loadData(CompoundTag compoundTag) {
+	public void loadData(net.minecraft.nbt.CompoundTag compoundTag) {
+		// Secure setup: obtain the static composite HolderLookup.Provider cleanly [3]
+		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+
 		var codec = isInput ? ItemTransferComponent.INPUT_CODEC : ItemTransferComponent.OUTPUT_CODEC;
-		codec.codec().parse(NbtOps.INSTANCE, compoundTag)
+		codec.codec().parse(ops, compoundTag)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse item transfer component data: {}", err))
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
 					this.inventoryId = decoded.getInventoryId();
 					this.useAll = decoded.isUseAll();
 					this.targetSlot = decoded.getTargetSlot();
-					this.activeSidesMask = decoded.getActiveSidesMask();
+					this.activeSidesMask = decoded.activeSidesMask;
 					this.enabledSlotsMasks.clear();
 					this.enabledSlotsMasks.addAll(decoded.getEnabledSlotsMasks());
 					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
@@ -609,12 +865,79 @@ public class ItemTransferComponent extends AbstractFlowComponent
 						this.filterLimits.add(-1);
 					}
 				});
+
+		// Direct NBT loading fallback as an exploit and desync shield [3]
+		if (compoundTag.contains("inventoryId")) {
+			this.inventoryId = compoundTag.getInt("inventoryId");
+		}
+		if (compoundTag.contains("useAll")) {
+			this.useAll = compoundTag.getBoolean("useAll");
+		}
+		if (compoundTag.contains("targetSlot")) {
+			this.targetSlot = compoundTag.getInt("targetSlot");
+		}
+		if (compoundTag.contains("activeSidesMask")) {
+			this.activeSidesMask = compoundTag.getInt("activeSidesMask");
+		}
+		if (compoundTag.contains("enabledSlotsMasks")) {
+			ListTag list = compoundTag.getList("enabledSlotsMasks", Tag.TAG_LONG);
+			this.enabledSlotsMasks.clear();
+			for (int i = 0; i < list.size(); i++) {
+				if (list.get(i) instanceof NumericTag numericTag) {
+					this.enabledSlotsMasks.add(numericTag.getAsLong());
+				} else {
+					this.enabledSlotsMasks.add(-1L);
+				}
+			}
+		}
+		if (compoundTag.contains("boundGroupVariableId")) {
+			this.boundGroupVariableId = compoundTag.getUUID("boundGroupVariableId");
+		} else {
+			this.boundGroupVariableId = null;
+		}
+		if (compoundTag.contains("boundFilterVariableId")) {
+			this.boundFilterVariableId = compoundTag.getUUID("boundFilterVariableId");
+		} else {
+			this.boundFilterVariableId = null;
+		}
+		if (compoundTag.contains("whitelist")) {
+			this.whitelist = compoundTag.getBoolean("whitelist");
+		}
+		if (compoundTag.contains("filterItems")) {
+			ListTag list = compoundTag.getList("filterItems", Tag.TAG_COMPOUND);
+			this.filterItems.clear();
+			for (int i = 0; i < list.size(); i++) {
+				CompoundTag itemTag = list.getCompound(i);
+				if (itemTag.isEmpty() || !itemTag.contains("id")) {
+					this.filterItems.add(ItemStack.EMPTY);
+				} else {
+					this.filterItems.add(ItemStack.parse(registries, itemTag).orElse(ItemStack.EMPTY));
+				}
+			}
+			while (this.filterItems.size() < 12) {
+				this.filterItems.add(ItemStack.EMPTY);
+			}
+		}
+		if (compoundTag.contains("filterLimits")) {
+			ListTag list = compoundTag.getList("filterLimits", Tag.TAG_INT);
+			this.filterLimits.clear();
+			for (int i = 0; i < list.size(); i++) {
+				if (list.get(i) instanceof NumericTag numericTag) {
+					this.filterLimits.add(numericTag.getAsInt());
+				} else {
+					this.filterLimits.add(-1);
+				}
+			}
+			while (this.filterLimits.size() < 12) {
+				this.filterLimits.add(-1);
+			}
+		}
 	}
 
 	@Override
 	public Component getName() {
-		if (getCustomName() != null && !getCustomName().isEmpty()) {
-			return Component.literal(getCustomName());
+		if (this.getCustomName() != null && !this.getCustomName().isEmpty()) {
+			return Component.literal(this.getCustomName());
 		}
 		return Component.translatable(isInput ? "gui.sfmflow.item_input" : "gui.sfmflow.item_output");
 	}

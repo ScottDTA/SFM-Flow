@@ -31,9 +31,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Main visual workspace representing ManagerBlock configurations [3]. Delegates
- * mouse interactions directly to a clean helper handler class [3]. Upgraded to
- * draw wires directly inside renderBg under the Painter's Algorithm [3].
+ * Main visual workspace representing ManagerBlock configurations [3].
+ * Incorporates a sliding drawer panel to display dynamic filter cards and warning counters [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
@@ -110,6 +109,9 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 						66 + textureY - this.topPos);
 			}
 		}
+
+		// Add dynamic sliding variable drawer widget [3]
+		this.addRenderableWidget(new VariableDrawerWidget(this, x + 346, y + 256, 162, 96));
 
 		if (this.activeModalPopup != null) {
 			int pWidth = this.activeModalPopup.getWidth();
@@ -200,25 +202,12 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
+		// Render Left Panel variable entries [3]
 		guiGraphics.enableScissor(x + 4, y + 256, x + 166, y + 352);
 		var groupVars = getMenu().getManagerBlockEntity().getGroupVariables();
 		for (int i = 0; i < groupVars.size(); i++) {
 			var varItem = groupVars.get(i);
 			int entryX = x + 4;
-			int entryY = y + 260 + i * 16;
-			boolean hovered = mouseX >= entryX && mouseX < entryX + 162 && mouseY >= entryY && mouseY < entryY + 14;
-
-			guiGraphics.fill(entryX, entryY, entryX + 162, entryY + 14, hovered ? 0xFF555555 : 0xFF222222);
-			guiGraphics.renderOutline(entryX, entryY, 162, 14, 0xFFD4AF37);
-			guiGraphics.drawString(font, varItem.name(), entryX + 4, entryY + 3, 0xFFFFFFFF, false);
-		}
-		guiGraphics.disableScissor();
-
-		guiGraphics.enableScissor(x + 346, y + 256, x + 508, y + 352);
-		var filterVars = getMenu().getManagerBlockEntity().getFilterVariables();
-		for (int i = 0; i < filterVars.size(); i++) {
-			var varItem = filterVars.get(i);
-			int entryX = x + 346;
 			int entryY = y + 260 + i * 16;
 			boolean hovered = mouseX >= entryX && mouseX < entryX + 162 && mouseY >= entryY && mouseY < entryY + 14;
 
@@ -301,7 +290,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		if (this.activeModalPopup != null && this.activeModalPopup.visible) {
 			RenderSystem.clear(256, Minecraft.ON_OSX);
 			guiGraphics.pose().pushPose();
-			// Increased Z-translation to baseZ + 800.0F to guarantee modal popup renders on top of the 3D scene [3]
 			guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 800.0F);
 			this.activeModalPopup.render(guiGraphics, mouseX, mouseY, partialTick);
 			guiGraphics.flush();
@@ -561,15 +549,28 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				4, 244, 4210752, false);
 
 		int errorCount = 0;
+		int warningCount = 0;
 		for (var comp : getMenu().getManagerBlockEntity().getFlowComponents().values()) {
 			if (WorkspaceValidator.hasUnboundInventoryError(this, comp)) {
 				errorCount++;
 			}
+			if (WorkspaceValidator.hasEmptyFilterVariableWarning(this, comp)) {
+				warningCount++;
+			}
 		}
 
+		int currentOffset = 4 + commandWidth + 12;
+
 		if (errorCount > 0) {
+			int errorWidth = this.font.width(Component.translatable("gui.sfmflow.errors", errorCount));
 			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.errors", errorCount),
-					4 + commandWidth + 12, 244, 0xFFD00000, false);
+					currentOffset, 244, 0xFFD00000, false);
+			currentOffset += errorWidth + 12;
+		}
+
+		if (warningCount > 0) {
+			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.warnings", warningCount),
+					currentOffset, 244, 0xFFFED83D, false); // Yellow warning color 0xFED83D [3]
 		}
 	}
 

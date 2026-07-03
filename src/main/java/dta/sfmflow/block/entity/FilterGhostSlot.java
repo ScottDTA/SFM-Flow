@@ -1,6 +1,7 @@
 package dta.sfmflow.block.entity;
 
-import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.api.component.IGhostSlotAware;
+import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Player;
@@ -9,8 +10,8 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Public API client-server visual capability slot that prevents item placements
- * and extractions [3]. Passes its true index to the parent constructor for
- * container mapping [3].
+ * and extractions [3]. Handles dynamic capability targets using IGhostSlotAware
+ * [3].
  */
 public class FilterGhostSlot extends Slot {
 	private final ManagerMenu menu;
@@ -24,18 +25,18 @@ public class FilterGhostSlot extends Slot {
 
 	@Override
 	public ItemStack getItem() {
-		ItemTransferComponent comp = menu.getActiveFilterComponent();
-		if (comp != null && filterIndex < comp.getFilterItems().size()) {
-			return comp.getFilterItems().get(filterIndex);
+		AbstractFlowComponent comp = menu.getActiveComponent();
+		if (comp instanceof IGhostSlotAware aware && filterIndex < aware.getGhostSlotCount()) {
+			return aware.getGhostStack(filterIndex);
 		}
 		return ItemStack.EMPTY;
 	}
 
 	@Override
 	public void set(ItemStack stack) {
-		ItemTransferComponent comp = menu.getActiveFilterComponent();
-		if (comp != null && filterIndex < comp.getFilterItems().size()) {
-			comp.getFilterItems().set(filterIndex, stack);
+		AbstractFlowComponent comp = menu.getActiveComponent();
+		if (comp instanceof IGhostSlotAware aware && filterIndex < aware.getGhostSlotCount()) {
+			aware.setGhostStack(filterIndex, stack);
 			menu.getManagerBlockEntity().setChanged();
 		}
 	}

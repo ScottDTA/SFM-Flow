@@ -38,6 +38,8 @@ import dta.sfmflow.kernel.ExecutionRingBuffer;
 import dta.sfmflow.kernel.FlowExecutionKernel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.RegistryAccess;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -50,6 +52,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -224,6 +227,11 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					if (elapsedTrigger < 0) {
 						trigger.setLastExecutionTick(currentTime);
 					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
+						// Diagnostic trace to safely audit trigger properties [3]
+						SFMFlow.LOGGER.info(
+								"[SFM-Flow] Trigger Fired: ID={}, Hash={}, GameTime={}, LastExecuted={}, Elapsed={}, Total={}",
+								trigger.getId(), System.identityHashCode(trigger), currentTime,
+								trigger.getLastExecutionTick(), elapsedTrigger, trigger.getTotalTicks());
 						trigger.setLastExecutionTick(currentTime);
 						activeTriggers.add(trigger.getId());
 					}
@@ -329,92 +337,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		pTag.put("ScannedInventories", invList);
 
 		super.saveAdditional(pTag, pRegistries);
-	}
-
-	@Override
-	protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
-		super.loadAdditional(pTag, pRegistries);
-
-		if (pTag.contains("ManagerId")) {
-			this.managerId = pTag.getUUID("ManagerId");
-		} else {
-			this.managerId = UUID.randomUUID();
-		}
-
-		if (pTag.contains("flowchart")) {
-			try {
-				this.flowchart = Flowchart.CODEC.parse(NbtOps.INSTANCE, pTag.get("flowchart"))
-						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-						.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
-				this.loadedExternal = true;
-			} catch (Exception e) {
-				SFMFlow.LOGGER.error(
-						"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
-						e);
-				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-			}
-		} else if (this.level == null || this.level.isClientSide()) {
-			if (this.flowchart == null) {
-				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-			}
-		}
-
-		if (pTag.contains("ScannedCablePositions")) {
-			long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
-			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
-			map.clear();
-			for (long longVal : dirOrdinals(flatPosOrdinals(flatPosArray))) {
-				map.getOrAddNode(BlockPos.of(longVal));
-			}
-		}
-
-		if (pTag.contains("GroupVariables")) {
-			InventoryGroupVariable.CODEC.codec().listOf().parse(NbtOps.INSTANCE, pTag.get("GroupVariables"))
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
-					.ifPresent(list -> {
-						this.groupVariables.clear();
-						this.groupVariables.addAll(list);
-						this.loadedExternal = true;
-					});
-		}
-		if (pTag.contains("FilterVariables")) {
-			ItemFilterVariable.CODEC.codec().listOf().parse(NbtOps.INSTANCE, pTag.get("FilterVariables"))
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
-					.ifPresent(list -> {
-						this.filterVariables.clear();
-						this.filterVariables.addAll(list);
-						this.loadedExternal = true;
-					});
-		}
-
-		if (pTag.contains("ScannedInventories")) {
-			ListTag invList = pTag.getList("ScannedInventories", Tag.TAG_COMPOUND);
-			List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
-			scanned.clear();
-			for (int i = 0; i < invList.size(); i++) {
-				CompoundTag invTag = invList.getCompound(i);
-				BlockPos pos = BlockPos.of(invTag.getLong("pos"));
-				int id = invTag.getInt("id");
-				int distance = invTag.getInt("distance");
-
-				ConnectionBlock inv = new ConnectionBlock(pos, distance);
-				inv.setId(id);
-
-				EnumSet<ConnectionBlockType> types = EnumSet.noneOf(ConnectionBlockType.class);
-				ListTag typeList = invTag.getList("types", Tag.TAG_STRING);
-				for (int k = 0; k < typeList.size(); k++) {
-					try {
-						types.add(ConnectionBlockType.valueOf(typeList.getString(k)));
-					} catch (IllegalArgumentException e) {
-						// Ignore unrecognized values
-					}
-				}
-				inv.setTypes(types);
-				scanned.add(inv);
-			}
-		}
-
-		commandCount = flowchart != null ? flowchart.components().size() : 0;
 	}
 
 	@Nullable
@@ -544,19 +466,213 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		CompoundTag tag = super.getUpdateTag(registries);
 		this.saveAdditional(tag, registries);
 
-		Flowchart.CODEC.encodeStart(NbtOps.INSTANCE, this.flowchart)
+		// Utilize RegistryOps to preserve dynamic item stack components over the
+		// network [3]
+		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+
+		Flowchart.CODEC.encodeStart(ops, this.flowchart)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
 				.ifPresent(nbt -> tag.put("flowchart", nbt));
 
-		InventoryGroupVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.groupVariables)
+		InventoryGroupVariable.CODEC.codec().listOf().encodeStart(ops, this.groupVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
 				.ifPresent(nbt -> tag.put("GroupVariables", nbt));
 
-		ItemFilterVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.filterVariables)
+		ItemFilterVariable.CODEC.codec().listOf().encodeStart(ops, this.filterVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 				.ifPresent(nbt -> tag.put("FilterVariables", nbt));
 
 		return tag;
+	}
+
+	@Override
+	protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
+		super.loadAdditional(pTag, pRegistries);
+
+		if (pTag.contains("ManagerId")) {
+			this.managerId = pTag.getUUID("ManagerId");
+		} else {
+			this.managerId = UUID.randomUUID();
+		}
+
+		// Utilize RegistryOps to parse dynamic item stack components safely [3]
+		var ops = RegistryOps.create(NbtOps.INSTANCE, pRegistries);
+
+		if (pTag.contains("flowchart")) {
+			try {
+				this.flowchart = Flowchart.CODEC.parse(ops, pTag.get("flowchart"))
+						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
+						.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
+				this.loadedExternal = true;
+			} catch (Exception e) {
+				SFMFlow.LOGGER.error(
+						"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
+						e);
+				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+			}
+		} else if (this.level == null || this.level.isClientSide()) {
+			if (this.flowchart == null) {
+				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+			}
+		}
+
+		if (pTag.contains("ScannedCablePositions")) {
+			long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
+			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
+			map.clear();
+			for (long longVal : dirOrdinals(flatPosOrdinals(flatPosArray))) {
+				map.getOrAddNode(BlockPos.of(longVal));
+			}
+		}
+
+		if (pTag.contains("GroupVariables")) {
+			InventoryGroupVariable.CODEC.codec().listOf().parse(ops, pTag.get("GroupVariables"))
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
+					.ifPresent(list -> {
+						this.groupVariables.clear();
+						this.groupVariables.addAll(list);
+						this.loadedExternal = true;
+					});
+		}
+		if (pTag.contains("FilterVariables")) {
+			ItemFilterVariable.CODEC.codec().listOf().parse(ops, pTag.get("FilterVariables"))
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
+					.ifPresent(list -> {
+						this.filterVariables.clear();
+						this.filterVariables.addAll(list);
+						this.loadedExternal = true;
+					});
+		}
+
+		if (pTag.contains("ScannedInventories")) {
+			ListTag invList = pTag.getList("ScannedInventories", Tag.TAG_COMPOUND);
+			List<ConnectionBlock> scanned = this.physicalNetwork.getScannedInventories();
+			scanned.clear();
+			for (int i = 0; i < invList.size(); i++) {
+				CompoundTag invTag = invList.getCompound(i);
+				BlockPos pos = BlockPos.of(invTag.getLong("pos"));
+				int id = invTag.getInt("id");
+				int distance = invTag.getInt("distance");
+
+				ConnectionBlock inv = new ConnectionBlock(pos, distance);
+				inv.setId(id);
+
+				EnumSet<ConnectionBlockType> types = EnumSet.noneOf(ConnectionBlockType.class);
+				ListTag typeList = invTag.getList("types", Tag.TAG_STRING);
+				for (int k = 0; k < typeList.size(); k++) {
+					try {
+						types.add(ConnectionBlockType.valueOf(typeList.getString(k)));
+					} catch (IllegalArgumentException e) {
+						// Ignore unrecognized values
+					}
+				}
+				inv.setTypes(types);
+				scanned.add(inv);
+			}
+		}
+
+		commandCount = flowchart != null ? flowchart.components().size() : 0;
+	}
+
+	private void saveExternalData() {
+		if (this.level == null || this.level.isClientSide() || this.managerId == null
+				|| this.level.getServer() == null) {
+			return;
+		}
+		try {
+			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
+			Path modDir = worldDir.resolve("sfmflow").resolve("managers");
+			Files.createDirectories(modDir);
+			Path filePath = modDir.resolve(this.managerId.toString() + ".dat");
+
+			var registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+			var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+
+			CompoundTag dataTag = new CompoundTag();
+			Flowchart.CODEC.encodeStart(ops, this.flowchart)
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
+					.ifPresent(nbt -> dataTag.put("flowchart", nbt));
+
+			InventoryGroupVariable.CODEC.codec().listOf().encodeStart(ops, this.groupVariables)
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
+					.ifPresent(nbt -> dataTag.put("GroupVariables", nbt));
+
+			ItemFilterVariable.CODEC.codec().listOf().encodeStart(ops, this.filterVariables)
+					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
+					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt)); // Fixed: correctly references dataTag [3]
+
+			try (var out = Files.newOutputStream(filePath)) {
+				NbtIo.writeCompressed(dataTag, out);
+			}
+		} catch (Exception e) {
+			SFMFlow.LOGGER.error("Failed to save external flowchart data for manager: {}", this.managerId, e);
+		}
+	}
+
+	private void loadExternalData() {
+		if (this.level == null || this.level.isClientSide() || this.managerId == null
+				|| this.level.getServer() == null) {
+			return;
+		}
+		try {
+			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
+			Path filePath = worldDir.resolve("sfmflow").resolve("managers").resolve(this.managerId.toString() + ".dat");
+
+			if (Files.exists(filePath)) {
+				CompoundTag dataTag;
+				try (var in = Files.newInputStream(filePath)) {
+					dataTag = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
+				}
+
+				if (dataTag != null) {
+					var registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+					var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+
+					if (dataTag.contains("flowchart")) {
+						try {
+							this.flowchart = Flowchart.CODEC.parse(ops, dataTag.get("flowchart"))
+									.resultOrPartial(
+											err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
+									.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
+						} catch (Exception e) {
+							SFMFlow.LOGGER.error(
+									"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
+									e);
+							this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+						}
+					} else {
+						this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+					}
+
+					if (dataTag.contains("GroupVariables")) {
+						InventoryGroupVariable.CODEC.codec().listOf().parse(ops, dataTag.get("GroupVariables"))
+								.resultOrPartial(
+										err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
+								.ifPresent(list -> {
+									this.groupVariables.clear();
+									this.groupVariables.addAll(list);
+								});
+					}
+
+					if (dataTag.contains("FilterVariables")) {
+						ItemFilterVariable.CODEC.codec().listOf().parse(ops, dataTag.get("FilterVariables"))
+								.resultOrPartial(
+										err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
+								.ifPresent(list -> {
+									this.filterVariables.clear();
+									this.filterVariables.addAll(list);
+								});
+					}
+				}
+			} else {
+				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+			}
+		} catch (Exception e) {
+			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
+			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+		}
+		this.commandCount = this.flowchart.components().size();
+		this.loadedExternal = true;
 	}
 
 	@Override
@@ -604,102 +720,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	private long[] dirOrdinals(long[] arr) {
 		return arr;
-	}
-
-	private void saveExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null
-				|| this.level.getServer() == null) {
-			return;
-		}
-		try {
-			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
-			Path modDir = worldDir.resolve("sfmflow").resolve("managers");
-			Files.createDirectories(modDir);
-			Path filePath = modDir.resolve(this.managerId.toString() + ".dat");
-
-			CompoundTag dataTag = new CompoundTag();
-			Flowchart.CODEC.encodeStart(NbtOps.INSTANCE, this.flowchart)
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
-					.ifPresent(nbt -> dataTag.put("flowchart", nbt));
-
-			InventoryGroupVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.groupVariables)
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
-					.ifPresent(nbt -> dataTag.put("GroupVariables", nbt));
-
-			ItemFilterVariable.CODEC.codec().listOf().encodeStart(NbtOps.INSTANCE, this.filterVariables)
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
-					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt));
-
-			try (var out = Files.newOutputStream(filePath)) {
-				NbtIo.writeCompressed(dataTag, out);
-			}
-		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to save external flowchart data for manager: {}", this.managerId, e);
-		}
-	}
-
-	private void loadExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null
-				|| this.level.getServer() == null) {
-			return;
-		}
-		try {
-			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
-			Path filePath = worldDir.resolve("sfmflow").resolve("managers").resolve(this.managerId.toString() + ".dat");
-
-			if (Files.exists(filePath)) {
-				CompoundTag dataTag;
-				try (var in = Files.newInputStream(filePath)) {
-					dataTag = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
-				}
-
-				if (dataTag != null) {
-					if (dataTag.contains("flowchart")) {
-						try {
-							this.flowchart = Flowchart.CODEC.parse(NbtOps.INSTANCE, dataTag.get("flowchart"))
-									.resultOrPartial(
-											err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-									.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
-						} catch (Exception e) {
-							SFMFlow.LOGGER.error(
-									"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
-									e);
-							this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-						}
-					} else {
-						this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-					}
-
-					if (dataTag.contains("GroupVariables")) {
-						InventoryGroupVariable.CODEC.codec().listOf()
-								.parse(NbtOps.INSTANCE, dataTag.get("GroupVariables"))
-								.resultOrPartial(
-										err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
-								.ifPresent(list -> {
-									this.groupVariables.clear();
-									this.groupVariables.addAll(list);
-								});
-					}
-
-					if (dataTag.contains("FilterVariables")) {
-						ItemFilterVariable.CODEC.codec().listOf().parse(NbtOps.INSTANCE, dataTag.get("FilterVariables"))
-								.resultOrPartial(
-										err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
-								.ifPresent(list -> {
-									this.filterVariables.clear();
-									this.filterVariables.addAll(list);
-								});
-					}
-				}
-			} else {
-				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-			}
-		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
-			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-		}
-		this.commandCount = this.flowchart.components().size();
-		this.loadedExternal = true;
 	}
 
 	public void deleteExternalData() {

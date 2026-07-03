@@ -2,18 +2,13 @@ package dta.sfmflow;
 
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.FlowClientRegistry;
-import dta.sfmflow.api.client.FlowSettingsRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
 import dta.sfmflow.api.client.plugin.SFMFlowClientPluginRegistry;
-import dta.sfmflow.api.client.widget.AbstractFlowWidget;
-import dta.sfmflow.api.client.widget.ISettingsWidgetProvider;
-import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.screen.CableClusterScreen;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
-import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
 import dta.sfmflow.screen.ModMenuTypes;
 import dta.sfmflow.util.Color;
 import net.minecraft.network.chat.Component;
@@ -96,13 +91,8 @@ public class SFMFlowClient {
 					public Supplier<Boolean> isEnabled() {
 						return () -> true;
 					}
-
-					@Override
-					public AbstractFlowWidget createSettingsWidget(FlowWidgetContainer container,
-							AbstractFlowComponent component) {
-						ISettingsWidgetProvider provider = FlowSettingsRegistry.getProvider(component.getType());
-						return provider != null ? provider.createSettingsWidget(container, component) : null;
-					}
+					// Cleaned up: Legacy expanded inline settings widget factory delegation removed
+					// [3]
 				});
 			}
 		});

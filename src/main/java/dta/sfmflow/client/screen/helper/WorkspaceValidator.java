@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.helper;
 
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
@@ -78,6 +79,20 @@ public final class WorkspaceValidator {
 					}
 				}
 			}
+		}
+		return false;
+	}
+
+	/**
+	 * Evaluates if a given component has an empty filter variable warning [3].
+	 *
+	 * @param screen    active screen manager [3]
+	 * @param component flow component query [3]
+	 * @return true if the component is an empty filter variable warning [3]
+	 */
+	public static boolean hasEmptyFilterVariableWarning(ManagerScreen screen, AbstractFlowComponent component) {
+		if (component instanceof AdvancedItemFilterVariableComponent varComp) {
+			return varComp.getFilterStack().isEmpty();
 		}
 		return false;
 	}

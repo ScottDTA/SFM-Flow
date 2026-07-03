@@ -1,7 +1,6 @@
 package dta.sfmflow.datagen;
 
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.block.ModBlocks;
 import net.minecraft.data.PackOutput;
 import net.neoforged.neoforge.common.data.LanguageProvider;
 
@@ -38,6 +37,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.interval_trigger", "Interval Trigger");
 		add("gui.sfmflow.item_input", "Item Input");
 		add("gui.sfmflow.item_output", "Item Output");
+		add("gui.sfmflow.advanced_item_filter_variable", "Advanced Item Filter");
+
 		add("gui.sfmflow.loading", "%1$s REQUESTS LOADING...");
 
 		add("gui.sfmflow.menu.camo", "Camouflage");
@@ -66,7 +67,8 @@ public class ModLanguageProvider extends LanguageProvider {
 
 		add("sfmflow.configuration.background", "Background Mask Hex");
 		add("sfmflow.configuration.background.button", "Edit Background Color");
-		add("sfmflow.configuration.background.tooltip", "The hexadecimal color string (#RRGGBB) used for background panels and borders.");
+		add("sfmflow.configuration.background.tooltip",
+				"The hexadecimal color string (#RRGGBB) used for background panels and borders.");
 
 		add("sfmflow.configuration.black", "Black");
 		add("sfmflow.configuration.black.button", "Black Settings");
@@ -82,17 +84,20 @@ public class ModLanguageProvider extends LanguageProvider {
 
 		add("sfmflow.configuration.colors", "Component Color Masks");
 		add("sfmflow.configuration.colors.button", "Configure Colors");
-		add("sfmflow.configuration.colors.tooltip", "Customize the hexadecimal background and label colors of your canvas nodes.");
+		add("sfmflow.configuration.colors.tooltip",
+				"Customize the hexadecimal background and label colors of your canvas nodes.");
 
 		add("sfmflow.configuration.cyan", "Cyan");
 		add("sfmflow.configuration.cyan.button", "Cyan Settings");
 		add("sfmflow.configuration.cyan.tooltip", "Custom color overrides for the cyan mask.");
 
 		add("sfmflow.configuration.enableDebugLogging", "Enable Pathfinder Debug Logging");
-		add("sfmflow.configuration.enableDebugLogging.tooltip", "Enables verbose diagnostic logging of physical network BFS scans inside the server console.");
+		add("sfmflow.configuration.enableDebugLogging.tooltip",
+				"Enables verbose diagnostic logging of physical network BFS scans inside the server console.");
 
 		add("sfmflow.configuration.forceGuiScale", "Force GUI Scale");
-		add("sfmflow.configuration.forceGuiScale.tooltip", "Force a specific GUI scale when opening the Machine Inventory Manager screen. Set to 0 to use standard adaptive auto-scaling.");
+		add("sfmflow.configuration.forceGuiScale.tooltip",
+				"Force a specific GUI scale when opening the Machine Inventory Manager screen. Set to 0 to use standard adaptive auto-scaling.");
 
 		add("sfmflow.configuration.gray", "Gray");
 		add("sfmflow.configuration.gray.button", "Gray Settings");
@@ -119,25 +124,32 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.magenta.tooltip", "Custom color overrides for the magenta mask.");
 
 		add("sfmflow.configuration.maxCableLength", "Max Cable Search Depth");
-		add("sfmflow.configuration.maxCableLength.tooltip", "The maximum distance (in cable blocks) that the network scanner is allowed to search from the Manager block.");
+		add("sfmflow.configuration.maxCableLength.tooltip",
+				"The maximum distance (in cable blocks) that the network scanner is allowed to search from the Manager block.");
 
 		add("sfmflow.configuration.maxComponentAmount", "Max Component Workspace Nodes");
-		add("sfmflow.configuration.maxComponentAmount.tooltip", "The maximum number of flow control components/nodes that can be placed on a single Manager layout canvas.");
+		add("sfmflow.configuration.maxComponentAmount.tooltip",
+				"The maximum number of flow control components/nodes that can be placed on a single Manager layout canvas.");
 
 		add("sfmflow.configuration.maxConnectedInventories", "Max Connected Inventories");
-		add("sfmflow.configuration.maxConnectedInventories.tooltip", "The absolute maximum number of chest/container inventories that a Manager block is allowed to connect to via cable scanning.");
+		add("sfmflow.configuration.maxConnectedInventories.tooltip",
+				"The absolute maximum number of chest/container inventories that a Manager block is allowed to connect to via cable scanning.");
 
 		add("sfmflow.configuration.maxIntervalTicks", "Max Interval Ticks");
-		add("sfmflow.configuration.maxIntervalTicks.tooltip", "The absolute maximum duration (in ticks) allowed for Interval Triggers.");
+		add("sfmflow.configuration.maxIntervalTicks.tooltip",
+				"The absolute maximum duration (in ticks) allowed for Interval Triggers.");
 
 		add("sfmflow.configuration.maxNestedGroupDepth", "Max Nested Group Depth");
-		add("sfmflow.configuration.maxNestedGroupDepth.tooltip", "The maximum allowable folder hierarchy nesting depth inside the manager.");
+		add("sfmflow.configuration.maxNestedGroupDepth.tooltip",
+				"The maximum allowable folder hierarchy nesting depth inside the manager.");
 
 		add("sfmflow.configuration.minIntervalTicks", "Min Interval Ticks");
-		add("sfmflow.configuration.minIntervalTicks.tooltip", "The absolute minimum duration (in ticks) allowed for Interval Triggers.");
+		add("sfmflow.configuration.minIntervalTicks.tooltip",
+				"The absolute minimum duration (in ticks) allowed for Interval Triggers.");
 
 		add("sfmflow.configuration.networkScanCooldown", "Network Scan Cooldown (Ticks)");
-		add("sfmflow.configuration.networkScanCooldown.tooltip", "The minimum tick duration/cooldown required between consecutive physical cable network scans.");
+		add("sfmflow.configuration.networkScanCooldown.tooltip",
+				"The minimum tick duration/cooldown required between consecutive physical cable network scans.");
 
 		add("sfmflow.configuration.orange", "Orange");
 		add("sfmflow.configuration.orange.button", "Orange Settings");
@@ -160,12 +172,14 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.section.sfmflow.server.toml", "SFM-Flow Server Configs");
 		add("sfmflow.configuration.section.sfmflow.server.toml.limits", "Performance Limits");
 		add("sfmflow.configuration.section.sfmflow.server.toml.limits.button", "Performance Limit Options");
-		add("sfmflow.configuration.section.sfmflow.server.toml.limits.tooltip", "Configure scanning thresholds and workspace restrictions to protect server performance.");
+		add("sfmflow.configuration.section.sfmflow.server.toml.limits.tooltip",
+				"Configure scanning thresholds and workspace restrictions to protect server performance.");
 		add("sfmflow.configuration.section.sfmflow.server.toml.title", "SFM-Flow Server Configs");
 
 		add("sfmflow.configuration.text", "Label Text Hex");
 		add("sfmflow.configuration.text.button", "Edit Text Color");
-		add("sfmflow.configuration.text.tooltip", "The hexadecimal color string (#RRGGBB) used for text labels and node headers.");
+		add("sfmflow.configuration.text.tooltip",
+				"The hexadecimal color string (#RRGGBB) used for text labels and node headers.");
 
 		add("sfmflow.configuration.title", "SFM-Flow Client Configurations");
 
@@ -179,5 +193,9 @@ public class ModLanguageProvider extends LanguageProvider {
 
 		// Slot Layout entries [3]
 		add("gui.sfmflow.error.slot_not_accessible", "Slot not accessible on selected side");
+
+		// Warnings [3]
+		add("gui.sfmflow.warnings", "Warnings: %1$s");
+		add("gui.sfmflow.warning.empty_filter_variable", "Active filter variable cannot be empty!");
 	}
 }

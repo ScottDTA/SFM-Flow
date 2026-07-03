@@ -7,6 +7,7 @@ import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.GradientBlitUtil;
 import dta.sfmflow.client.screen.helper.WorkspaceValidator;
+import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.util.Color;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -19,7 +20,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Basic panel base class rendering compact visual cards [3]. Upgraded to
- * dynamically process error indicator lines and outline highlights [3].
+ * dynamically process error and warning indicators and outline highlights [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class FlowWidgetBase extends AbstractFlowWidget {
@@ -27,6 +28,8 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 			"textures/gui/flowcomponents/component_min_bg.png");
 	private static final ResourceLocation ERROR_INDICATOR = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/flowcomponents/error_indicator.png");
+	private static final ResourceLocation WARNING_INDICATOR = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/warning_indicator.png");
 
 	private final FlowWidgetContainer container;
 	private FlowWidgetMoveButton moveButton;
@@ -58,11 +61,12 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 
 		org.joml.Matrix4f matrix = guiGraphics.pose().last().pose();
 
-		// Check error state dynamically [3]
+		// Check error and warning states dynamically [3]
 		boolean hasError = WorkspaceValidator.hasUnboundInventoryError(container.getParent(), comp);
+		boolean hasWarning = WorkspaceValidator.hasEmptyFilterVariableWarning(container.getParent(), comp);
 
-		// Adjust title text position depending on error state [3]
-		if (hasError) {
+		// Adjust title text position depending on error/warning states [3]
+		if (hasError || hasWarning) {
 			this.titleText.setX(getX() + 10);
 		} else {
 			this.titleText.setX(getX() + 4);
@@ -81,6 +85,17 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 				vOffset = 14; // Hovered state V offset [3]
 			}
 			guiGraphics.blit(ERROR_INDICATOR, getX() + 4, getY() + 3, 0, vOffset, 4, 14, 4, 28);
+		} else if (hasWarning) {
+			// Symmetrically outline the card in bright yellow and blit your warning
+			// indicator texture [3]
+			guiGraphics.renderOutline(getX(), getY(), 64, 20, 0xFFFED83D); // Yellow warning outline [3]
+
+			int vOffset = 0;
+			// Check mouse hover over the indicator position [3]
+			if (mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
+				vOffset = 14; // Hovered state V offset [3]
+			}
+			guiGraphics.blit(WARNING_INDICATOR, getX() + 4, getY() + 3, 0, vOffset, 4, 14, 4, 28);
 		}
 
 		for (GuiEventListener child : children) {
@@ -94,7 +109,7 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 		// Render tooltip directly if indicator is hovered [3]
 		if (hasError && mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3 && mouseY < getY() + 17) {
 			Component errorMsg = Component.translatable("gui.sfmflow.error.unbound_inventory");
-			if (comp instanceof dta.sfmflow.flowcomponents.ItemTransferComponent transfer) {
+			if (comp instanceof ItemTransferComponent transfer) {
 				if (transfer.getActiveSidesMask() == 0) {
 					errorMsg = Component.translatable("gui.sfmflow.error.no_active_sides");
 				} else if (transfer.getInventoryId() != -1 && transfer.isWhitelist()) {
@@ -111,6 +126,11 @@ public class FlowWidgetBase extends AbstractFlowWidget {
 				}
 			}
 			guiGraphics.renderTooltip(container.getParent().getFont(), errorMsg, mouseX, mouseY);
+		} else if (hasWarning && mouseX >= getX() + 4 && mouseX < getX() + 8 && mouseY >= getY() + 3
+				&& mouseY < getY() + 17) {
+			// Symmetrically render empty variable warning tooltip [3]
+			Component warningMsg = Component.translatable("gui.sfmflow.warning.empty_filter_variable");
+			guiGraphics.renderTooltip(container.getParent().getFont(), warningMsg, mouseX, mouseY);
 		}
 	}
 
