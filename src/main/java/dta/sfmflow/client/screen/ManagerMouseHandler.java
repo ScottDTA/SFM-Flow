@@ -164,8 +164,7 @@ public class ManagerMouseHandler {
 					return false;
 				}
 
-				// Block clicks on the settings overlay's empty space *only* within the canvas
-				// region
+				// Block clicks on the settings overlay's empty space *only* within the canvas region
 				if (mouseY < screen.getTopPos() + 256) {
 					return true;
 				}
@@ -193,11 +192,11 @@ public class ManagerMouseHandler {
 		}
 
 		int x = screen.getLeftPos();
-		int y = screen.getTopPos();
 		if (button == 0) {
-			if (mouseX >= x + 4 && mouseX < x + 166 && mouseY >= y + 256 && mouseY < y + 352) {
+			// Updated variable list click range to align with player inventory coordinates [3]
+			if (mouseX >= x + 4 && mouseX < x + 166 && mouseY >= screen.height - 90 && mouseY < screen.height) {
 				var groupVars = screen.getMenu().getManagerBlockEntity().getGroupVariables();
-				int clickedIdx = (int) ((mouseY - (y + 260)) / 16);
+				int clickedIdx = (int) ((mouseY - (screen.height - 90 + 4)) / 16);
 				if (clickedIdx >= 0 && clickedIdx < groupVars.size()) {
 					this.activeDraggedVariableId = groupVars.get(clickedIdx).id();
 					this.isDraggingGroupVariable = true;
@@ -206,9 +205,9 @@ public class ManagerMouseHandler {
 				}
 			}
 
-			if (mouseX >= x + 346 && mouseX < x + 508 && mouseY >= y + 256 && mouseY < y + 352) {
+			if (mouseX >= x + 346 && mouseX < x + 508 && mouseY >= screen.height - 90 && mouseY < screen.height) {
 				var filterVars = screen.getMenu().getManagerBlockEntity().getFilterVariables();
-				int clickedIdx = (int) ((mouseY - (y + 260)) / 16);
+				int clickedIdx = (int) ((mouseY - (screen.height - 90 + 4)) / 16);
 				if (clickedIdx >= 0 && clickedIdx < filterVars.size()) {
 					this.activeDraggedVariableId = filterVars.get(clickedIdx).id();
 					this.isDraggingGroupVariable = false;
@@ -333,8 +332,8 @@ public class ManagerMouseHandler {
 
 		if (button == 0) {
 			if (activeDragged != null) {
-				int x = (screen.width - screen.getImageWidth()) / 2;
-				int y = (screen.height - screen.getImageHeight()) / 2;
+				int x = screen.getLeftPos();
+				int y = screen.getTopPos();
 				int newX = clampCoordinate((int) (mouseX - this.dragStartX), false, activeDragged);
 				int newY = clampCoordinate((int) (mouseY - this.dragStartY), true, activeDragged);
 				activeDragged.getComponent().setX(newX - x);
@@ -536,7 +535,7 @@ public class ManagerMouseHandler {
 	}
 
 	private int clampCoordinate(int rawPos, boolean isY, FlowWidgetContainer container) {
-		int origin = isY ? (screen.height - screen.getImageHeight()) / 2 : (screen.width - screen.getImageWidth()) / 2;
+		int origin = isY ? screen.getTopPos() : screen.getLeftPos();
 		if (isY) {
 			int minY = origin + (container.getComponent().hasInputNodes() ? 10 : 4);
 			int maxY = origin + 240 - container.getHeight();

@@ -1,16 +1,23 @@
 7-2-2026
 
 ###[Added]
+* Drawer Sliding Animations: Added smooth, frame-rate independent sliding animations when opening or closing the Variable Drawer.
+* Interactive Handle Labels: Added a vertical "Item Vars" title label and hover tooltips directly onto the drawer's handle.
 * Advanced Item Filter Nodes: Players can now instantiate a customizable variable node to save, name, and link reusable item filter configurations across the network.
 * Variables Drawer UI: Added a sliding side panel containing a searchable, scrollable 3x3 grid of active variables for instant drag-and-drop capability mapping.
 * Visual Warning Indicators: Canvas nodes now highlight in yellow and display custom warning tooltips when configured with empty or unassigned filter variables.
 * Variable Card Item: Introduced a physical "Variable Card" carrying custom data signatures to link canvas configurations dynamically.
 
 ###[Changed]
+* Centered Workspace Layout: Centered the main flowchart canvas within the screen while dynamically positioning player inventory slots to prevent layout overlaps.
+* Polished Variable Drawer: Redesigned the Variable Drawer panel to use themed backgrounds, custom slots, and a tactile vertical handle.
 * Extensible Panel Mappings: Upgraded the overlay menu system to support clean third-party add-on settings panel registrations.
 * NBT Serialization Upgrades: Refactored behind-the-scenes save systems to safely preserve modern item components and properties.
 
 ###[Fixed]
+* Coordinate Drag Drift: Fixed drag-and-drop calculation drifts that occurred when running the manager interface under custom or forced GUI scales.
+* Drawer Click Blocking: Restricted the closed Variable Drawer's collision boundaries so players can interact with canvas nodes behind it without obstruction.
+* Component Overlaps: Corrected inventory slot positions to ensure they never overlap with the workspace canvas or sliding drawer.
 * Inventory Security Exploits: Fixed duplication vulnerabilities where virtual variable cards could be placed into player inventories or dropped as actual physical items in the world.
 * Filter Serialization Recovery: Resolved an issue where variable cards would fail to persist inside external manager files when the world was reloaded.
 * Item Stack Matching Desyncs: Corrected calculation issues where item transfers would occasionally fail to match due to dynamic component changes.

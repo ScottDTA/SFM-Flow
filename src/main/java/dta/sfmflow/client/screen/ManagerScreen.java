@@ -58,7 +58,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	public ManagerScreen(ManagerMenu menu, Inventory playerInventory, Component title) {
 		super(menu, playerInventory, title);
 		this.imageWidth = 512;
-		this.imageHeight = 352;
+		this.imageHeight = 256; // Centered on the 256px canvas [3]
 		this.mc = Minecraft.getInstance();
 		this.originalGuiScale = this.mc.options.guiScale().get();
 		this.mouseHandler = new ManagerMouseHandler(this);
@@ -75,7 +75,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 
 		int x = (width - imageWidth) / 2;
-		int y = (height - imageHeight) / 2;
+		// Centers the canvas while guaranteeing at least an 8px margin above the player inventory [3]
+		int y = Math.min((height - imageHeight) / 2, height - imageHeight - 90 - 8);
 		this.leftPos = x;
 		this.topPos = y;
 
@@ -110,8 +111,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Add dynamic sliding variable drawer widget [3]
-		this.addRenderableWidget(new VariableDrawerWidget(this, x + 346, y + 256, 162, 96));
+		// Add sliding variable drawer widget aligned with the player inventory [3]
+		this.addRenderableWidget(new VariableDrawerWidget(this, x + 344, this.height - 86, 75, 82));
 
 		if (this.activeModalPopup != null) {
 			int pWidth = this.activeModalPopup.getWidth();
@@ -128,7 +129,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			if (pHeight >= 360) {
 				this.activeSettingsOverlay.setY(25);
 			} else {
-				this.activeSettingsOverlay.setY((256 - pHeight) / 2);
+				this.activeSettingsOverlay.setY(this.topPos + (256 - pHeight) / 2);
 			}
 		}
 	}
@@ -161,18 +162,12 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		RenderSystem.setShader(GameRenderer::getPositionTexShader);
 		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 		RenderSystem.setShaderTexture(0, GUI_BG1);
-		int x = (width - imageWidth) / 2;
-		int y = (height - imageHeight) / 2;
+		int x = this.leftPos;
+		int y = this.topPos;
 
 		guiGraphics.blit(GUI_BG1, x, y, 0, 0, 256, 256);
 		RenderSystem.setShaderTexture(0, GUI_BG2);
 		guiGraphics.blit(GUI_BG2, x + 256, y, 0, 0, 256, 256);
-
-		guiGraphics.fill(x, y + 256, x + 512, y + 352, 0xFF2B2B2B);
-		guiGraphics.renderOutline(x, y + 256, 512, 96, 0xFFD4AF37);
-
-		guiGraphics.fill(x + 170, y + 256, x + 172, y + 352, 0xFF151515);
-		guiGraphics.fill(x + 342, y + 256, x + 344, y + 352, 0xFF151515);
 
 		int textureX = (this.width - 176) / 2;
 		int textureY = this.height - 90;
@@ -202,13 +197,13 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-		// Render Left Panel variable entries [3]
-		guiGraphics.enableScissor(x + 4, y + 256, x + 166, y + 352);
+		// Render Left Panel variable entries aligned with player inventory [3]
+		guiGraphics.enableScissor(x + 4, this.height - 90, x + 166, this.height);
 		var groupVars = getMenu().getManagerBlockEntity().getGroupVariables();
 		for (int i = 0; i < groupVars.size(); i++) {
 			var varItem = groupVars.get(i);
 			int entryX = x + 4;
-			int entryY = y + 260 + i * 16;
+			int entryY = (this.height - 90) + 4 + i * 16;
 			boolean hovered = mouseX >= entryX && mouseX < entryX + 162 && mouseY >= entryY && mouseY < entryY + 14;
 
 			guiGraphics.fill(entryX, entryY, entryX + 162, entryY + 14, hovered ? 0xFF555555 : 0xFF222222);

@@ -5,6 +5,8 @@ import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
+import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -26,18 +28,43 @@ import java.util.Locale;
  */
 @OnlyIn(Dist.CLIENT)
 public class VariableDrawerWidget extends AbstractFlowWidget {
-	private static final ResourceLocation DRAWER_TX = ResourceLocation.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID,
-			"textures/gui/flowcomponents/generic_slot.png");
+
+	// Path to your custom dual-state slot texture (18x36 px) [3]
+	private static final ResourceLocation SLOT_TX = ResourceLocation.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID,
+			"textures/gui/flowcomponents/variable_drawer_slot.png");
+
+	// Path to your custom horizontally-tiling background texture [3]
+	private static final ResourceLocation BACKGROUND_TX = ResourceLocation.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID,
+			"textures/gui/flowcomponents/variable_drawer_bg.png");
+	
+	private static final ResourceLocation BACKGROUND_END_TX = ResourceLocation.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID,
+			"textures/gui/flowcomponents/variable_drawer_end.png");
+
+	// Path to your custom vertical drawer handle texture (12x84 px) [3]
+	private static final ResourceLocation HANDLE_TX = ResourceLocation.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID,
+			"textures/gui/flowcomponents/drawer_handle.png");
+
+	private static final int BG_TEX_WIDTH = 16;  
+	private static final int BG_TEX_HEIGHT = 82; 
+	private static final int HANDLE_TEX_WIDTH = 12; 
+	private static final int HANDLE_TEX_HEIGHT = 84; 
+
+	// Persistent state matching user layout preference on GUI re-entry [3]
+	private static boolean isDrawerOpen = true;
 
 	private final ManagerScreen parentScreen;
 	private final EditBox searchEdit;
 	private int scrollY = 0;
 
+	private boolean open = isDrawerOpen;
+	private transient float slideProgress = isDrawerOpen ? 1.0F : 0.0F;
+	private transient long lastFrameTime = 0L;
+
 	public VariableDrawerWidget(ManagerScreen parentScreen, int x, int y, int width, int height) {
 		super(x, y, width, height, Component.literal("Variables Drawer"));
 		this.parentScreen = parentScreen;
 
-		this.searchEdit = new EditBox(parentScreen.getFont(), getX() + 4, getY() + 6, width - 8, 12,
+		this.searchEdit = new EditBox(parentScreen.getFont(), getX() + 4, getY() + 6, width - 11, 12,
 				Component.literal("Search"));
 		this.searchEdit.setHint(Component.literal("Search..."));
 		this.searchEdit.setCanLoseFocus(true);
@@ -66,8 +93,20 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		if (!this.visible || !this.active) {
+		if (!this.visible || !this.active || !isMouseOver(mouseX, mouseY)) {
 			return false;
+		}
+
+		// Toggle state if left-clicking on the handle bounds [3]
+		if (button == 0 && mouseX >= getX() + width && mouseX < getX() + width + HANDLE_TEX_WIDTH && mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1) {
+			this.open = !this.open;
+			isDrawerOpen = this.open;
+			this.parentScreen.getMinecraft().getSoundManager().play(
+				net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
+					net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F
+				)
+			);
+			return true;
 		}
 
 		for (GuiEventListener child : children) {
@@ -76,11 +115,11 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			}
 		}
 
-		// Grid bounds check
-		int gridX = getX() + 47;
-		int gridY = getY() + 24;
+		// Grid bounds check (54x54 viewport) [3]
+		int gridX = getX() + 8;
+		int gridY = getY() + 20;
 
-		if (button == 0 && mouseX >= gridX && mouseX < gridX + 58 && mouseY >= gridY && mouseY < gridY + 60) {
+		if (button == 0 && mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
 			List<AdvancedItemFilterVariableComponent> vars = getFilteredVariables();
 
 			for (int i = 0; i < vars.size(); i++) {
@@ -108,25 +147,23 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		return false;
 	}
 
-	// Methods renamed from gridX/gridY to getCellX/getCellY to prevent local
-	// variable shadowing [3]
 	private int getCellX(int col) {
-		return getX() + 47 + col * 20;
+		return getX() + 8 + col * 18;
 	}
 
 	private int getCellY(int row) {
-		return getY() + 24 + row * 20 - scrollY;
+		return getY() + 20 + row * 18 - scrollY;
 	}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-		int gridX = getX() + 47;
-		int gridY = getY() + 24;
+		int gridX = getX() + 8;
+		int gridY = getY() + 20;
 
-		if (mouseX >= gridX && mouseX < gridX + 58 && mouseY >= gridY && mouseY < gridY + 60) {
+		if (mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
 			List<AdvancedItemFilterVariableComponent> vars = getFilteredVariables();
 			int rows = (vars.size() + 2) / 3;
-			int maxScrollY = Math.max(0, rows * 20 - 60);
+			int maxScrollY = Math.max(0, rows * 18 - 54); // Correctly bound to 54px [3]
 
 			if (maxScrollY > 0) {
 				this.scrollY = Mth.clamp(this.scrollY - (int) scrollY * 10, 0, maxScrollY);
@@ -138,8 +175,55 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		guiGraphics.fill(getX(), getY(), getX() + width, getY() + height, 0xFA151515);
-		guiGraphics.renderOutline(getX(), getY(), width, height, 0xFF434343);
+		// Update slide animation progress frame-rate independently [3]
+		long now = net.minecraft.Util.getMillis();
+		if (lastFrameTime == 0L) {
+			lastFrameTime = now;
+		}
+		float deltaTime = (now - lastFrameTime) / 1000.0F;
+		lastFrameTime = now;
+		deltaTime = Math.min(deltaTime, 0.1F); // Shield against frame rate lag spikes [3]
+
+		float speed = 8.0F;
+		int openX = parentScreen.getLeftPos() + 344;
+		int closedX = parentScreen.getLeftPos() + 344 - width;
+
+		if (open) {
+			if (slideProgress < 1.0F) {
+				slideProgress = Math.min(1.0F, slideProgress + deltaTime * speed);
+				this.setX((int) Math.round(closedX + (openX - closedX) * slideProgress));
+			}
+		} else {
+			if (slideProgress > 0.0F) {
+				slideProgress = Math.max(0.0F, slideProgress - deltaTime * speed);
+				this.setX((int) Math.round(closedX + (openX - closedX) * slideProgress));
+			}
+		}
+
+		// Enable scissor mask to clip everything left of the player inventory boundary [3]
+		guiGraphics.enableScissor(parentScreen.getLeftPos() + 344, 0, parentScreen.width, parentScreen.height);
+
+		// Render custom background texture stretched horizontally to match width [3]
+		RenderSystem.setShader(GameRenderer::getPositionTexShader);
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		guiGraphics.blit(BACKGROUND_TX, getX(), getY(), width - 3, height, 0.0F, 0.0F, BG_TEX_WIDTH, BG_TEX_HEIGHT, BG_TEX_WIDTH, BG_TEX_HEIGHT);
+		guiGraphics.blit(BACKGROUND_END_TX, getX() + width - 3, getY(), 4, height, 0.0F, 0.0F, 4, BG_TEX_HEIGHT, 4, BG_TEX_HEIGHT);
+		
+		// Draw custom handle on the far right edge, shifted up 1px to center vertically [3]
+		guiGraphics.blit(HANDLE_TX, getX() + width, getY() - 1, 0.0F, 0.0F, HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT, HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT);
+
+		// Render rotated vertical "Item Vars" label inside the handle bounds [3]
+		guiGraphics.pose().pushPose();
+		int textWidth = parentScreen.getFont().width("Item Vars");
+		int fontHeight = parentScreen.getFont().lineHeight;
+		
+		float textX = (getX() + width) + (HANDLE_TEX_WIDTH + fontHeight) / 2.0F;
+		float textY = (getY() - 1) + (HANDLE_TEX_HEIGHT - textWidth) / 2.0F;
+
+		guiGraphics.pose().translate(textX, textY, 0.0F);
+		guiGraphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(90.0F));
+		guiGraphics.drawString(parentScreen.getFont(), "Item Vars", 0, 0, 0xFF404040, false);
+		guiGraphics.pose().popPose();
 
 		for (GuiEventListener child : children) {
 			if (child instanceof AbstractFlowWidget widget) {
@@ -151,28 +235,25 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 		List<AdvancedItemFilterVariableComponent> vars = getFilteredVariables();
 
-		int gridX = getX() + 47;
-		int gridY = getY() + 24;
+		int gridX = getX() + 8;
+		int gridY = getY() + 20;
 
 		// Limit rendering with scissor mask to standard grid box boundaries [3]
-		guiGraphics.enableScissor(gridX, gridY, gridX + 58, gridY + 60);
+		guiGraphics.enableScissor(gridX, gridY, gridX + 54, gridY + 54);
 
 		for (int i = 0; i < matchedVariableSize(vars); i++) {
 			AdvancedItemFilterVariableComponent variable = vars.get(i);
 			int col = i % 3;
 			int row = i / 3;
 
-			// Method names updated to getCellX/getCellY [3]
 			int cellX = getCellX(col);
 			int cellY = getCellY(row);
 
 			boolean hovered = mouseX >= cellX && mouseX < cellX + 18 && mouseY >= cellY && mouseY < cellY + 18;
 
-			guiGraphics.blit(DRAWER_TX, cellX, cellY, 0, 0, 18, 18, 18, 18);
-
-			if (hovered) {
-				guiGraphics.renderOutline(cellX, cellY, 18, 18, 0xFF8B8B8B);
-			}
+			// Blit UV from custom slot texture sheet (V: 18 when hovered, 0 otherwise) [3]
+			int vOffset = hovered ? 18 : 0;
+			guiGraphics.blit(SLOT_TX, cellX, cellY, 0, vOffset, 18, 18, 18, 36);
 
 			ItemStack stack = variable.getFilterStack();
 			if (!stack.isEmpty()) {
@@ -186,21 +267,28 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 		// Scrollbar
 		int rows = (vars.size() + 2) / 3;
-		int maxScrollY = Math.max(0, rows * 20 - 60);
+		int maxScrollY = Math.max(0, rows * 18 - 54);
 		if (maxScrollY > 0) {
-			int scrollbarX = getX() + width - 6;
+			int scrollbarX = getX() + width - 9;
 			int scrollbarY = gridY;
-			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 2, scrollbarY + 60, 0x40000000);
+			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 2, scrollbarY + 54, 0x40000000);
 
-			int thumbHeight = (int) ((60.0F / (rows * 20.0F)) * 60.0F);
-			thumbHeight = Math.max(10, Math.min(60, thumbHeight));
-			int thumbY = scrollbarY + (int) (((float) scrollY / maxScrollY) * (60 - thumbHeight));
+			int thumbHeight = (int) ((54.0F / (rows * 18.0F)) * 54.0F);
+			thumbHeight = Math.max(10, Math.min(54, thumbHeight));
+			int thumbY = scrollbarY + (int) (((float) scrollY / maxScrollY) * (54 - thumbHeight));
 
 			guiGraphics.fill(scrollbarX, thumbY, scrollbarX + 2, thumbY + thumbHeight, 0xFF8B8B8B);
 		}
 
-		// Tooltip rendering loop
-		if (mouseX >= gridX && mouseX < gridX + 58 && mouseY >= gridY && mouseY < gridY + 60) {
+		// Disable parent drawer scissor mask cleanly [3]
+		guiGraphics.disableScissor();
+
+		// Tooltip rendering pass (Drawn AFTER scissoring to prevent text cutoffs) [3]
+		boolean hoveringHandle = mouseX >= getX() + width && mouseX < getX() + width + HANDLE_TEX_WIDTH && mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1;
+		if (hoveringHandle) {
+			Component tooltipText = open ? Component.literal("Close Drawer") : Component.literal("Open Drawer");
+			guiGraphics.renderTooltip(parentScreen.getFont(), tooltipText, mouseX, mouseY);
+		} else if (mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
 			for (int i = 0; i < vars.size(); i++) {
 				int col = i % 3;
 				int row = i / 3;
@@ -218,6 +306,16 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	private int matchedVariableSize(List<AdvancedItemFilterVariableComponent> vars) {
 		return vars != null ? vars.size() : 0;
+	}
+
+	@Override
+	public boolean isMouseOver(double mouseX, double mouseY) {
+		// Restrict mouse interaction boundary so only the visible portion of the drawer/handle intercepts input [3]
+		double leftBound = parentScreen.getLeftPos() + 344;
+		double rightBound = getX() + width + HANDLE_TEX_WIDTH;
+		double topBound = getY() - 1;
+		double bottomBound = getY() + height + 1;
+		return this.visible && mouseX >= leftBound && mouseX < rightBound && mouseY >= topBound && mouseY < bottomBound;
 	}
 
 	@Override
