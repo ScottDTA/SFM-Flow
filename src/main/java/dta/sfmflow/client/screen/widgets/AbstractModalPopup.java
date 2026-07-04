@@ -1,5 +1,6 @@
 package dta.sfmflow.client.screen.widgets;
 
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.gui.GuiGraphics;
@@ -16,8 +17,8 @@ import net.neoforged.api.distmarker.OnlyIn;
 @OnlyIn(Dist.CLIENT)
 public abstract class AbstractModalPopup extends AbstractFlowWidget {
 	protected final ManagerScreen parentScreen;
-	protected static final ResourceLocation SUBMENU_BG = ResourceLocation
-			.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID, "textures/gui/submenu_bg.png");
+	protected static final ResourceLocation SUBMENU_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/submenu_bg.png");
 
 	public AbstractModalPopup(ManagerScreen parentScreen, int width, int height, Component title) {
 		// Dynamically center the modal relative to current game window dimensions [3]
@@ -68,5 +69,19 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 
 		// Stretched central segments
 		guiGraphics.blit(SUBMENU_BG, x + c, y + c, width - 2 * c, height - 2 * c, (float) c, (float) c, m, m, 22, 22);
+	}
+
+	@Override
+	public void setX(int x) {
+		int dif = this.getX() - x; // Standardized subtraction formula [3]
+		super.setX(x);
+		updateChildrenXPositions(dif);
+	}
+
+	@Override
+	public void setY(int y) {
+		int dif = this.getY() - y; // Standardized subtraction formula [3]
+		super.setY(y);
+		updateChildrenYPositions(dif);
 	}
 }

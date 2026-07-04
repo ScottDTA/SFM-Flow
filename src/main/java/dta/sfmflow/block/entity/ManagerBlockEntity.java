@@ -1,7 +1,5 @@
 package dta.sfmflow.block.entity;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -43,10 +41,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.StringTag;
-import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -63,13 +59,12 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.LevelResource;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Backing BlockEntity class for the Manager block [3]. Synchronously tracks
- * loaded instances in a copy-on-write registry for profiling [3].
+ * Backing BlockEntity class for the Manager block [3]. Tracks active logical elements 
+ * and delegatess external layout saves/loads to DataStateManager [3].
  */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
@@ -80,6 +75,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	private UUID managerId;
 	private boolean loadedExternal = false;
+	private boolean isDataDirty = false; // Persistent dirty state tracking [3]
 
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
@@ -182,6 +178,14 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 	}
 
+	public void setDataDirty(boolean dirty) {
+		this.isDataDirty = dirty;
+	}
+
+	public boolean isDataDirty() {
+		return this.isDataDirty;
+	}
+
 	public void tick(Level pLevel, BlockPos pBlockPos, BlockState pBlockState) {
 		if (pLevel != null && !pLevel.isClientSide()) {
 			if (this.isFirstTick) {
@@ -227,11 +231,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					if (elapsedTrigger < 0) {
 						trigger.setLastExecutionTick(currentTime);
 					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
-						// Diagnostic trace to safely audit trigger properties [3]
-						SFMFlow.LOGGER.info(
-								"[SFM-Flow] Trigger Fired: ID={}, Hash={}, GameTime={}, LastExecuted={}, Elapsed={}, Total={}",
-								trigger.getId(), System.identityHashCode(trigger), currentTime,
-								trigger.getLastExecutionTick(), elapsedTrigger, trigger.getTotalTicks());
+						// Diagnostic trace is now gated behind ServerConfig debug logging option [3]
+						if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+							SFMFlow.LOGGER.info(
+									"[SFM-Flow] Trigger Fired: ID={}, Hash={}, GameTime={}, LastExecuted={}, Elapsed={}, Total={}",
+									trigger.getId(), System.identityHashCode(trigger), currentTime,
+									trigger.getLastExecutionTick(), elapsedTrigger, trigger.getTotalTicks());
+						}
 						trigger.setLastExecutionTick(currentTime);
 						activeTriggers.add(trigger.getId());
 					}
@@ -307,8 +313,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.putUUID("ManagerId", this.managerId);
 
-		if (this.level != null && !this.level.isClientSide()) {
-			saveExternalData();
+		// Synchronously serialize and asynchronously save to disk only if data is dirty [3]
+		if (this.level != null && !this.level.isClientSide() && this.level.getServer() != null) {
+			if (this.isDataDirty) {
+				DataStateManager.saveAsync(this.level.getServer(), this.managerId, this.flowchart,
+						this.groupVariables, this.filterVariables, pRegistries);
+				this.isDataDirty = false;
+			}
 		}
 
 		PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
@@ -351,6 +362,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			AbstractFlowComponent newComponent = type.createComponent(newUUID);
 			newComponent.setZ(flowchart.components().size() + 1);
 			flowchart.components().put(newUUID, newComponent);
+			this.isDataDirty = true; // Mark dirty! [3]
 			this.setChanged();
 			commandCount = flowchart.components().size();
 
@@ -381,6 +393,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		this.flowchart.components().remove(componentId);
 		this.flowchart.connections().removeIf(wire -> wire.getSourceComponentId().equals(componentId)
 				|| wire.getTargetComponentId().equals(componentId));
+		this.isDataDirty = true; // Mark dirty! [3]
 		this.setChanged();
 		this.commandCount = this.flowchart.components().size();
 
@@ -420,6 +433,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			copy.setY(nextY);
 			copy.setZ(original.getZ() + 1);
 			this.flowchart.components().put(newId, copy);
+			this.isDataDirty = true; // Mark dirty! [3]
 			this.setChanged();
 			this.commandCount = this.flowchart.components().size();
 
@@ -440,6 +454,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				component.setX(entry.x());
 				component.setY(entry.y());
 				component.setZ(entry.z());
+				this.isDataDirty = true; // Mark dirty! [3]
 
 				CompoundTag dataTag = new CompoundTag();
 				dataTag.putInt("x", entry.x());
@@ -466,8 +481,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		CompoundTag tag = super.getUpdateTag(registries);
 		this.saveAdditional(tag, registries);
 
-		// Utilize RegistryOps to preserve dynamic item stack components over the
-		// network [3]
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 
 		Flowchart.CODEC.encodeStart(ops, this.flowchart)
@@ -495,7 +508,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			this.managerId = UUID.randomUUID();
 		}
 
-		// Utilize RegistryOps to parse dynamic item stack components safely [3]
 		var ops = RegistryOps.create(NbtOps.INSTANCE, pRegistries);
 
 		if (pTag.contains("flowchart")) {
@@ -574,99 +586,19 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		commandCount = flowchart != null ? flowchart.components().size() : 0;
 	}
 
-	private void saveExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null
-				|| this.level.getServer() == null) {
-			return;
-		}
-		try {
-			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
-			Path modDir = worldDir.resolve("sfmflow").resolve("managers");
-			Files.createDirectories(modDir);
-			Path filePath = modDir.resolve(this.managerId.toString() + ".dat");
-
-			var registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
-			var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-
-			CompoundTag dataTag = new CompoundTag();
-			Flowchart.CODEC.encodeStart(ops, this.flowchart)
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
-					.ifPresent(nbt -> dataTag.put("flowchart", nbt));
-
-			InventoryGroupVariable.CODEC.codec().listOf().encodeStart(ops, this.groupVariables)
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
-					.ifPresent(nbt -> dataTag.put("GroupVariables", nbt));
-
-			ItemFilterVariable.CODEC.codec().listOf().encodeStart(ops, this.filterVariables)
-					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
-					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt)); // Fixed: correctly references dataTag [3]
-
-			try (var out = Files.newOutputStream(filePath)) {
-				NbtIo.writeCompressed(dataTag, out);
-			}
-		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to save external flowchart data for manager: {}", this.managerId, e);
-		}
-	}
-
 	private void loadExternalData() {
 		if (this.level == null || this.level.isClientSide() || this.managerId == null
 				|| this.level.getServer() == null) {
 			return;
 		}
 		try {
-			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
-			Path filePath = worldDir.resolve("sfmflow").resolve("managers").resolve(this.managerId.toString() + ".dat");
-
-			if (Files.exists(filePath)) {
-				CompoundTag dataTag;
-				try (var in = Files.newInputStream(filePath)) {
-					dataTag = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
-				}
-
-				if (dataTag != null) {
-					var registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
-					var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-
-					if (dataTag.contains("flowchart")) {
-						try {
-							this.flowchart = Flowchart.CODEC.parse(ops, dataTag.get("flowchart"))
-									.resultOrPartial(
-											err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-									.orElseGet(() -> new Flowchart(new HashMap<>(), new ArrayList<>()));
-						} catch (Exception e) {
-							SFMFlow.LOGGER.error(
-									"CRITICAL: Caught unhandled internal Mojang DFU structural exception while decoding flowchart data!",
-									e);
-							this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-						}
-					} else {
-						this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-					}
-
-					if (dataTag.contains("GroupVariables")) {
-						InventoryGroupVariable.CODEC.codec().listOf().parse(ops, dataTag.get("GroupVariables"))
-								.resultOrPartial(
-										err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
-								.ifPresent(list -> {
-									this.groupVariables.clear();
-									this.groupVariables.addAll(list);
-								});
-					}
-
-					if (dataTag.contains("FilterVariables")) {
-						ItemFilterVariable.CODEC.codec().listOf().parse(ops, dataTag.get("FilterVariables"))
-								.resultOrPartial(
-										err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
-								.ifPresent(list -> {
-									this.filterVariables.clear();
-									this.filterVariables.addAll(list);
-								});
-					}
-				}
-			} else {
-				this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-			}
+			var loaded = DataStateManager.loadSync(this.level.getServer(), this.managerId,
+					RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));
+			this.flowchart = loaded.flowchart();
+			this.groupVariables.clear();
+			this.groupVariables.addAll(loaded.groupVariables());
+			this.filterVariables.clear();
+			this.filterVariables.addAll(loaded.filterVariables());
 		} catch (Exception e) {
 			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
 			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
@@ -727,14 +659,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				|| this.level.getServer() == null) {
 			return;
 		}
-		try {
-			Path worldDir = this.level.getServer().getWorldPath(LevelResource.ROOT);
-			Path filePath = worldDir.resolve("sfmflow").resolve("managers").resolve(this.managerId.toString() + ".dat");
-			if (Files.exists(filePath)) {
-				Files.delete(filePath);
-			}
-		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to delete external flowchart data for manager: {}", this.managerId, e);
-		}
+		DataStateManager.deleteSync(this.level.getServer(), this.managerId);
 	}
 }

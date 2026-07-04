@@ -31,8 +31,6 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.UUID;
@@ -44,7 +42,7 @@ import java.util.function.Supplier;
 @EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT)
 public class SFMFlowClient {
 	public SFMFlowClient(ModContainer container) {
-		container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+		// Empty constructor - configuration factory hook is safely mapped inside main constructor [3]
 	}
 
 	@SubscribeEvent
@@ -66,8 +64,7 @@ public class SFMFlowClient {
 				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
 					if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-						// Pull the live independent card filterColor rather than canvas background mask
-						// [3]
+						// Pull the live independent card filterColor rather than canvas background mask [3]
 						return 0xFF000000 | advancedVar.getFilterColor().getHexColor();
 					}
 				}
@@ -79,8 +76,7 @@ public class SFMFlowClient {
 		}, ModItems.VARIABLE_CARD.get());
 	}
 
-	// Register our hidden flat model using 1.21's standalone variant structural
-	// layouts [3]
+	// Register our hidden flat model using 1.21's standalone variant structural layouts [3]
 	@SubscribeEvent
 	public static void registerAdditionalModels(ModelEvent.RegisterAdditional event) {
 		event.register(ModelResourceLocation
@@ -96,8 +92,7 @@ public class SFMFlowClient {
 			// Sweeps and triggers visual layout setup across all client plugins safely [3]
 			SFMFlowClientPluginRegistry.initAllClientProperties();
 
-			// Inject the client-only tooltip resolver safely to avoid dedicated server
-			// crashes [3]
+			// Inject the client-only tooltip resolver safely to avoid dedicated server crashes [3]
 			VariableCardItem.setTooltipDataResolver(stack -> {
 				UUID varId = VariableCardRenderer.getVariableId(stack);
 				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
@@ -144,8 +139,7 @@ public class SFMFlowClient {
 					public Supplier<Boolean> isEnabled() {
 						return () -> true;
 					}
-					// Cleaned up: Legacy expanded inline settings widget factory delegation removed
-					// [3]
+					// Cleaned up: Legacy expanded inline settings widget factory delegation removed [3]
 				});
 			}
 		});

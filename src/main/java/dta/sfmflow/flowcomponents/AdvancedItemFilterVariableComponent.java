@@ -24,6 +24,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
 
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -165,7 +166,8 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		}
 		compoundTag.putBoolean("useQuantity", this.useQuantity);
 		compoundTag.putInt("quantity", this.quantity);
-		compoundTag.putString("filterColor", this.filterColor.name()); // Persist card color [3]
+		// Fixed: write lowercase serialized name so standard StringRepresentable codecs parse it cleanly [3]
+		compoundTag.putString("filterColor", this.filterColor.getSerializedName()); 
 		return compoundTag;
 	}
 
@@ -198,8 +200,10 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 			this.quantity = compoundTag.getInt("quantity");
 		}
 		if (compoundTag.contains("filterColor")) {
+			// Symmetrical Fix: automatically upper-case NBT strings to securely parse existing upper-case configurations [3]
+			String nameVal = compoundTag.getString("filterColor").toUpperCase(Locale.ROOT);
 			try {
-				this.filterColor = Color.valueOf(compoundTag.getString("filterColor"));
+				this.filterColor = Color.valueOf(nameVal);
 			} catch (IllegalArgumentException e) {
 				this.filterColor = Color.WHITE;
 			}

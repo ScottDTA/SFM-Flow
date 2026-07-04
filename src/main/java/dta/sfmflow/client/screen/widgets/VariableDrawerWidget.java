@@ -232,7 +232,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		int textWidth = parentScreen.getFont().width("Item Vars");
 		int fontHeight = parentScreen.getFont().lineHeight;
 
-		float textX = (getX() + width) + (HANDLE_TEX_WIDTH + fontHeight) / 2.0F;
+		float textX = (getX() + width - 1) + (HANDLE_TEX_WIDTH + fontHeight) / 2.0F;
 		float textY = (getY() - 1) + (HANDLE_TEX_HEIGHT - textWidth) / 2.0F;
 
 		guiGraphics.pose().translate(textX, textY, 0.0F);
@@ -326,14 +326,14 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setX(int x) {
-		int dif = x - this.getX();
+		int dif = this.getX() - x; // Fix inversion: absolute child tracking translation [3]
 		super.setX(x);
 		updateChildrenXPositions(dif);
 	}
 
 	@Override
 	public void setY(int y) {
-		int dif = y - this.getY();
+		int dif = this.getY() - y; // Fix inversion: absolute child tracking translation [3]
 		super.setY(y);
 		updateChildrenYPositions(dif);
 	}

@@ -54,6 +54,12 @@ public class SFMFlow {
 		ModMenuTypes.register(modEventBus);
 		modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
 		modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "sfmflow-client.toml");
+
+		// Safely register client config screens to the mod list without server classloading risks [3]
+		if (net.neoforged.fml.loading.FMLEnvironment.dist == net.neoforged.api.distmarker.Dist.CLIENT) {
+			modContainer.registerExtensionPoint(net.neoforged.neoforge.client.gui.IConfigScreenFactory.class,
+					(container, parent) -> new net.neoforged.neoforge.client.gui.ConfigurationScreen(container, parent));
+		}
 	}
 
 	/**

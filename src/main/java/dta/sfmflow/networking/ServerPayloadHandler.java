@@ -92,6 +92,7 @@ public class ServerPayloadHandler {
 				AbstractFlowComponent component = manager.getFlowComponents().get(data.componentId());
 				if (component != null) {
 					component.loadData(data.settings());
+					manager.setDataDirty(true); // Flag dirty to trigger saving [3]
 					manager.setChanged();
 
 					ServerPlayer player = (ServerPlayer) context.player();
@@ -108,6 +109,7 @@ public class ServerPayloadHandler {
 			}
 		});
 	}
+
 
 	public static void handleSyncClusterSlotDirection(final SyncClusterSlotDirectionPacket data,
 			final IPayloadContext context) {
@@ -130,6 +132,7 @@ public class ServerPayloadHandler {
 
 				connections.add(new FlowComponentConnections(data.sourceId(), data.outputIdx(), data.targetId(),
 						data.inputIdx()));
+				manager.setDataDirty(true); // Flag dirty to trigger saving [3]
 				manager.setChanged();
 
 				CompoundTag dataTag = new CompoundTag();
@@ -155,6 +158,7 @@ public class ServerPayloadHandler {
 						&& conn.getOutputNodeIndex() == data.outputIdx()
 						&& conn.getTargetComponentId().equals(data.targetId())
 						&& conn.getInputNodeIndex() == data.inputIdx());
+				manager.setDataDirty(true); // Flag dirty to trigger saving [3]
 				manager.setChanged();
 
 				CompoundTag dataTag = new CompoundTag();
@@ -181,6 +185,7 @@ public class ServerPayloadHandler {
 					} else {
 						transfer.setBoundFilterVariableId(data.variableId());
 					}
+					manager.setDataDirty(true); // Flag dirty to trigger saving [3]
 					manager.setChanged();
 
 					CompoundTag settingsTag = new CompoundTag();
@@ -191,6 +196,7 @@ public class ServerPayloadHandler {
 			}
 		});
 	}
+
 
 	public static void handleRequestInventorySlots(final RequestInventorySlotsPacket data,
 			final IPayloadContext context) {

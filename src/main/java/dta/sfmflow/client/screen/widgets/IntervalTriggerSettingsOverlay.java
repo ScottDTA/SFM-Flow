@@ -1,11 +1,13 @@
 package dta.sfmflow.client.screen.widgets;
 
+import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
@@ -38,7 +40,7 @@ public class IntervalTriggerSettingsOverlay extends NodeSettingsOverlay {
 					component.setTimeUnit(value);
 
 					int minVal = (value == IntervalTriggerComponent.TimeUnit.TICKS)
-							? dta.sfmflow.ServerConfig.MIN_INTERVAL_TICKS.get()
+							? ServerConfig.MIN_INTERVAL_TICKS.get()
 							: 1;
 					int maxVal = (value == IntervalTriggerComponent.TimeUnit.TICKS) ? 100 : 60;
 					component.setIntervalValue(Mth.clamp(component.getIntervalValue(), minVal, maxVal));
@@ -58,20 +60,6 @@ public class IntervalTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		this.children.add(new ApiWidgetAdapter<>(cycleButton));
 		this.children.add(new ApiWidgetAdapter<>(slider));
-	}
-
-	@Override
-	public void setX(int x) {
-		int dif = this.getX() - x;
-		super.setX(x);
-		updateChildrenXPositions(dif);
-	}
-
-	@Override
-	public void setY(int y) {
-		int dif = this.getY() - y;
-		super.setY(y);
-		updateChildrenYPositions(dif);
 	}
 
 	@OnlyIn(Dist.CLIENT)
@@ -96,7 +84,7 @@ public class IntervalTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		private static int getMinLimit(IntervalTriggerComponent comp) {
 			return (comp.getTimeUnit() == IntervalTriggerComponent.TimeUnit.TICKS)
-					? dta.sfmflow.ServerConfig.MIN_INTERVAL_TICKS.get()
+					? ServerConfig.MIN_INTERVAL_TICKS.get()
 					: 1;
 		}
 
@@ -152,7 +140,7 @@ public class IntervalTriggerSettingsOverlay extends NodeSettingsOverlay {
 		 * @param soundManager system sound manager [3]
 		 */
 		@Override
-		public void playDownSound(net.minecraft.client.sounds.SoundManager soundManager) {
+		public void playDownSound(SoundManager soundManager) {
 			// No-op: Removes default UI clicking noise during drag or click [3]
 		}
 	}

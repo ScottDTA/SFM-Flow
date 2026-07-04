@@ -1,5 +1,6 @@
 package dta.sfmflow.client.screen.widgets;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
@@ -54,6 +55,8 @@ public class CategoryButton extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		// Reset GL shader color to prevent contamination from maps or other screens [3]
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 		int vOffset = 0;
 
 		// Check if the submenu overlay corresponding to this category button is

@@ -23,8 +23,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.Locale;
 
 /**
- * Settings overlay enabling visual configuration of a single-slot item variable
- * [3].
+ * Settings overlay enabling visual configuration of a single-slot item variable [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverlay {
@@ -41,9 +40,10 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 		super(parentScreen, component);
 		this.component = component;
 		this.width = 200;
-		this.height = 165; // Expanded height to house color selector cleanly [3]
+		this.height = 165;
 		this.setX((parentScreen.width - this.width) / 2);
-		this.setY((256 - this.height) / 2);
+		// Fix: Include topPos for stable initialization coordinates [3]
+		this.setY(parentScreen.getTopPos() + (256 - this.height) / 2);
 
 		parentScreen.getMenu().setActiveComponent(component);
 		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
@@ -54,8 +54,6 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 		repositionGhostSlot();
 
-		// 1. Initialize qtyEdit first to resolve Java "blank final field capture"
-		// compilation issues [3]
 		this.qtyEdit = new EditBox(parentScreen.getFont(), getX() + 20, getY() + 90, 160, 20,
 				Component.literal("Quantity"));
 		this.qtyEdit.setValue(String.valueOf(component.getQuantity()));
@@ -73,8 +71,6 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 			}
 		});
 
-		// 2. Initialize toggleQtyBtn afterward now that qtyEdit is safely initialized
-		// and can be captured [3]
 		this.toggleQtyBtn = Button
 				.builder(Component.literal("Specific Qty: " + (component.isUseQuantity() ? "ON" : "OFF")), btn -> {
 					component.setUseQuantity(!component.isUseQuantity());
@@ -84,8 +80,6 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 					sendSettingsUpdate();
 				}).pos(getX() + 20, getY() + 65).size(160, 20).build();
 
-		// 3. Initialize the standard Minecraft color cycle selector for the card's
-		// filter dye color [3]
 		this.colorCycleBtn = CycleButton
 				.builder((Color c) -> Component.literal(c.getSerializedName().toUpperCase(Locale.ROOT)))
 				.withValues(Color.values()).withInitialValue(component.getFilterColor()).displayOnlyValue()
@@ -116,17 +110,15 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 	@Override
 	public void setX(int x) {
-		int dif = x - this.getX();
+		// Children translation math is now inherited securely from super class NodeSettingsOverlay [3]
 		super.setX(x);
-		updateChildrenXPositions(dif);
 		repositionGhostSlot();
 	}
 
 	@Override
 	public void setY(int y) {
-		int dif = y - this.getY();
+		// Children translation math is now inherited securely from super class NodeSettingsOverlay [3]
 		super.setY(y);
-		updateChildrenYPositions(dif);
 		repositionGhostSlot();
 	}
 

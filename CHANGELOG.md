@@ -1,3 +1,21 @@
+7-4-2026
+
+### [Added]
+* Background saving pipeline that offloads layout writes to a separate thread, preventing performance stutters during auto-saves.
+* Unified client-side configuration screen registration, making in-game mod options accessible directly from the mod list.
+
+### [Changed]
+* Gated console trigger execution traces behind the server debug config option to reduce standard log spam.
+* Refactored settings panels to securely inherit translation positioning math directly from parent classes.
+
+### [Fixed]
+* Resolved coordinate inversion calculations that caused custom layout selections and item filters to drift when moved.
+* Fixed an NBT color parsing issue where older uppercase values in card configurations would fail to load.
+* Solved a color bleeding bug by resetting graphics shader settings before drawing category menus.
+
+### [Removed]
+* Redundant inline configuration code structures, delegating menu coordinate translation math directly to the base widget classes.
+
 7-3-2026
 
 ###[Added]

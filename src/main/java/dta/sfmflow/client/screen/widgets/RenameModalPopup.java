@@ -8,6 +8,7 @@ import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.contents.TranslatableContents;
@@ -40,7 +41,7 @@ public class RenameModalPopup extends AbstractModalPopup {
 		if (initialValue == null || initialValue.isEmpty()) {
 			Component defaultName = component.getName();
 			if (defaultName.getContents() instanceof TranslatableContents translatable) {
-				initialValue = net.minecraft.client.resources.language.I18n.get(translatable.getKey());
+				initialValue = I18n.get(translatable.getKey());
 			} else {
 				initialValue = defaultName.getString();
 			}
@@ -152,17 +153,4 @@ public class RenameModalPopup extends AbstractModalPopup {
 		guiGraphics.drawCenteredString(parentScreen.getFont(), "Cancel", cx + 24, cy + 3, 0xFFFFFFFF);
 	}
 
-	@Override
-	public void setX(int x) {
-		int dif = this.getX() - x;
-		super.setX(x);
-		updateChildrenXPositions(dif);
-	}
-
-	@Override
-	public void setY(int y) {
-		int dif = this.getY() - y;
-		super.setY(y);
-		updateChildrenYPositions(dif);
-	}
 }

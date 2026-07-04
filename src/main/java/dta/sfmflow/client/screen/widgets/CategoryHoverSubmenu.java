@@ -2,6 +2,9 @@ package dta.sfmflow.client.screen.widgets;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+
+import com.mojang.blaze3d.systems.RenderSystem;
 
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.NodeCategory;
@@ -84,7 +87,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 		// Set up dynamically scaled FlowWidgetText for the category name header
 		// (positioned 4px below top edge)
 		Component titleText = Component
-				.translatable("gui.sfmflow.menu." + category.name().toLowerCase(java.util.Locale.ROOT));
+				.translatable("gui.sfmflow.menu." + category.name().toLowerCase(Locale.ROOT));
 		int titleWidth = parentScreen.getFont().width(titleText);
 		float titleScale = 0.8F;
 
@@ -161,6 +164,9 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		// Reset GL shader color to prevent contamination from maps or other screens [3]
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
 		// 1. Draw 9-slice background texture (submenu_bg.png)
 		render9SliceBackground(guiGraphics);
 

@@ -160,17 +160,4 @@ public class ColorModalPopup extends AbstractModalPopup {
 		guiGraphics.drawCenteredString(parentScreen.getFont(), "Cancel", cx + 24, cy + 3, 0xFFFFFFFF);
 	}
 
-	@Override
-	public void setX(int x) {
-		int dif = this.getX() - x;
-		super.setX(x);
-		updateChildrenXPositions(dif);
-	}
-
-	@Override
-	public void setY(int y) {
-		int dif = this.getY() - y;
-		super.setY(y);
-		updateChildrenYPositions(dif);
-	}
 }
