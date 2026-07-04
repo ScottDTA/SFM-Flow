@@ -1,13 +1,16 @@
 package dta.sfmflow.client.screen.widgets;
 
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
+import dta.sfmflow.util.Color;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -17,31 +20,37 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
+import java.util.Locale;
+
 /**
  * Settings overlay enabling visual configuration of a single-slot item variable
  * [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverlay {
-	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation
-			.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
+	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/filter_slot.png");
 
 	private final AdvancedItemFilterVariableComponent component;
 	private final Button toggleQtyBtn;
 	private final EditBox qtyEdit;
+	private final CycleButton<Color> colorCycleBtn;
 
 	public AdvancedItemFilterVariableSettingsOverlay(ManagerScreen parentScreen,
 			AdvancedItemFilterVariableComponent component) {
 		super(parentScreen, component);
 		this.component = component;
 		this.width = 200;
-		this.height = 140;
+		this.height = 165; // Expanded height to house color selector cleanly [3]
 		this.setX((parentScreen.width - this.width) / 2);
 		this.setY((256 - this.height) / 2);
 
 		parentScreen.getMenu().setActiveComponent(component);
 		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId()));
+				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
+						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
+						: null,
+				component.getId()));
 
 		repositionGhostSlot();
 
@@ -75,8 +84,20 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 					sendSettingsUpdate();
 				}).pos(getX() + 20, getY() + 65).size(160, 20).build();
 
+		// 3. Initialize the standard Minecraft color cycle selector for the card's
+		// filter dye color [3]
+		this.colorCycleBtn = CycleButton
+				.builder((Color c) -> Component.literal(c.getSerializedName().toUpperCase(Locale.ROOT)))
+				.withValues(Color.values()).withInitialValue(component.getFilterColor()).displayOnlyValue()
+				.create(getX() + 20, getY() + 115, 160, 20, Component.literal("Card Tint Color"), (btn, value) -> {
+					component.setFilterColor(value);
+					parentScreen.getMenu().getManagerBlockEntity().setChanged();
+					sendSettingsUpdate();
+				});
+
 		this.children.add(new ApiWidgetAdapter<>(this.toggleQtyBtn));
 		this.children.add(new ApiWidgetAdapter<>(this.qtyEdit));
+		this.children.add(new ApiWidgetAdapter<>(this.colorCycleBtn));
 	}
 
 	private void repositionGhostSlot() {
@@ -95,7 +116,7 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x;
+		int dif = x - this.getX();
 		super.setX(x);
 		updateChildrenXPositions(dif);
 		repositionGhostSlot();
@@ -103,7 +124,7 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y;
+		int dif = y - this.getY();
 		super.setY(y);
 		updateChildrenYPositions(dif);
 		repositionGhostSlot();

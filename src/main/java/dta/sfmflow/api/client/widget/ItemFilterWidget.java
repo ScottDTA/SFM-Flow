@@ -1,5 +1,6 @@
 package dta.sfmflow.api.client.widget;
 
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
@@ -20,7 +21,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 @OnlyIn(Dist.CLIENT)
 public class ItemFilterWidget extends AbstractFlowWidget {
 	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation
-			.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
+			.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
 
 	private final IFilterable model;
 	private final ManagerScreen parentScreen;
@@ -46,11 +47,11 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 
 	private void repositionGhostSlots() {
 		int gridStartX = getX();
-		int gridStartY = getY() + 20;
+		int gridY = getY() + 20;
 
 		for (int i = 0; i < 12; i++) {
 			int slotX = gridStartX + i * 20 + 1;
-			int slotY = gridStartY + 1;
+			int slotY = gridY + 1;
 
 			int slotIndexInMenu = 36 + i;
 			if (slotIndexInMenu < parentScreen.getMenu().slots.size()) {
@@ -90,11 +91,11 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 		}
 
 		int gridStartX = getX();
-		int gridStartY = getY() + 20;
+		int gridY = getY() + 20;
 
 		for (int c = 0; c < 12; c++) {
 			int slotX = gridStartX + c * 20;
-			int slotY = gridStartY;
+			int slotY = gridY;
 			boolean hovered = mouseX >= slotX && mouseX < slotX + 18 && mouseY >= slotY && mouseY < slotY + 18;
 
 			ItemStack stack = model.getFilterItems().get(c);
@@ -108,9 +109,10 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF8B8B8B);
 			}
 
-			// Render the item stack manually on top of the slot background [3]
+			// Render the item stack manually on top of the slot background using the BEWLR pipeline [3]
 			if (hasItem) {
-				guiGraphics.renderItem(stack, slotX + 1, slotY + 1);
+				// Reverted & Simplified: renderFakeItem natively captures the custom item card color matrices and nested icons [3]
+				guiGraphics.renderFakeItem(stack, slotX + 1, slotY + 1);
 				guiGraphics.renderItemDecorations(parentScreen.getFont(), stack, slotX + 1, slotY + 1);
 
 				// Render our custom text limits overlay here [3]
@@ -136,7 +138,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x;
+		int dif = x - this.getX();
 		super.setX(x);
 		updateChildrenXPositions(dif);
 		repositionGhostSlots();
@@ -144,7 +146,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y;
+		int dif = y - this.getY();
 		super.setY(y);
 		updateChildrenYPositions(dif);
 		repositionGhostSlots();

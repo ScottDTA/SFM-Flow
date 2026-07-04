@@ -14,6 +14,7 @@ import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.util.Mth;
+import net.minecraft.Util;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
@@ -220,7 +221,7 @@ public class ManagerMouseHandler {
 		FlowWidgetBase clickedBase = getTopBaseAt(mouseX, mouseY);
 
 		if (button == 0 && clickedBase != null) {
-			long currentTime = net.minecraft.Util.getMillis();
+			long currentTime = Util.getMillis();
 			UUID clickedId = clickedBase.getContainer().getComponent().getId();
 
 			if (this.doubleClickCandidateId != null && clickedId.equals(this.doubleClickCandidateId)

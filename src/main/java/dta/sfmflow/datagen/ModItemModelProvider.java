@@ -1,10 +1,11 @@
-
 package dta.sfmflow.datagen;
 
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.item.ModItems;
 import net.minecraft.data.PackOutput;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
+import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 /**
@@ -18,8 +19,18 @@ public class ModItemModelProvider extends ItemModelProvider {
 	@Override
 	protected void registerModels() {
 		/* STREAMING_CHUNK:Registering variable card item model */
-		// Generate standard flat item model layout for our dynamic variables item card
-		// [3]
-		basicItem(ModItems.VARIABLE_CARD.get());
+		// Generates variable_card item model referencing the active dynamic entity template [3]
+		getBuilder(ModItems.VARIABLE_CARD.getId().getPath())
+				.parent(new ModelFile.UncheckedModelFile(
+						ResourceLocation.withDefaultNamespace("builtin/entity")
+				))
+				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item/" + ModItems.VARIABLE_CARD.getId().getPath()));
+
+		// Generates the hidden variable_card_flat item model utilized by the BEWLR renderer [3]
+		getBuilder(ModItems.VARIABLE_CARD.getId().getPath() + "_flat")
+				.parent(new ModelFile.UncheckedModelFile(
+						ResourceLocation.withDefaultNamespace("item/generated")
+				))
+				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item/" + ModItems.VARIABLE_CARD.getId().getPath()));
 	}
 }

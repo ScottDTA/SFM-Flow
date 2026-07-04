@@ -17,7 +17,7 @@ public class ModItems {
 	 * parameters [3].
 	 */
 	public static final DeferredItem<Item> VARIABLE_CARD = ITEMS.register("variable_card",
-			() -> new Item(new Item.Properties().stacksTo(1)));
+			() -> new VariableCardItem(new Item.Properties().stacksTo(1)));
 
 	public static void register(IEventBus eventBus) {
 		ITEMS.register(eventBus);

@@ -7,6 +7,7 @@ import dta.sfmflow.block.entity.ModBlockEntities;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.item.ModCreativeModeTabs;
 import dta.sfmflow.item.ModItems;
+import dta.sfmflow.registry.ModDataComponents;
 import dta.sfmflow.networking.PacketHandlerManager;
 import dta.sfmflow.networking.ServerPayloadHandler;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
@@ -46,6 +47,7 @@ public class SFMFlow {
 		modEventBus.addListener(this::registerNetworking);
 		ModCreativeModeTabs.register(modEventBus);
 		ModItems.register(modEventBus);
+		ModDataComponents.register(modEventBus);
 		ModBlocks.register(modEventBus);
 		FlowComponentType.register(modEventBus);
 		ModBlockEntities.register(modEventBus);

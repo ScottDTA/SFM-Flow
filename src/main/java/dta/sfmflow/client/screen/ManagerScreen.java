@@ -7,6 +7,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
+import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
 import dta.sfmflow.client.screen.helper.WorkspaceValidator;
@@ -18,6 +19,7 @@ import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -32,7 +34,8 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Main visual workspace representing ManagerBlock configurations [3].
- * Incorporates a sliding drawer panel to display dynamic filter cards and warning counters [3].
+ * Incorporates a sliding drawer panel to display dynamic filter cards and
+ * warning counters [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
@@ -75,7 +78,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 
 		int x = (width - imageWidth) / 2;
-		// Centers the canvas while guaranteeing at least an 8px margin above the player inventory [3]
+		// Centers the canvas while guaranteeing at least an 8px margin above the player
+		// inventory [3]
 		int y = Math.min((height - imageHeight) / 2, height - imageHeight - 90 - 8);
 		this.leftPos = x;
 		this.topPos = y;
@@ -305,7 +309,12 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
+		// Fix: Push the container's standard slot tooltips onto a high Z-layer to
+		// prevent overlay overlap [3]
+		guiGraphics.pose().pushPose();
+		guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
 		this.renderTooltip(guiGraphics, mouseX, mouseY);
+		guiGraphics.pose().popPose();
 
 		for (Renderable renderable : this.renderables) {
 			resetFlagsRecursive(renderable);
@@ -476,7 +485,29 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 				return true;
 			}
 		}
+
+		// Prevent keypresses (like "E") from closing the screen when an edit box is
+		// focused [3]
+		if (this.getFocused() != null) {
+			if (this.getFocused().keyPressed(keyCode, scanCode, modifiers)) {
+				return true;
+			}
+			if (isEditingText(this.getFocused())) {
+				if (keyCode == 256) { // Escape key should still close [3]
+					return super.keyPressed(keyCode, scanCode, modifiers);
+				}
+				return true;
+			}
+		}
+
 		return super.keyPressed(keyCode, scanCode, modifiers);
+	}
+
+	private boolean isEditingText(GuiEventListener listener) {
+		if (listener instanceof ApiWidgetAdapter<?> adapter) {
+			return adapter.getVanillaWidget() instanceof EditBox;
+		}
+		return listener instanceof EditBox;
 	}
 
 	@Override
@@ -558,8 +589,8 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		if (errorCount > 0) {
 			int errorWidth = this.font.width(Component.translatable("gui.sfmflow.errors", errorCount));
-			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.errors", errorCount),
-					currentOffset, 244, 0xFFD00000, false);
+			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.errors", errorCount), currentOffset,
+					244, 0xFFD00000, false);
 			currentOffset += errorWidth + 12;
 		}
 

@@ -1,3 +1,19 @@
+7-3-2026
+
+###[Added]
+* Variable Card 3D Models: Variable Cards now render as detailed 3D models displaying their custom dye color and a miniature version of their filtered item stack.
+* Detailed Variable Tooltips: Hovering over a Variable Card now displays its target filter, quantity limit settings, and dye color.
+* Card Tint Customizer: Added a color selector to the Advanced Item Filter settings overlay, allowing players to dye variable cards independently of their node color.
+
+###[Changed]
+* Expanded Variables Search: Extended search queries inside the Variable Drawer; players can now search for variables using their dye color name or target item name.
+
+###[Fixed]
+* Typing Conflict Keybinds: Fixed a conflict where pressing the default inventory key ("E") while typing inside a node's search or text box would close the interface.
+* Text Box Shift Offsets: Fixed a layout coordinate bug where searching for inventories would shift search boxes to incorrect screen offsets.
+* Drawer Performance Boost: Optimized drawer panel rendering to skip cards scrolled out of view, improving frame rates.
+* Tooltip Depth Clipping: Corrected tooltip rendering layers to prevent item details from clipping underneath active popups and settings overlays.
+
 7-2-2026
 
 ###[Added]

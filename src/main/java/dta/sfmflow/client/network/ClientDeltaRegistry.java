@@ -54,6 +54,7 @@ public class ClientDeltaRegistry {
 		STRATEGIES.put(DeltaType.SETTINGS, (screen, packet, localComponent) -> {
 			if (localComponent != null && packet.data() != null) {
 				localComponent.loadData(packet.data());
+				screen.refreshWidgetLayout(); // Rebuild widgets to instantly refresh names/colors! [3]
 			}
 		});
 

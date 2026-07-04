@@ -73,9 +73,11 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			return false;
 		}
 
-		// Delegate clicks to the search box first [3]
+		// Delegate clicks to the search box first and establish the focus delegation
+		// chain [3]
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
+				this.setFocused(child); // Fix: Set focused child on click so key events propagate [3]
 				return true;
 			}
 		}
@@ -191,14 +193,14 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x;
+		int dif = x - this.getX();
 		super.setX(x);
 		updateChildrenXPositions(dif);
 	}
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y;
+		int dif = y - this.getY();
 		super.setY(y);
 		updateChildrenYPositions(dif);
 	}
