@@ -5,8 +5,13 @@
 * Added a dynamic error-handling API (`INodeClientProperties#getErrorTooltip`) that enables custom flowchart blocks to display custom validation errors and warning card tooltips in the interface.
 
 ### [Changed]
+* Refactored network code into a separate processing module to clean up the mod's initial boot sequence.
+* Re-organized how client-side settings, screens, and keybinds register themselves during game startup.
 * Refactored slot selector menus to support configurations on any compatible custom inventory node rather than restricting them exclusively to the default item input and output blocks.
 * Moved visual node error message logic out of main system rendering loops and into modular client registries.
+
+### [Fixed]
+* Isolated client-only code paths to prevent crash loop errors when hosting or running dedicated multiplayer servers.
 
 
 7-4-2026 Hotfix

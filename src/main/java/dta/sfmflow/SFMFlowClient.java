@@ -22,15 +22,17 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.component.DyedItemColor;
 import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.ModelEvent;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+import net.neoforged.neoforge.client.gui.ConfigurationScreen;
 import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.UUID;
@@ -39,32 +41,47 @@ import java.util.function.Supplier;
 /**
  * Client-only event subscriber and bootstrappery driver [3].
  */
-@EventBusSubscriber(modid = SFMFlow.MODID, value = Dist.CLIENT)
+@OnlyIn(Dist.CLIENT)
 public class SFMFlowClient {
-	public SFMFlowClient(ModContainer container) {
-		// Empty constructor - configuration factory hook is safely mapped inside main constructor [3]
+
+	private SFMFlowClient() {}
+
+	/**
+	 * Safely registers all client-side event listeners and extension points on the physical client [3].
+	 * Called explicitly inside the main mod constructor context [3].
+	 *
+	 * @param modEventBus  the Mod-scoped event bus [3]
+	 * @param modContainer the current mod container [3]
+	 */
+	public static void initialize(IEventBus modEventBus, ModContainer modContainer) {
+		modEventBus.addListener(SFMFlowClient::registerScreens);
+		modEventBus.addListener(SFMFlowClient::registerClientReloadListeners);
+		modEventBus.addListener(SFMFlowClient::registerItemColors);
+		modEventBus.addListener(SFMFlowClient::registerAdditionalModels);
+		modEventBus.addListener(SFMFlowClient::clientSetup);
+		modEventBus.addListener(SFMFlowClient::registerKeyMappings);
+
+		// Config screen factory extension point belongs on client startup [3]
+		modContainer.registerExtensionPoint(IConfigScreenFactory.class,
+				(container, parent) -> new ConfigurationScreen(container, parent));
 	}
 
-	@SubscribeEvent
-	public static void registerScreens(RegisterMenuScreensEvent event) {
+	private static void registerScreens(RegisterMenuScreensEvent event) {
 		event.register(ModMenuTypes.MANAGER_MENU.get(), ManagerScreen::new);
 		event.register(ModMenuTypes.CABLE_CLUSTER_MENU.get(), CableClusterScreen::new);
 	}
 
-	@SubscribeEvent
-	public static void registerClientReloadListeners(RegisterClientReloadListenersEvent event) {
+	private static void registerClientReloadListeners(RegisterClientReloadListenersEvent event) {
 		event.registerReloadListener(new SlotLayoutManager());
 	}
 
-	@SubscribeEvent
-	public static void registerItemColors(RegisterColorHandlersEvent.Item event) {
+	private static void registerItemColors(RegisterColorHandlersEvent.Item event) {
 		event.register((stack, tintIndex) -> {
 			if (tintIndex == 0) {
 				UUID varId = VariableCardRenderer.getVariableId(stack);
 				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
 					if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-						// Pull the live independent card filterColor rather than canvas background mask [3]
 						return 0xFF000000 | advancedVar.getFilterColor().getHexColor();
 					}
 				}
@@ -76,23 +93,17 @@ public class SFMFlowClient {
 		}, ModItems.VARIABLE_CARD.get());
 	}
 
-	// Register our hidden flat model using 1.21's standalone variant structural layouts [3]
-	@SubscribeEvent
-	public static void registerAdditionalModels(ModelEvent.RegisterAdditional event) {
+	private static void registerAdditionalModels(ModelEvent.RegisterAdditional event) {
 		event.register(ModelResourceLocation
 				.standalone(ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item/variable_card_flat")));
 	}
 
-	@SubscribeEvent
-	public static void clientSetup(FMLClientSetupEvent event) {
+	private static void clientSetup(FMLClientSetupEvent event) {
 		NeoForge.EVENT_BUS.register(HighlightManager.class);
 
 		event.enqueueWork(() -> {
-			/* STREAMING_CHUNK:Invoking client plugin registrations */
-			// Sweeps and triggers visual layout setup across all client plugins safely [3]
 			SFMFlowClientPluginRegistry.initAllClientProperties();
 
-			// Inject the client-only tooltip resolver safely to avoid dedicated server crashes [3]
 			VariableCardItem.setTooltipDataResolver(stack -> {
 				UUID varId = VariableCardRenderer.getVariableId(stack);
 				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
@@ -139,14 +150,12 @@ public class SFMFlowClient {
 					public Supplier<Boolean> isEnabled() {
 						return () -> true;
 					}
-					// Cleaned up: Legacy expanded inline settings widget factory delegation removed [3]
 				});
 			}
 		});
 	}
 
-	@SubscribeEvent
-	public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
+	private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
 		HighlightManager.registerKeyMappings(event);
 	}
 }
