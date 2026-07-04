@@ -2,23 +2,29 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.layout.SlotLayout;
 import dta.sfmflow.api.client.layout.SlotEntry;
+import dta.sfmflow.SFMFlow;
+import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.layout.FlowLayoutRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
+import dta.sfmflow.api.component.ISlotConfigurable; // Standardized slot configuration [3]
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.network.ClientInventoryCache;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
-import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -28,18 +34,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 /**
  * Symmetrical slot configuration modal popup that allows players to toggle
  * which slots in an inventory are active for a specific side [3].
- * Rendered at 50% scale to maintain high compact density and supports
- * rendering client-cached items and custom layouts [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class SlotLayoutModalPopup extends AbstractModalPopup {
-	private static final ResourceLocation SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-			dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/generic_slot.png");
+	private static final ResourceLocation SLOT_TEXTURE = ResourceLocation
+			.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/generic_slot.png");
 
-	// Centralized slot coordinates constants to prevent scoping errors [3]
 	private static final int GRID_START_X = 10;
 	private static final int GRID_START_Y = 20;
 
@@ -50,13 +55,14 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 	private final int totalSlots;
 	private final Set<Integer> accessibleSlots = new HashSet<>();
-	private @javax.annotation.Nullable IItemHandler nullHandler = null;
-	private @javax.annotation.Nullable SlotLayout layout = null;
+	private @Nullable IItemHandler nullHandler = null;
+	private @Nullable SlotLayout layout = null;
 
 	private final int unscaledWidth;
 	private final int unscaledHeight;
 
-	public SlotLayoutModalPopup(ManagerScreen parentScreen, ISideConfigurable sideModel, Direction side, BlockPos blockPos, Runnable onChanged) {
+	public SlotLayoutModalPopup(ManagerScreen parentScreen, ISideConfigurable sideModel, Direction side,
+			BlockPos blockPos, Runnable onChanged) {
 		super(parentScreen, 110, 100, Component.literal("Slot Layout"));
 		this.sideModel = sideModel;
 		this.side = side;
@@ -65,18 +71,16 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 		Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 		IItemHandler sideHandler = null;
-		net.minecraft.world.level.block.entity.BlockEntity be = null;
+		BlockEntity be = null;
 
 		if (level != null && blockPos != null) {
 			this.nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, null);
 			sideHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, side);
 			be = level.getBlockEntity(blockPos);
 
-			// Query custom JSON-driven slot layouts matching targeted block registry keys [3]
-			net.minecraft.world.level.block.state.BlockState state = level.getBlockState(blockPos);
-			ResourceLocation blockId = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock());
+			BlockState state = level.getBlockState(blockPos);
+			ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
 			if (blockId != null) {
-				// Prioritize API programmatic overrides first, then fall back to data-loaded layouts [3]
 				this.layout = FlowLayoutRegistry.getLayout(blockId);
 				if (this.layout == null) {
 					this.layout = SlotLayoutManager.getLayout(blockId);
@@ -84,21 +88,20 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		// Log fallback warning if debug logging is enabled [3]
 		if (this.layout == null) {
 			try {
-				if (dta.sfmflow.ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
-					dta.sfmflow.SFMFlow.LOGGER.info("[SFM-Flow] Inventory at {} does not have a registered slot layout; falling back to generic grid.", this.blockPos);
+				if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+					SFMFlow.LOGGER.info(
+							"[SFM-Flow] Inventory at {} does not have a registered slot layout; falling back to generic grid.",
+							this.blockPos);
 				}
-			} catch (Exception e) {
-				// Safeguard to prevent crashes if ServerConfig is queried during offline testing [3]
+			} catch (Exception ignored) {
 			}
 		}
 
 		this.totalSlots = this.nullHandler != null ? this.nullHandler.getSlots() : 0;
 
-		// Map accessible slots based on worldly containers or standard sizing
-		if (be instanceof net.minecraft.world.WorldlyContainer worldly && side != null) {
+		if (be instanceof WorldlyContainer worldly && side != null) {
 			int[] slots = worldly.getSlotsForFace(side);
 			if (slots != null) {
 				for (int s : slots) {
@@ -118,14 +121,14 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		// Calculate scaled grid dimensions or utilize unscaled custom bounds from JSON [3]
 		if (this.layout != null) {
 			this.unscaledWidth = this.layout.width();
 			this.unscaledHeight = this.layout.height();
 		} else {
 			int cols = 9;
 			int rows = (this.totalSlots + 8) / 9;
-			if (rows <= 0) rows = 1;
+			if (rows <= 0)
+				rows = 1;
 
 			int gridW = cols * 20 - 2;
 			int gridH = rows * 20 - 2;
@@ -134,15 +137,12 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			this.unscaledHeight = 20 + gridH + 30;
 		}
 
-		// Apply 50% scale properties to base dimensions
 		this.width = this.unscaledWidth / 2;
 		this.height = this.unscaledHeight / 2;
 
-		// Center the popup symmetrically inside parent screen
 		this.setX((parentScreen.width - this.width) / 2);
 		this.setY((parentScreen.height - this.height) / 2);
 
-		// Dispatch C2S request to synchronize target inventory slot item stacks cleanly over the network [3]
 		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos));
 	}
 
@@ -152,22 +152,19 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			return false;
 		}
 
-		// Map screen space inputs into unscaled 2x coordinates relative to top-left
 		double localX = (mouseX - getX()) * 2.0;
 		double localY = (mouseY - getY()) * 2.0;
 
-		// Save/Close button bounds check
 		int btnX = (this.unscaledWidth - 80) / 2;
 		int btnY = this.unscaledHeight - 22;
 
 		if (button == 0 && localX >= btnX && localX < btnX + 80 && localY >= btnY && localY < btnY + 14) {
-			Minecraft.getInstance().getSoundManager().play(
-					SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+			Minecraft.getInstance().getSoundManager()
+					.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 			close();
 			return true;
 		}
 
-		// Toggle custom layout coordinates slots
 		if (button == 0 && this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {
 				int i = entry.index();
@@ -176,11 +173,12 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 				if (localX >= slotX && localX < slotX + 18 && localY >= slotY && localY < slotY + 18) {
 					if (accessibleSlots.contains(i)) {
-						if (sideModel instanceof ItemTransferComponent transfer) {
+						// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
+						if (sideModel instanceof ISlotConfigurable transfer) {
 							transfer.toggleSlot(side, i);
 							this.onChanged.run();
-							Minecraft.getInstance().getSoundManager().play(
-									SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+							Minecraft.getInstance().getSoundManager()
+									.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 							return true;
 						}
 					}
@@ -188,7 +186,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		// Dynamic fallback slot grid toggle bounds check
 		if (button == 0 && this.layout == null && this.totalSlots > 0) {
 			for (int i = 0; i < this.totalSlots; i++) {
 				int row = i / 9;
@@ -199,11 +196,12 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 				if (localX >= slotX && localX < slotX + 18 && localY >= slotY && localY < slotY + 18) {
 					if (accessibleSlots.contains(i)) {
-						if (sideModel instanceof ItemTransferComponent transfer) {
+						// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
+						if (sideModel instanceof ISlotConfigurable transfer) {
 							transfer.toggleSlot(side, i);
 							this.onChanged.run();
-							Minecraft.getInstance().getSoundManager().play(
-									SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+							Minecraft.getInstance().getSoundManager()
+									.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 							return true;
 						}
 					}
@@ -216,7 +214,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Calculate local mouse coordinates in the 2x scaled coordinates space
 		double localMouseX = (mouseX - getX()) * 2.0;
 		double localMouseY = (mouseY - getY()) * 2.0;
 
@@ -227,7 +224,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		int w = this.unscaledWidth;
 		int h = this.unscaledHeight;
 
-		// 1. Draw custom background texture or fallback to standard 9-slice [3]
 		if (this.layout != null) {
 			guiGraphics.blit(this.layout.background(), 0, 0, 0, 0, w, h, w, h);
 		} else {
@@ -238,24 +234,20 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			guiGraphics.blit(SUBMENU_BG, 0, h - c, 0, 16, c, c, 22, 22);
 			guiGraphics.blit(SUBMENU_BG, w - c, h - c, 16, 16, c, c, 22, 22);
 
-			// Borders
 			guiGraphics.blit(SUBMENU_BG, c, 0, w - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
 			guiGraphics.blit(SUBMENU_BG, c, h - c, w - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
 			guiGraphics.blit(SUBMENU_BG, 0, c, c, h - 2 * c, 0.0F, (float) c, c, m, 22, 22);
 			guiGraphics.blit(SUBMENU_BG, w - c, c, c, h - 2 * c, 16.0F, (float) c, c, m, 22, 22);
 
-			// Central stretch
 			guiGraphics.blit(SUBMENU_BG, c, c, w - 2 * c, h - 2 * c, (float) c, (float) c, m, m, 22, 22);
 		}
 
-		// Localized face header title
 		String sideName = side != null ? side.name() : "GENERAL";
 		Component titleComponent = Component.literal(sideName + " SLOTS");
 		guiGraphics.drawCenteredString(parentScreen.getFont(), titleComponent, w / 2, 6, 0xFFD4AF37);
 
 		ItemStack[] cachedItems = ClientInventoryCache.get(this.blockPos);
 
-		// 2. Render Slots based on data-driven mappings or grid fallbacks [3]
 		if (this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {
 				int i = entry.index();
@@ -267,16 +259,13 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				boolean isAccessible = accessibleSlots.contains(i);
 
 				if (!isAccessible) {
-					// Grayed overlay with Red X inside slot bounds (skips drawing items cleanly) [3]
 					guiGraphics.fill(slotX + 1, slotY + 1, slotX + 17, slotY + 17, 0x80151515);
 
-					// Symmetrical thick red X
 					for (int k = 0; k < 12; k++) {
 						guiGraphics.fill(slotX + 3 + k, slotY + 3 + k, slotX + 5 + k, slotY + 4 + k, 0xFFFF0000);
 						guiGraphics.fill(slotX + 3 + k, slotY + 14 - k, slotX + 5 + k, slotY + 15 - k, 0xFFFF0000);
 					}
 				} else {
-					// Draw item contents only if slot is accessible to keep overlays clear [3]
 					if (cachedItems != null && i >= 0 && i < cachedItems.length) {
 						ItemStack stack = cachedItems[i];
 						if (stack != null && !stack.isEmpty()) {
@@ -285,7 +274,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					}
 
 					boolean isEnabled = true;
-					if (sideModel instanceof ItemTransferComponent transfer) {
+					// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
+					if (sideModel instanceof ISlotConfigurable transfer) {
 						isEnabled = transfer.isSlotEnabled(side, i);
 					}
 					if (isEnabled) {
@@ -309,14 +299,12 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 				boolean isAccessible = accessibleSlots.contains(i);
 				if (!isAccessible) {
-					// Grayed overlay with Red X inside slot bounds (skips drawing items cleanly) [3]
 					guiGraphics.fill(slotX + 1, slotY + 1, slotX + 17, slotY + 17, 0x80151515);
 					for (int k = 0; k < 12; k++) {
 						guiGraphics.fill(slotX + 3 + k, slotY + 3 + k, slotX + 5 + k, slotY + 4 + k, 0xFFFF0000);
 						guiGraphics.fill(slotX + 3 + k, slotY + 14 - k, slotX + 5 + k, slotY + 15 - k, 0xFFFF0000);
 					}
 				} else {
-					// Draw item contents only if slot is accessible to keep overlays clear [3]
 					if (cachedItems != null && i >= 0 && i < cachedItems.length) {
 						ItemStack stack = cachedItems[i];
 						if (stack != null && !stack.isEmpty()) {
@@ -325,7 +313,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					}
 
 					boolean isEnabled = true;
-					if (sideModel instanceof ItemTransferComponent transfer) {
+					// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
+					if (sideModel instanceof ISlotConfigurable transfer) {
 						isEnabled = transfer.isSlotEnabled(side, i);
 					}
 					if (isEnabled) {
@@ -339,10 +328,10 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		// Render the close button
 		int btnX = (w - 80) / 2;
 		int btnY = h - 22;
-		boolean btnHovered = localMouseX >= btnX && localMouseX < btnX + 80 && localMouseY >= btnY && localMouseY < btnY + 14;
+		boolean btnHovered = localMouseX >= btnX && localMouseX < btnX + 80 && localMouseY >= btnY
+				&& localMouseY < btnY + 14;
 
 		guiGraphics.fill(btnX, btnY, btnX + 80, btnY + 14, btnHovered ? 0xFF555555 : 0xFF222222);
 		guiGraphics.renderOutline(btnX, btnY, 80, 14, 0xFFD4AF37);
@@ -350,7 +339,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 		guiGraphics.pose().popPose();
 
-		// Symmetrical unscaled overlay rendering pass for slot item and warning tooltips [3]
 		if (this.totalSlots > 0) {
 			if (this.layout != null) {
 				for (SlotEntry entry : this.layout.slots()) {
@@ -361,7 +349,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					if (mouseX >= slotX && mouseX < slotX + 9 && mouseY >= slotY && mouseY < slotY + 9) {
 						boolean isAccessible = accessibleSlots.contains(i);
 						if (!isAccessible) {
-							guiGraphics.renderTooltip(parentScreen.getFont(), Component.translatable("gui.sfmflow.error.slot_not_accessible"), mouseX, mouseY);
+							guiGraphics.renderTooltip(parentScreen.getFont(),
+									Component.translatable("gui.sfmflow.error.slot_not_accessible"), mouseX, mouseY);
 							break;
 						} else if (cachedItems != null && i >= 0 && i < cachedItems.length) {
 							ItemStack stack = cachedItems[i];
@@ -380,13 +369,14 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					int row = i / 9;
 					int col = i % 9;
 
-					int slotX = unscaledStartX + col * 10; // 20 * 0.5 = 10
+					int slotX = unscaledStartX + col * 10;
 					int slotY = unscaledStartY + row * 10;
 
 					if (mouseX >= slotX && mouseX < slotX + 9 && mouseY >= slotY && mouseY < slotY + 9) {
 						boolean isAccessible = accessibleSlots.contains(i);
 						if (!isAccessible) {
-							guiGraphics.renderTooltip(parentScreen.getFont(), Component.translatable("gui.sfmflow.error.slot_not_accessible"), mouseX, mouseY);
+							guiGraphics.renderTooltip(parentScreen.getFont(),
+									Component.translatable("gui.sfmflow.error.slot_not_accessible"), mouseX, mouseY);
 							break;
 						} else if (cachedItems != null && i >= 0 && i < cachedItems.length) {
 							ItemStack stack = cachedItems[i];

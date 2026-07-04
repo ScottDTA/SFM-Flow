@@ -1,9 +1,12 @@
 package dta.sfmflow.client.screen.helper;
 
+import javax.annotation.Nullable;
+
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -81,6 +84,49 @@ public final class WorkspaceValidator {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Retrieves the specific error tooltip component based on the active validation state [3].
+	 * Returns null if the component does not exhibit any active errors [3].
+	 */
+	public static @Nullable Component getErrorTooltip(ManagerScreen screen, AbstractFlowComponent component) {
+		if (component instanceof ItemTransferComponent transfer) {
+			// 1. Check if bound inventory is connected [3]
+			boolean foundBoundInventory = false;
+			if (transfer.getInventoryId() != -1) {
+				for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
+					if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
+						foundBoundInventory = true;
+						break;
+					}
+				}
+			}
+
+			if (transfer.getInventoryId() == -1 || !foundBoundInventory) {
+				return Component.translatable("gui.sfmflow.error.unbound_inventory");
+			}
+
+			// 2. Empty Whitelist validation check [3]
+			if (transfer.isWhitelist()) {
+				boolean empty = true;
+				for (ItemStack stack : transfer.getFilterItems()) {
+					if (stack != null && !stack.isEmpty()) {
+						empty = false;
+						break;
+					}
+				}
+				if (empty) {
+					return Component.translatable("gui.sfmflow.error.empty_whitelist");
+				}
+			}
+
+			// 3. No active sides error check [3]
+			if (transfer.getActiveSidesMask() == 0) {
+				return Component.translatable("gui.sfmflow.error.no_active_sides");
+			}
+		}
+		return null;
 	}
 
 	/**

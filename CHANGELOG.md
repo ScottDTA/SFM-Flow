@@ -1,6 +1,17 @@
 7-4-2026
 
 ### [Added]
+* Introduced a slot configuration developer API (`ISlotConfigurable`) that allows third-party add-on creators to reuse the compact block slot selector menu on their own custom nodes.
+* Added a dynamic error-handling API (`INodeClientProperties#getErrorTooltip`) that enables custom flowchart blocks to display custom validation errors and warning card tooltips in the interface.
+
+### [Changed]
+* Refactored slot selector menus to support configurations on any compatible custom inventory node rather than restricting them exclusively to the default item input and output blocks.
+* Moved visual node error message logic out of main system rendering loops and into modular client registries.
+
+
+7-4-2026 Hotfix
+
+### [Added]
 * Background saving pipeline that offloads layout writes to a separate thread, preventing performance stutters during auto-saves.
 * Unified client-side configuration screen registration, making in-game mod options accessible directly from the mod list.
 

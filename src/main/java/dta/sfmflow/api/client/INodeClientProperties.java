@@ -1,9 +1,14 @@
 package dta.sfmflow.api.client;
 
 import java.util.function.Supplier;
+
+import javax.annotation.Nullable;
+
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.WorkspaceValidator;
 import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -67,5 +72,14 @@ public interface INodeClientProperties {
 	@javax.annotation.Nullable
 	default AbstractFlowWidget createSettingsWidget(FlowWidgetContainer container, AbstractFlowComponent component) {
 		return null;
+	}
+
+	/**
+	 * Retrieves the specific error tooltip component based on the active validation state [3].
+	 * Returns null if the component does not exhibit any active errors [3].
+	 */
+	@Nullable
+	default Component getErrorTooltip(ManagerScreen screen, AbstractFlowComponent component) {
+		return WorkspaceValidator.getErrorTooltip(screen, component);
 	}
 }

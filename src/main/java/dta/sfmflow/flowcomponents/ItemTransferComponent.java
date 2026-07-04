@@ -11,6 +11,7 @@ import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
+import dta.sfmflow.api.component.ISlotConfigurable;
 import dta.sfmflow.api.component.IGhostSlotAware;
 import dta.sfmflow.api.execution.FlowItemBuffer;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
@@ -53,7 +54,7 @@ import java.util.Map;
  * slot bitmasks, variable bindings, and custom item quantity limits [3].
  */
 public class ItemTransferComponent extends AbstractFlowComponent
-		implements IFilterable, IInventoryTarget, ISideConfigurable, IGhostSlotAware {
+		implements IFilterable, IInventoryTarget, ISideConfigurable, IGhostSlotAware, ISlotConfigurable {
 	private final boolean isInput;
 	private int inventoryId = -1;
 	private boolean useAll = true;
@@ -835,7 +836,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 	}
 
 	@Override
-	public void loadData(net.minecraft.nbt.CompoundTag compoundTag) {
+	public void loadData(CompoundTag compoundTag) {
 		// Secure setup: obtain the static composite HolderLookup.Provider cleanly [3]
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
