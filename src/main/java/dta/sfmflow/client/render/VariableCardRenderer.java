@@ -13,13 +13,19 @@ import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import javax.annotation.Nullable;
@@ -87,17 +93,59 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 	/**
 	 * Pulls the live, synchronized filter stack from the client's workspace if
 	 * available, falling back to the stack's saved component [3].
+	 * Cycles dynamically through all items inside the configured tag if UseTag is enabled [3].
 	 */
 	private ItemStack getLiveGhostStack(ItemStack stack) {
 		UUID varId = getVariableId(stack);
 		if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 			var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
 			if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-				return advancedVar.getFilterStack();
+				ItemStack ghost = advancedVar.getFilterStack();
+				if (advancedVar.isUseTag() && !advancedVar.getSelectedTag().isEmpty()) {
+					List<ItemStack> tagItems = getTagItems(advancedVar.getSelectedTag());
+					if (!tagItems.isEmpty()) {
+						long gameTime = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
+						int idx = (int) ((gameTime / 20) % tagItems.size()); // Cycle items once per second [3]
+						return tagItems.get(idx);
+					}
+				}
+				return ghost;
 			}
 		}
+
 		var compVal = stack.get(ModDataComponents.FILTERED_ITEM.get());
-		return compVal != null ? compVal.stack() : ItemStack.EMPTY;
+		ItemStack ghost = compVal != null ? compVal.stack() : ItemStack.EMPTY;
+
+		// Fallback to static components outside of screens [3]
+		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+		if (customData != null) {
+			CompoundTag tag = customData.copyTag();
+			if (tag.getBoolean("UseTag") && tag.contains("SelectedTag")) {
+				List<ItemStack> tagItems = getTagItems(tag.getString("SelectedTag"));
+				if (!tagItems.isEmpty()) {
+					long gameTime = Minecraft.getInstance().level != null ? Minecraft.getInstance().level.getGameTime() : 0;
+					int idx = (int) ((gameTime / 20) % tagItems.size());
+					return tagItems.get(idx);
+				}
+			}
+		}
+
+		return ghost;
+	}
+
+	/**
+	 * Resolves all item stacks associated with a specified tag namespace cleanly [3].
+	 */
+	private static List<ItemStack> getTagItems(String tagLocation) {
+		List<ItemStack> items = new ArrayList<>();
+		ResourceLocation tagLoc = ResourceLocation.tryParse(tagLocation);
+		if (tagLoc != null) {
+			var tagKey = TagKey.create(Registries.ITEM, tagLoc);
+			BuiltInRegistries.ITEM.getTag(tagKey).ifPresent(tag -> {
+				tag.forEach(holder -> items.add(new ItemStack(holder.value())));
+			});
+		}
+		return items;
 	}
 
 	@Nullable

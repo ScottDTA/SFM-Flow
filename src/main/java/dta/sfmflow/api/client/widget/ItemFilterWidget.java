@@ -4,12 +4,16 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
+import dta.sfmflow.item.ModItems;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
@@ -102,20 +106,37 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			boolean hasItem = stack != null && !stack.isEmpty();
 			int vOffset = hasItem ? 18 : 0;
 
-			// Draw our custom slot design background
 			guiGraphics.blit(FILTER_SLOT_TEXTURE, slotX, slotY, 0, vOffset, 18, 18, 18, 36);
 
 			if (hovered) {
 				guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF8B8B8B);
 			}
 
-			// Render the item stack manually on top of the slot background using the BEWLR pipeline [3]
 			if (hasItem) {
-				// Reverted & Simplified: renderFakeItem natively captures the custom item card color matrices and nested icons [3]
 				guiGraphics.renderFakeItem(stack, slotX + 1, slotY + 1);
 				guiGraphics.renderItemDecorations(parentScreen.getFont(), stack, slotX + 1, slotY + 1);
 
-				// Render our custom text limits overlay here [3]
+				// Render "MID" overlay on variable cards that have UseModId enabled [3]
+				if (stack.is(ModItems.VARIABLE_CARD.get())) {
+					CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+					if (customData != null) {
+						CompoundTag tag = customData.copyTag();
+						if (tag.getBoolean("UseModId")) {
+							guiGraphics.pose().pushPose();
+							guiGraphics.pose().translate(0, 0, 200.0F);
+							String modIdText = "MID";
+							int strW = parentScreen.getFont().width(modIdText);
+							float textScale = 0.55F;
+							guiGraphics.pose().pushPose();
+							guiGraphics.pose().translate(slotX + 17 - (strW * textScale), slotY + 12, 0);
+							guiGraphics.pose().scale(textScale, textScale, 1.0F);
+							guiGraphics.drawString(parentScreen.getFont(), modIdText, 0, 0, 0xFFFFFF00, true);
+							guiGraphics.pose().popPose();
+							guiGraphics.pose().popPose();
+						}
+					}
+				}
+
 				int limit = model.getFilterLimits().get(c);
 				if (limit > 0) {
 					guiGraphics.pose().pushPose();
@@ -135,6 +156,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			}
 		}
 	}
+
 
 	@Override
 	public void setX(int x) {

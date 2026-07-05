@@ -713,48 +713,33 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		boolean found = false;
 
 		// 1. Resolve bound variable components placed directly on the flowchart canvas
-		// [3]
 		if (component.getBoundFilterVariableId() != null) {
 			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
 			if (boundComp instanceof AdvancedItemFilterVariableComponent varComp) {
-				filterItem = varComp.getFilterStack();
-				limit = varComp.isUseQuantity() ? varComp.getQuantity() : -1;
-
-				// Symmetrical Fix: Changed from isSameItemSameComponents to isSameItem to
-				// bypass dynamic components mismatches [3]
-				if (filterItem != null && !filterItem.isEmpty() && ItemStack.isSameItem(stack, filterItem)) {
+				// Symmetrical check utilizing our robust dynamic namespaces/tag matcher [3]
+				if (AdvancedItemFilterVariableComponent.matchesVariableFilter(varComp, stack)) {
 					found = true;
+					limit = varComp.isUseQuantity() ? varComp.getQuantity() : -1;
 				}
 			}
 		} else {
-			// 2. Scan each of the 12 ghost slots, checking for virtual variable cards [3]
+			// 2. Scan each of the 12 ghost slots, checking for virtual variable cards
 			for (int i = 0; i < component.getFilterItems().size(); i++) {
 				ItemStack filter = component.getFilterItems().get(i);
 				if (filter == null || filter.isEmpty()) {
 					continue;
 				}
 
-				if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) { // Secure
-																													// Check
-																													// Fix
-																													// [3]
+				if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) {
 					CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 					if (tag.contains("VariableId")) {
 						UUID varId = tag.getUUID("VariableId");
 						AbstractFlowComponent varComp = context.getComponents().get(varId);
 						if (varComp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-							ItemStack varStack = advancedVar.getFilterStack();
-
-							// Symmetrical Fix: Changed from isSameItemSameComponents to isSameItem to
-							// bypass dynamic components mismatches [3]
-							if (varStack != null && !varStack.isEmpty() && ItemStack.isSameItem(stack, varStack)) {
+							// Symmetrical check utilizing our robust dynamic namespaces/tag matcher [3]
+							if (AdvancedItemFilterVariableComponent.matchesVariableFilter(advancedVar, stack)) {
 								found = true;
 								limit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
-								if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
-									SFMFlow.LOGGER.info(
-											"[SFM-Flow] matchesFilter Matched Variable Card: ID={}, Item={}, UseQty={}, Limit={}",
-											varId, stack.getItem().toString(), advancedVar.isUseQuantity(), limit);
-								}
 								break;
 							}
 						} else {
@@ -765,7 +750,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 							}
 						}
 					}
-				} else if (ItemStack.isSameItem(stack, filter)) { // Symmetrical Fix: use isSameItem [3]
+				} else if (ItemStack.isSameItem(stack, filter)) {
 					found = true;
 					limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
 					break;
@@ -784,10 +769,8 @@ public class ItemTransferComponent extends AbstractFlowComponent
 		if (component.getBoundFilterVariableId() != null) {
 			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
 			if (boundComp instanceof AdvancedItemFilterVariableComponent varComp) {
-				ItemStack filterItem = varComp.getFilterStack();
-
-				// Symmetrical Fix: use isSameItem [3]
-				if (filterItem != null && !filterItem.isEmpty() && ItemStack.isSameItem(stack, filterItem)) {
+				// Symmetrical check utilizing our robust dynamic namespaces/tag matcher [3]
+				if (AdvancedItemFilterVariableComponent.matchesVariableFilter(varComp, stack)) {
 					return varComp.isUseQuantity() ? varComp.getQuantity() : -1;
 				}
 			}
@@ -798,19 +781,14 @@ public class ItemTransferComponent extends AbstractFlowComponent
 			if (filter == null || filter.isEmpty())
 				continue;
 
-			if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) { // Secure
-																												// Check
-																												// Fix
-																												// [3]
+			if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) {
 				CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 				if (tag.contains("VariableId")) {
 					UUID varId = tag.getUUID("VariableId");
 					AbstractFlowComponent varComp = context.getComponents().get(varId);
 					if (varComp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-						ItemStack varStack = advancedVar.getFilterStack();
-
-						// Symmetrical Fix: use isSameItem [3]
-						if (varStack != null && !varStack.isEmpty() && ItemStack.isSameItem(stack, varStack)) {
+						// Symmetrical check utilizing our robust dynamic namespaces/tag matcher [3]
+						if (AdvancedItemFilterVariableComponent.matchesVariableFilter(advancedVar, stack)) {
 							int resolvedLimit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
 							if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
 								SFMFlow.LOGGER.info(
@@ -827,7 +805,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 						}
 					}
 				}
-			} else if (ItemStack.isSameItem(stack, filter)) { // Symmetrical Fix: use isSameItem [3]
+			} else if (ItemStack.isSameItem(stack, filter)) {
 				return component.getFilterLimit(stack);
 			}
 		}

@@ -175,6 +175,21 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.section.sfmflow.server.toml.limits.tooltip",
 				"Configure scanning thresholds and workspace restrictions to protect server performance.");
 		add("sfmflow.configuration.section.sfmflow.server.toml.title", "SFM-Flow Server Configs");
+		add("sfmflow.configuration.general", "General Client Settings");
+		add("sfmflow.configuration.general.button", "Configure General Settings");
+		add("sfmflow.configuration.general.tooltip", 
+				"Configure core client UI rendering and scaling behaviors.");
+		
+		add("sfmflow.configuration.limits", "Performance Limits");
+		add("sfmflow.configuration.limits.button", "Configure Limits");
+		add("sfmflow.configuration.limits.tooltip", 
+				"Configure scanning thresholds and workspace restrictions to protect server performance.");
+
+		// Execution Budget Option [3]
+		add("sfmflow.configuration.maxExecutionBudgetUs", "Max Execution Budget (Microseconds)");
+		add("sfmflow.configuration.maxExecutionBudgetUs.tooltip", 
+				"The maximum time budget (in microseconds) per Manager block per tick to execute transfer tasks.");
+		
 
 		add("sfmflow.configuration.text", "Label Text Hex");
 		add("sfmflow.configuration.text.button", "Edit Text Color");

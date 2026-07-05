@@ -1,11 +1,15 @@
 package dta.sfmflow.item;
 
 import dta.sfmflow.client.render.VariableCardRenderer;
+import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.registry.ModDataComponents;
 import dta.sfmflow.util.Color;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
@@ -15,6 +19,7 @@ import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -43,6 +48,9 @@ public class VariableCardItem extends Item {
 		boolean useQty = false;
 		int qty = 1;
 		Color tintColor = Color.WHITE;
+		boolean useModId = false;
+		boolean useTag = false;
+		String selectedTag = "";
 
 		// 1. Attempt live client lookup using the injected side-safe resolver [3]
 		Object[] liveData = tooltipDataResolver.apply(stack);
@@ -51,6 +59,18 @@ public class VariableCardItem extends Item {
 			useQty = (Boolean) liveData[1];
 			qty = (Integer) liveData[2];
 			tintColor = (Color) liveData[3];
+			// Live tracking for modid & tags [3]
+			if (Minecraft.getInstance().screen instanceof ManagerScreen screen) {
+				UUID varId = VariableCardRenderer.getVariableId(stack);
+				if (varId != null) {
+					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
+					if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
+						useModId = advancedVar.isUseModId();
+						useTag = advancedVar.isUseTag();
+						selectedTag = advancedVar.getSelectedTag();
+					}
+				}
+			}
 		} else {
 			// 2. Fallback to reading static components/NBT outside of active screen [3]
 			ModDataComponents.FilteredItemComponent compVal = stack.get(ModDataComponents.FILTERED_ITEM.get());
@@ -70,6 +90,13 @@ public class VariableCardItem extends Item {
 						tintColor = Color.valueOf(tag.getString("FilterColor"));
 					} catch (IllegalArgumentException ignored) {
 					}
+				}
+				if (tag.contains("UseModId")) {
+					useModId = tag.getBoolean("UseModId");
+				}
+				if (tag.contains("UseTag")) {
+					useTag = tag.getBoolean("UseTag");
+					selectedTag = tag.getString("SelectedTag");
 				}
 			}
 		}
@@ -96,8 +123,22 @@ public class VariableCardItem extends Item {
 		tooltipComponents.add(Component.literal("Color: ").withStyle(ChatFormatting.GRAY).append(Component
 				.literal(tintColor.getSerializedName().toUpperCase(Locale.ROOT)).withStyle(tintColor.getChatFormat())));
 
+		// Line 4: ModID Filter [3]
+		if (useModId) {
+			String modIdStr = ghost.isEmpty() ? "Any" : BuiltInRegistries.ITEM.getKey(ghost.getItem()).getNamespace();
+			tooltipComponents.add(Component.literal("ModID Filter: ").withStyle(ChatFormatting.GRAY)
+					.append(Component.literal(modIdStr).withStyle(ChatFormatting.AQUA)));
+		}
+
+		// Line 5: Tag Filter [3]
+		if (useTag && !selectedTag.isEmpty()) {
+			tooltipComponents.add(Component.literal("Tag Filter: ").withStyle(ChatFormatting.GRAY)
+					.append(Component.literal("#" + selectedTag).withStyle(ChatFormatting.DARK_GREEN)));
+		}
+
 		super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
 	}
+
 
 	@Override
 	public void initializeClient(Consumer<IClientItemExtensions> consumer) {

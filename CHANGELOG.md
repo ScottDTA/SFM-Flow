@@ -1,10 +1,16 @@
 7-4-2026
 
 ### [Added]
+* Advanced Item Filter cards can now match items by Mod ID (matching all items belonging to a specific mod) or by Item Tag (such as `#minecraft:planks`).
+* Scrollable tag selector within the filter card settings panel to choose matching tags dynamically.
+* Cycling item preview animations on cards configured for tags, cycling once per second through all items associated with the selected tag.
+* Visual "MID" text overlay on filter card slots when they are configured to match by Mod ID.
+* Custom tooltip lines on filter cards to describe whether they are matching by a specific item, mod namespace, or tag.
 * Introduced a slot configuration developer API (`ISlotConfigurable`) that allows third-party add-on creators to reuse the compact block slot selector menu on their own custom nodes.
 * Added a dynamic error-handling API (`INodeClientProperties#getErrorTooltip`) that enables custom flowchart blocks to display custom validation errors and warning card tooltips in the interface.
 
 ### [Changed]
+* Aligned quantity configuration fields to the right of the item slot in the variable card overlay, making room for color and tag controls.
 * Refactored network code into a separate processing module to clean up the mod's initial boot sequence.
 * Re-organized how client-side settings, screens, and keybinds register themselves during game startup.
 * Refactored slot selector menus to support configurations on any compatible custom inventory node rather than restricting them exclusively to the default item input and output blocks.
