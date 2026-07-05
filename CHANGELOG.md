@@ -1,3 +1,16 @@
+7-5-2026
+
+### [Added]
+* Variable cards can now filter items based on their attached Data Components (such as matching items with specific damage values, enchantments, or custom names).
+* Added a component configuration system allowing developers to register custom settings menus for individual data components.
+* Added a scrollable list inside the variable settings panel to choose which item data components are validated.
+* Truncated UI text labels now display their full text in a popup tooltip when hovered.
+
+### [Changed]
+* Redesigned the variable card settings panel to arrange the tag selector and the new data component list side-by-side for a more balanced layout.
+* Updated variable files saving to safely recycle system threads on server reloads.
+
+
 7-4-2026
 
 ### [Added]

@@ -18,7 +18,10 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.StringTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
@@ -28,7 +31,10 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -54,9 +60,13 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 							Codec.BOOL.optionalFieldOf("useTag", false)
 									.forGetter(AdvancedItemFilterVariableComponent::isUseTag),
 							Codec.STRING.optionalFieldOf("selectedTag", "")
-									.forGetter(AdvancedItemFilterVariableComponent::getSelectedTag))
+									.forGetter(AdvancedItemFilterVariableComponent::getSelectedTag),
+							Codec.BOOL.optionalFieldOf("useComponentFilter", false)
+									.forGetter(AdvancedItemFilterVariableComponent::isUseComponentFilter),
+							Codec.STRING.listOf().optionalFieldOf("enabledComponentTypes", List.of())
+									.forGetter(AdvancedItemFilterVariableComponent::getEnabledComponentTypes))
 					.apply(instance, (baseProps, filterStack, useQuantity, quantity, filterColor, useModId, useTag,
-							selectedTag) -> {
+							selectedTag, useComponentFilter, enabledComponentTypes) -> {
 						AdvancedItemFilterVariableComponent comp = new AdvancedItemFilterVariableComponent(
 								baseProps.id());
 						comp.setBaseProperties(baseProps);
@@ -67,21 +77,26 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 						comp.useModId = useModId;
 						comp.useTag = useTag;
 						comp.selectedTag = selectedTag;
+						comp.useComponentFilter = useComponentFilter;
+						comp.enabledComponentTypes.clear();
+						comp.enabledComponentTypes.addAll(enabledComponentTypes);
 						return comp;
 					}));
 
 	private ItemStack filterStack = ItemStack.EMPTY;
 	private boolean useQuantity = false;
 	private int quantity = 1;
-	private Color filterColor = Color.WHITE; // Independent card frame dye color [3]
-	private boolean useModId = false; // Filter using namespace/modid instead of item [3]
-	private boolean useTag = false; // Filter using a registered tag [3]
-	private String selectedTag = ""; // The active tag key string selected [3]
+	private Color filterColor = Color.WHITE;
+	private boolean useModId = false;
+	private boolean useTag = false;
+	private String selectedTag = "";
+	private boolean useComponentFilter = false; // Enabled data component matching [3]
+	private final List<String> enabledComponentTypes = new ArrayList<>(); // Enabled data component registry IDs [3]
 
 	public AdvancedItemFilterVariableComponent(UUID uuid) {
 		super(uuid);
-		this.hasInputNodes = false; // 0 inputs
-		this.hasOutputNodes = false; // 0 outputs
+		this.hasInputNodes = false;
+		this.hasOutputNodes = false;
 	}
 
 	@Override
@@ -145,8 +160,21 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		this.selectedTag = selectedTag == null ? "" : selectedTag;
 	}
 
+	public boolean isUseComponentFilter() {
+		return useComponentFilter;
+	}
+
+	public void setUseComponentFilter(boolean useComponentFilter) {
+		this.useComponentFilter = useComponentFilter;
+	}
+
+	public List<String> getEnabledComponentTypes() {
+		return enabledComponentTypes;
+	}
+
 	/**
-	 * Matches an item stack based on the dynamic card configurations [3].
+	 * Matches an item stack based on the dynamic card configurations [3]. Performs
+	 * deep value-based equality checking on enabled data components [3].
 	 */
 	public static boolean matchesVariableFilter(AdvancedItemFilterVariableComponent varComp, ItemStack candidate) {
 		ItemStack filterItem = varComp.getFilterStack();
@@ -166,21 +194,41 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 			matchTag = false;
 			ResourceLocation tagLoc = ResourceLocation.tryParse(varComp.getSelectedTag());
 			if (tagLoc != null) {
-				// Fix: Correctly pass the Registries.ITEM resource key to TagKey.create [3]
 				TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagLoc);
 				matchTag = candidate.is(tagKey);
 			}
-		} else if (!varComp.isUseModId()) {
+		} else if (!varComp.isUseModId() && !varComp.isUseComponentFilter()) {
 			return ItemStack.isSameItem(candidate, filterItem);
+		}
+
+		// Perform deep matching on checked/active data components [3]
+		if (varComp.isUseComponentFilter()) {
+			for (String typeStr : varComp.getEnabledComponentTypes()) {
+				ResourceLocation loc = ResourceLocation.tryParse(typeStr);
+				if (loc != null) {
+					var typeOpt = BuiltInRegistries.DATA_COMPONENT_TYPE.getOptional(loc);
+					if (typeOpt.isPresent()) {
+						var type = typeOpt.get();
+						boolean filterHas = filterItem.has(type);
+						boolean candidateHas = candidate.has(type);
+						if (filterHas != candidateHas) {
+							return false; // Type mismatch
+						}
+						if (filterHas) {
+							Object filterVal = filterItem.get(type);
+							Object candidateVal = candidate.get(type);
+							if (!Objects.equals(filterVal, candidateVal)) {
+								return false; // Values differ
+							}
+						}
+					}
+				}
+			}
 		}
 
 		return matchModId && matchTag;
 	}
 
-	/**
-	 * Bundles this variable's runtime identity into an ItemStack using standard
-	 * Custom Data components [3].
-	 */
 	public ItemStack toItemStack() {
 		ItemStack stack = new ItemStack(ModItems.VARIABLE_CARD.get());
 
@@ -199,27 +247,17 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		tag.putBoolean("UseModId", this.useModId);
 		tag.putBoolean("UseTag", this.useTag);
 		tag.putString("SelectedTag", this.selectedTag);
+		tag.putBoolean("UseComponentFilter", this.useComponentFilter);
+
+		ListTag typesList = new ListTag();
+		for (String type : this.enabledComponentTypes) {
+			typesList.add(StringTag.valueOf(type));
+		}
+		tag.put("EnabledComponentTypes", typesList);
 
 		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 		stack.set(DataComponents.CUSTOM_NAME, this.getName());
 		return stack;
-	}
-
-	@Override
-	public ItemStack getGhostStack(int index) {
-		return index == 0 ? this.filterStack : ItemStack.EMPTY;
-	}
-
-	@Override
-	public void setGhostStack(int index, ItemStack stack) {
-		if (index == 0) {
-			this.setFilterStack(stack);
-		}
-	}
-
-	@Override
-	public int getGhostSlotCount() {
-		return 1;
 	}
 
 	@Override
@@ -233,11 +271,17 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		}
 		compoundTag.putBoolean("useQuantity", this.useQuantity);
 		compoundTag.putInt("quantity", this.quantity);
-		compoundTag.putString("filterColor", this.filterColor.getSerializedName()); // Fixed lowercase serialized names
-																					// [3]
+		compoundTag.putString("filterColor", this.filterColor.getSerializedName());
 		compoundTag.putBoolean("useModId", this.useModId);
 		compoundTag.putBoolean("useTag", this.useTag);
 		compoundTag.putString("selectedTag", this.selectedTag);
+		compoundTag.putBoolean("useComponentFilter", this.useComponentFilter);
+
+		ListTag typesList = new ListTag();
+		for (String type : this.enabledComponentTypes) {
+			typesList.add(StringTag.valueOf(type));
+		}
+		compoundTag.put("enabledComponentTypes", typesList);
 		return compoundTag;
 	}
 
@@ -257,6 +301,9 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 					this.setUseModId(decoded.isUseModId());
 					this.setUseTag(decoded.isUseTag());
 					this.setSelectedTag(decoded.getSelectedTag());
+					this.setUseComponentFilter(decoded.isUseComponentFilter());
+					this.enabledComponentTypes.clear();
+					this.enabledComponentTypes.addAll(decoded.getEnabledComponentTypes());
 				});
 
 		if (compoundTag.contains("filterStack")) {
@@ -270,8 +317,6 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 			this.quantity = compoundTag.getInt("quantity");
 		}
 		if (compoundTag.contains("filterColor")) {
-			// Symmetrical Fix: converted to uppercase to parse existing capitalization
-			// formats smoothly [3]
 			String nameVal = compoundTag.getString("filterColor").toUpperCase(Locale.ROOT);
 			try {
 				this.filterColor = Color.valueOf(nameVal);
@@ -294,6 +339,37 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		} else if (compoundTag.contains("SelectedTag")) {
 			this.selectedTag = compoundTag.getString("SelectedTag");
 		}
+		if (compoundTag.contains("useComponentFilter")) {
+			this.useComponentFilter = compoundTag.getBoolean("useComponentFilter");
+		} else if (compoundTag.contains("UseComponentFilter")) {
+			this.useComponentFilter = compoundTag.getBoolean("UseComponentFilter");
+		}
+		if (compoundTag.contains("enabledComponentTypes") || compoundTag.contains("EnabledComponentTypes")) {
+			ListTag list = compoundTag.contains("enabledComponentTypes")
+					? compoundTag.getList("enabledComponentTypes", Tag.TAG_STRING)
+					: compoundTag.getList("EnabledComponentTypes", Tag.TAG_STRING);
+			this.enabledComponentTypes.clear();
+			for (int i = 0; i < list.size(); i++) {
+				this.enabledComponentTypes.add(list.getString(i));
+			}
+		}
+	}
+
+	@Override
+	public ItemStack getGhostStack(int index) {
+		return index == 0 ? this.filterStack : ItemStack.EMPTY;
+	}
+
+	@Override
+	public void setGhostStack(int index, ItemStack stack) {
+		if (index == 0) {
+			this.setFilterStack(stack);
+		}
+	}
+
+	@Override
+	public int getGhostSlotCount() {
+		return 1;
 	}
 
 	@Override

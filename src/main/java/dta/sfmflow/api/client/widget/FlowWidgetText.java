@@ -3,7 +3,6 @@ package dta.sfmflow.api.client.widget;
 import java.util.function.Supplier;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
 
@@ -59,7 +58,9 @@ public class FlowWidgetText extends AbstractFlowWidget {
 		int titleWidth = font.width(getMessage());
 		int textColor = this.colorSupplier.get(); // Dynamic color query [3]
 
-		if (titleWidth <= availableScaledWidth) {
+		boolean tooLong = titleWidth > availableScaledWidth;
+
+		if (!tooLong) {
 			int startX = this.centered ? (availableScaledWidth - titleWidth) / 2 : 0;
 			guiGraphics.drawString(font, getMessage(), startX, 0, textColor, false);
 		} else {
@@ -70,8 +71,12 @@ public class FlowWidgetText extends AbstractFlowWidget {
 			int startX = this.centered ? (availableScaledWidth - croppedWidth) / 2 : 0;
 
 			guiGraphics.drawString(font, croppedText + "...", startX, 0, textColor, false);
-			setCustomTooltip(Tooltip.create(getMessage()));
 		}
 		guiGraphics.pose().popPose();
+
+		// Symmetrical Immediate Hover Tooltip (drawn on top of the overlay correctly) [3]
+		if (tooLong && mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
+			guiGraphics.renderTooltip(font, getMessage(), mouseX, mouseY);
+		}
 	}
 }

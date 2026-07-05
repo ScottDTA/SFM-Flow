@@ -36,13 +36,24 @@ import java.util.concurrent.TimeUnit;
 @EventBusSubscriber(modid = SFMFlow.MODID)
 public final class DataStateManager {
 
-	private static final ExecutorService IO_EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
-		Thread thread = new Thread(runnable, "SFM-Flow I/O Worker");
-		thread.setDaemon(true);
-		return thread;
-	});
+	private static ExecutorService ioExecutor = null;
 
 	private DataStateManager() {}
+
+	/**
+	 * Lazily retrieves or instantiates a fresh background save executor thread pool [3].
+	 * Re-creates the executor automatically if the previous one was terminated on server unload [3].
+	 */
+	private static synchronized ExecutorService getExecutor() {
+		if (ioExecutor == null || ioExecutor.isShutdown() || ioExecutor.isTerminated()) {
+			ioExecutor = Executors.newSingleThreadExecutor(runnable -> {
+				Thread thread = new Thread(runnable, "SFM-Flow I/O Worker");
+				thread.setDaemon(true);
+				return thread;
+			});
+		}
+		return ioExecutor;
+	}
 
 	/**
 	 * Synchronously encodes active flowchart properties to a CompoundTag on the main 
@@ -70,7 +81,6 @@ public final class DataStateManager {
 			var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 			CompoundTag dataTag = new CompoundTag();
 
-			// Perform serialization synchronously on the main thread to ensure collection snapshot safety [3]
 			Flowchart.CODEC.encodeStart(ops, flowchart)
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
 					.ifPresent(nbt -> dataTag.put("flowchart", nbt));
@@ -83,8 +93,8 @@ public final class DataStateManager {
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt));
 
-			// Offload the disk compression write asynchronously [3]
-			IO_EXECUTOR.submit(() -> {
+			// Offload the disk compression write asynchronously using the dynamic pool [3]
+			getExecutor().submit(() -> {
 				try {
 					Files.createDirectories(filePath.getParent());
 					try (OutputStream out = Files.newOutputStream(filePath)) {
@@ -129,8 +139,8 @@ public final class DataStateManager {
 					Flowchart flowchart = null;
 					if (dataTag.contains("flowchart")) {
 						flowchart = Flowchart.CODEC.parse(ops, dataTag.get("flowchart"))
-								.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-								.orElse(null);
+                                .resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
+                                .orElse(null);
 					}
 
 					List<InventoryGroupVariable> groupVars = new ArrayList<>();
@@ -185,16 +195,19 @@ public final class DataStateManager {
 	/**
 	 * Gracefully shuts down the background I/O pool, blocking up to 5 seconds to flush pending tasks [3].
 	 */
-	public static void shutdown() {
-		SFMFlow.LOGGER.info("[SFM-Flow] Shutting down background flowchart saving thread pool...");
-		IO_EXECUTOR.shutdown();
-		try {
-			if (!IO_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
-				IO_EXECUTOR.shutdownNow();
+	public static synchronized void shutdown() {
+		if (ioExecutor != null) {
+			SFMFlow.LOGGER.info("[SFM-Flow] Shutting down background flowchart saving thread pool...");
+			ioExecutor.shutdown();
+			try {
+				if (!ioExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+					ioExecutor.shutdownNow();
+				}
+			} catch (InterruptedException e) {
+				ioExecutor.shutdownNow();
+				Thread.currentThread().interrupt();
 			}
-		} catch (InterruptedException e) {
-			IO_EXECUTOR.shutdownNow();
-			Thread.currentThread().interrupt();
+			ioExecutor = null; // Reset reference so a fresh executor can instantiate on re-entry [3]
 		}
 	}
 
