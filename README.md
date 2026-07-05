@@ -2,6 +2,10 @@
 
 SFM-Flow (`sfmflow`) is a flowchart-based automation mod built for **NeoForge 1.21.1**. It provides an interactive graphical interface to design, execute, and monitor automated logistical networks using cables and nodes.
 
+https://www.curseforge.com/minecraft/mc-mods/sfm-flow
+
+https://modrinth.com/mod/sfm-flow
+
 ---
 
 ## What SFM-Flow Offers
