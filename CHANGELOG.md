@@ -1,6 +1,7 @@
 7-5-2026
 
 ### [Added]
+* Extensible behavior registry for card clusters, allowing modular ticking updates for any installed hardware cards.
 * Dedicated settings sub-menus for item Damage (durability) and Enchantment properties.
 * Tool durability checks now support filtering based on raw values or custom percentage ranges (such as matching only pickaxes with less than 20% durability).
 * Enchantment checks now support advanced matching profiles: match any enchanted items, completely un-enchanted items, items containing specific enchantments with level bounds, or items containing exact matches.
@@ -11,11 +12,19 @@
 * Truncated UI text labels now display their full text in a popup tooltip when hovered.
 
 ### [Changed]
+* Cleaned up the codebase by removing unused custom plugin registry files.
+* Moved default network item transfers setup to the main vanilla registration step.
 * Sub-menus now properly capture input focus, resolving an issue where clicking text boxes inside configuration popups would fail to accept keyboard entries.
 * Obscured tooltips in the background are now muted while a settings panel or pop-up modal is actively open in the foreground.
 * Visual overlays now strictly check the visibility status of sub-elements before rendering them.
 * Redesigned the variable card settings panel to arrange the tag selector and the new data component list side-by-side for a more balanced layout.
 * Updated variable files saving to safely recycle system threads on server reloads.
+
+### [Fixed]
+* Selecting a different chest in the item transfer settings now safely resets the side and slot configurations to default, preventing old slot filters from carrying over onto the new chest.
+
+### [Removed]
+* Removed the unused TOGGLE_OPEN canvas operation to streamline layout choices.
 
 
 7-4-2026

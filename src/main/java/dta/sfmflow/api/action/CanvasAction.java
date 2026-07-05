@@ -11,7 +11,7 @@ import net.minecraft.util.StringRepresentable;
  * canvas nodes [3].
  */
 public enum CanvasAction implements StringRepresentable {
-	COPY("copy"), DELETE("delete"), TOGGLE_OPEN("toggle_open");
+	COPY("copy"), DELETE("delete");
 
 	private final String name;
 

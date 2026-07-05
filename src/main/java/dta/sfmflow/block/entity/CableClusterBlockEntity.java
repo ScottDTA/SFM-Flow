@@ -1,12 +1,13 @@
 package dta.sfmflow.block.entity;
 
+import dta.sfmflow.api.capability.CableClusterBehaviorRegistry;
+import dta.sfmflow.api.capability.ClusterCardBehavior;
 import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.screen.CableClusterMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -16,7 +17,6 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -28,10 +28,12 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
- * Backing block entity logic running cluster card proxy sweeps, pre-allocated
+ * Backing BlockEntity logic running cluster card proxy sweeps, pre-allocated
  * directional capability routing, staggered logic executions, and adjacent pipe
  * cache flush notifications [3]. Fully cleaned to delegate execution behavior to
  * HatchBehaviorHelper [3].
@@ -68,7 +70,7 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		};
 
 		this.slotDirections = new Direction[numSlots];
-		Arrays.fill(this.slotDirections, null); // Null/NONE unassigned by default
+		java.util.Arrays.fill(this.slotDirections, null); // Null/NONE unassigned by default
 
 		this.slotBuffers = new ItemStackHandler[numSlots];
 		this.fluidBuffers = new FluidTank[numSlots];
@@ -177,27 +179,10 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			if (dir == null) {
 				continue;
 			}
-			if (stack.is(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get().asItem())) {
-				if ((level.getGameTime() + i) % 10 == 0) {
-					HatchBehaviorHelper.performVacuum(level, pos, dir, be.slotBuffers[i], be::setChanged);
-				}
-			} else if (stack.is(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get().asItem())) {
-				if ((level.getGameTime() + i) % 4 == 0) {
-					HatchBehaviorHelper.performEjection(level, pos, dir, be.slotBuffers[i], be::setChanged);
-				}
-			} else if (stack.is(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem())) {
-				if ((level.getGameTime() + i) % 10 == 0) {
-					String modeStr = "vacuum";
-					CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-					if (tag.contains("mode")) {
-						modeStr = tag.getString("mode");
-					}
-					if ("vacuum".equals(modeStr)) {
-						HatchBehaviorHelper.performFluidVacuum(level, pos, dir, be.fluidBuffers[i], be::setChanged);
-					} else {
-						HatchBehaviorHelper.performFluidEjection(level, pos, dir, be.fluidBuffers[i], be::setChanged);
-					}
-				}
+			// Delegate custom ticking to the extensible behavior registry [3]
+			ClusterCardBehavior behavior = CableClusterBehaviorRegistry.get(stack.getItem());
+			if (behavior != null) {
+				behavior.tick(level, pos, dir, i, stack, be);
 			}
 		}
 	}

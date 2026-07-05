@@ -3,7 +3,6 @@ package dta.sfmflow;
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
-import dta.sfmflow.api.client.plugin.SFMFlowClientPluginRegistry;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.render.HighlightManager;
@@ -13,6 +12,7 @@ import dta.sfmflow.client.screen.helper.SlotLayoutManager;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.item.VariableCardItem;
+import dta.sfmflow.plugin.vanilla.VanillaSFMFlowClientPlugin;
 import dta.sfmflow.screen.ModMenuTypes;
 import dta.sfmflow.util.Color;
 import net.minecraft.client.Minecraft;
@@ -103,7 +103,9 @@ public class SFMFlowClient {
 		NeoForge.EVENT_BUS.register(HighlightManager.class);
 
 		event.enqueueWork(() -> {
-			SFMFlowClientPluginRegistry.initAllClientProperties();
+			// Register vanilla client properties directly, completely avoiding static
+			// plugin lists [3]
+			new VanillaSFMFlowClientPlugin().registerClientProperties();
 
 			VariableCardItem.setTooltipDataResolver(stack -> {
 				UUID varId = VariableCardRenderer.getVariableId(stack);
@@ -139,6 +141,10 @@ public class SFMFlowClient {
 
 					@Override
 					public ResourceLocation getIconTexture() {
+						ResourceLocation parsed = ResourceLocation.tryParse(builder.getIconPath());
+						if (parsed != null && !parsed.getNamespace().equals("minecraft")) {
+							return parsed;
+						}
 						return ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, builder.getIconPath());
 					}
 

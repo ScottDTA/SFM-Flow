@@ -4,7 +4,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import com.mojang.serialization.MapCodec;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.api.plugin.SFMFlowPluginRegistry;
+import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
@@ -13,7 +13,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * Public API registry definition and factory class for custom flowchart
- * component types [3]. Handles mod plugin component hooks dynamically [3].
+ * component types [3].
  */
 public class FlowComponentType {
 	public static final ResourceKey<Registry<FlowComponentType>> REGISTRY_KEY = ResourceKey
@@ -26,9 +26,8 @@ public class FlowComponentType {
 			.makeRegistry(builder -> builder.sync(true));
 
 	static {
-		/* STREAMING_CHUNK:Registering custom plugin components */
-		// Sweeps and triggers dynamic registration hooks for vanilla and external plugins [3]
-		SFMFlowPluginRegistry.registerAllComponents(COMPONENT_TYPES);
+		// Initialize the vanilla components directly during class loading [3]
+		new VanillaSFMFlowPlugin().registerComponents(COMPONENT_TYPES);
 	}
 
 	private final Function<UUID, AbstractFlowComponent> factoryFunction;

@@ -60,7 +60,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 	private boolean useAll = true;
 	private int targetSlot = -1;
 
-	private int activeSidesMask = 63;
+	private int activeSidesMask = 0;
 
 	private final List<Long> enabledSlotsMasks = new ArrayList<>(List.of(-1L, -1L, -1L, -1L, -1L, -1L));
 
@@ -80,7 +80,7 @@ public class ItemTransferComponent extends AbstractFlowComponent
 						Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemTransferComponent::getInventoryId),
 						Codec.BOOL.optionalFieldOf("useAll", true).forGetter(ItemTransferComponent::isUseAll),
 						Codec.INT.optionalFieldOf("targetSlot", -1).forGetter(ItemTransferComponent::getTargetSlot),
-						Codec.INT.optionalFieldOf("activeSidesMask", 63)
+						Codec.INT.optionalFieldOf("activeSidesMask", 0)
 								.forGetter(ItemTransferComponent::getActiveSidesMask),
 						Codec.LONG.listOf().optionalFieldOf("enabledSlotsMasks", List.of(-1L, -1L, -1L, -1L, -1L, -1L))
 								.forGetter(ItemTransferComponent::getEnabledSlotsMasks),

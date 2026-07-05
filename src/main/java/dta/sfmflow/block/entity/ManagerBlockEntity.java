@@ -62,10 +62,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * Backing BlockEntity class for the Manager block [3]. Tracks active logical elements 
- * and delegatess external layout saves/loads to DataStateManager [3].
- */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 	protected final ContainerData data;
@@ -75,7 +71,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	private UUID managerId;
 	private boolean loadedExternal = false;
-	private boolean isDataDirty = false; // Persistent dirty state tracking [3]
+	private boolean isDataDirty = false;
 
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
@@ -83,7 +79,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private final List<InventoryGroupVariable> groupVariables = new ArrayList<>();
 	private final List<ItemFilterVariable> filterVariables = new ArrayList<>();
 
-	// Thread-safe collection tracking active server-side block entity instances [3]
 	private static final List<ManagerBlockEntity> ACTIVE_MANAGERS = new CopyOnWriteArrayList<>();
 
 	private transient long rollingExecutionTimeNs = 0;
@@ -99,10 +94,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		return this.filterVariables;
 	}
 
-	/**
-	 * Retrieves an unmodifiable view of all active loaded server manager block
-	 * entities [3].
-	 */
 	public static List<ManagerBlockEntity> getActiveManagers() {
 		return ACTIVE_MANAGERS;
 	}
@@ -231,7 +222,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					if (elapsedTrigger < 0) {
 						trigger.setLastExecutionTick(currentTime);
 					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
-						// Diagnostic trace is now gated behind ServerConfig debug logging option [3]
 						if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
 							SFMFlow.LOGGER.info(
 									"[SFM-Flow] Trigger Fired: ID={}, Hash={}, GameTime={}, LastExecuted={}, Elapsed={}, Total={}",
@@ -286,7 +276,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void onLoad() {
 		super.onLoad();
 		if (this.level != null && !this.level.isClientSide()) {
-			ACTIVE_MANAGERS.add(this); // Statically register loaded block entity [3]
+			ACTIVE_MANAGERS.add(this);
 			if (!this.loadedExternal) {
 				loadExternalData();
 			}
@@ -297,13 +287,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	@Override
 	public void onChunkUnloaded() {
 		super.onChunkUnloaded();
-		ACTIVE_MANAGERS.remove(this); // Unregister when chunk unloads [3]
+		ACTIVE_MANAGERS.remove(this);
 	}
 
 	@Override
 	public void setRemoved() {
 		super.setRemoved();
-		ACTIVE_MANAGERS.remove(this); // Unregister when block is broken/removed [3]
+		ACTIVE_MANAGERS.remove(this);
 	}
 
 	@Override
@@ -313,7 +303,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.putUUID("ManagerId", this.managerId);
 
-		// Synchronously serialize and asynchronously save to disk only if data is dirty [3]
 		if (this.level != null && !this.level.isClientSide() && this.level.getServer() != null) {
 			if (this.isDataDirty) {
 				DataStateManager.saveAsync(this.level.getServer(), this.managerId, this.flowchart,
@@ -362,7 +351,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			AbstractFlowComponent newComponent = type.createComponent(newUUID);
 			newComponent.setZ(flowchart.components().size() + 1);
 			flowchart.components().put(newUUID, newComponent);
-			this.isDataDirty = true; // Mark dirty! [3]
+			this.isDataDirty = true;
 			this.setChanged();
 			commandCount = flowchart.components().size();
 
@@ -385,7 +374,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		switch (action) {
 		case DELETE -> handleDelete(componentId);
 		case COPY -> handleCopy(componentId);
-		case TOGGLE_OPEN -> handleToggleOpen(componentId);
 		}
 	}
 
@@ -393,7 +381,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		this.flowchart.components().remove(componentId);
 		this.flowchart.connections().removeIf(wire -> wire.getSourceComponentId().equals(componentId)
 				|| wire.getTargetComponentId().equals(componentId));
-		this.isDataDirty = true; // Mark dirty! [3]
+		this.isDataDirty = true;
 		this.setChanged();
 		this.commandCount = this.flowchart.components().size();
 
@@ -433,7 +421,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			copy.setY(nextY);
 			copy.setZ(original.getZ() + 1);
 			this.flowchart.components().put(newId, copy);
-			this.isDataDirty = true; // Mark dirty! [3]
+			this.isDataDirty = true;
 			this.setChanged();
 			this.commandCount = this.flowchart.components().size();
 
@@ -444,9 +432,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 	}
 
-	private void handleToggleOpen(UUID componentId) {
-	}
-
 	public void componentMoved(ComponentMoved pData, IPayloadContext context) {
 		for (ComponentMoved.Entry entry : pData.entries()) {
 			AbstractFlowComponent component = flowchart.components().get(entry.id());
@@ -454,7 +439,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				component.setX(entry.x());
 				component.setY(entry.y());
 				component.setZ(entry.z());
-				this.isDataDirty = true; // Mark dirty! [3]
+				this.isDataDirty = true;
 
 				CompoundTag dataTag = new CompoundTag();
 				dataTag.putInt("x", entry.x());
@@ -575,7 +560,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					try {
 						types.add(ConnectionBlockType.valueOf(typeList.getString(k)));
 					} catch (IllegalArgumentException e) {
-						// Ignore unrecognized values
 					}
 				}
 				inv.setTypes(types);

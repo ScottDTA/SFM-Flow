@@ -35,14 +35,9 @@ public abstract class AbstractFlowComponent {
 
 	/**
 	 * Helper record containing core flowchart component properties to streamline
-	 * Codec usage [3]. NBT Purged: Completely removed isOpen, xBeforeOpen, and
-	 * yBeforeOpen fields to match compact specifications [3].
+	 * Codec usage [3].
 	 */
 	public record BaseProperties(UUID id, int x, int y, int z, String customName, Color colorMask) {
-		/**
-		 * MapCodec handling the base flowchart component fields. Fully purged of old
-		 * toggled coordinates [3].
-		 */
 		public static final MapCodec<BaseProperties> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 				.group(UUIDUtil.CODEC.fieldOf("id").forGetter(BaseProperties::id),
 						Codec.INT.optionalFieldOf("x", -9999).forGetter(BaseProperties::x),
@@ -84,20 +79,10 @@ public abstract class AbstractFlowComponent {
 		this.colorMask = Color.WHITE;
 	}
 
-	/**
-	 * Packs the core fields of this component into a BaseProperties wrapper [3].
-	 *
-	 * @return the BaseProperties instance [3]
-	 */
 	public BaseProperties getBaseProperties() {
 		return new BaseProperties(id, x, y, z, customName, colorMask);
 	}
 
-	/**
-	 * Unpacks core fields from a BaseProperties wrapper into this component [3].
-	 *
-	 * @param props the BaseProperties instance containing values to apply [3]
-	 */
 	public void setBaseProperties(BaseProperties props) {
 		this.id = props.id();
 		this.x = props.x() == -9999 ? 50 : props.x();
@@ -105,30 +90,6 @@ public abstract class AbstractFlowComponent {
 		this.z = props.z() == -1 ? 0 : props.z();
 		this.customName = props.customName() == null ? "" : props.customName();
 		this.colorMask = props.colorMask() == null ? Color.WHITE : props.colorMask();
-	}
-
-	/**
-	 * Stub helper method retained as transient to prevent compile errors [3].
-	 */
-	public void setOpen(boolean open) {
-	}
-
-	/**
-	 * Always compact layout: returns false [3].
-	 */
-	public boolean isOpen() {
-		return false;
-	}
-
-	public int getXBeforeOpen() {
-		return -1;
-	}
-
-	public int getYBeforeOpen() {
-		return -1;
-	}
-
-	public void setXBeforeOpen(int x) {
 	}
 
 	/**
@@ -150,7 +111,6 @@ public abstract class AbstractFlowComponent {
 	}
 
 	public CompoundTag saveData(CompoundTag compoundTag) {
-		// Secure setup: obtain the static composite HolderLookup.Provider cleanly [3]
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 
@@ -170,7 +130,6 @@ public abstract class AbstractFlowComponent {
 	}
 
 	public void loadData(CompoundTag compoundTag) {
-		// Secure setup: obtain the static composite HolderLookup.Provider cleanly [3]
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 
@@ -262,15 +221,6 @@ public abstract class AbstractFlowComponent {
 		this.activeCategory = category;
 	}
 
-	/**
-	 * Executes or plans the logical behavior of this component during a flowchart
-	 * evaluation sweep [3]. Custom components can override this to implement custom
-	 * logic [3].
-	 *
-	 * @param context the execution context providing safe access to snapshot states
-	 *                and connection queues [3]
-	 */
 	public void plan(FlowchartPlanningContext context) {
-		// Default implementation: do nothing [3]
 	}
 }

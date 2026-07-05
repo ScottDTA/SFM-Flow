@@ -57,6 +57,11 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component, ConnectionBlockType.ITEM,
 				parentScreen, newInv -> {
+					// Reset side selection settings to default when binding a different inventory [3]
+					component.setActiveSidesMask(0); // Reset side selection mask to 0 (all sides disabled) [3]
+					for (Direction dir : Direction.values()) {
+						component.setEnabledSlotsMask(dir, -1L); // Reset per-side slot exclusions to all enabled [3]
+					}
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
 					}
