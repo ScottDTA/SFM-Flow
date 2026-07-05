@@ -7,6 +7,7 @@ import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.layout.FlowLayoutRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.component.ISlotConfigurable; // Standardized slot configuration [3]
+import dta.sfmflow.api.logging.FlowLogger;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.network.ClientInventoryCache;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
@@ -90,11 +91,9 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 		if (this.layout == null) {
 			try {
-				if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
-					SFMFlow.LOGGER.info(
-							"[SFM-Flow] Inventory at {} does not have a registered slot layout; falling back to generic grid.",
-							this.blockPos);
-				}
+				FlowLogger.execution(
+						"Inventory at %s does not have a registered slot layout; falling back to generic grid.",
+						this.blockPos);
 			} catch (Exception ignored) {
 			}
 		}

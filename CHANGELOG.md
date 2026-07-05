@@ -1,3 +1,13 @@
+7-5-2026-2
+
+### [Added]
+* New unified execution logging channel to cleanly monitor flowchart triggers, item routing, and settings warnings in debug logs.
+
+### [Changed]
+* Refactored core internal logic to completely separate flowchart data models from their pathfinding planners, making the codebase more modular.
+* Moved copy, delete, and movement canvas actions out of the main block controller into a dedicated canvas actions handler.
+
+
 7-5-2026
 
 ### [Added]

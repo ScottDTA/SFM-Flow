@@ -32,4 +32,23 @@ public final class FlowLogger {
 			SFMFlow.LOGGER.info("[SFM-Flow] [Pathfinder] {}", formatted);
 		}
 	}
+
+	/**
+	 * Logs flowchart planning, ticking, and UI execution diagnostics under active
+	 * debug configurations [3].
+	 *
+	 * @param message format string [3]
+	 * @param args    message parameters [3]
+	 */
+	public static void execution(String message, Object... args) {
+		try {
+			if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
+				String formatted = String.format(Locale.ROOT, message, args);
+				SFMFlow.LOGGER.info("[SFM-Flow] [Execution] {}", formatted);
+			}
+		} catch (IllegalStateException e) {
+			String formatted = String.format(Locale.ROOT, message, args);
+			SFMFlow.LOGGER.info("[SFM-Flow] [Execution] {}", formatted);
+		}
+	}
 }

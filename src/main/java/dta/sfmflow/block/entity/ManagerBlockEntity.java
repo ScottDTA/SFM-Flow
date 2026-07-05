@@ -18,6 +18,7 @@ import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.api.flowchart.Flowchart;
+import dta.sfmflow.api.logging.FlowLogger;
 import dta.sfmflow.api.variable.InventoryGroupVariable;
 import dta.sfmflow.api.variable.ItemFilterVariable;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
@@ -62,6 +63,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
+/**
+ * Backing BlockEntity class for the Manager block [3]. Tracks active logical elements 
+ * and delegates external layout saves/loads to DataStateManager [3].
+ */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 	protected final ContainerData data;
@@ -222,12 +227,12 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					if (elapsedTrigger < 0) {
 						trigger.setLastExecutionTick(currentTime);
 					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
-						if (ServerConfig.ENABLE_DEBUG_LOGGING.get()) {
-							SFMFlow.LOGGER.info(
-									"[SFM-Flow] Trigger Fired: ID={}, Hash={}, GameTime={}, LastExecuted={}, Elapsed={}, Total={}",
-									trigger.getId(), System.identityHashCode(trigger), currentTime,
-									trigger.getLastExecutionTick(), elapsedTrigger, trigger.getTotalTicks());
-						}
+						// Centralized execution log routing [3]
+						FlowLogger.execution(
+								"Trigger Fired: ID=%s, Hash=%d, GameTime=%d, LastExecuted=%d, Elapsed=%d, Total=%d",
+								trigger.getId(), System.identityHashCode(trigger), currentTime,
+								trigger.getLastExecutionTick(), elapsedTrigger, trigger.getTotalTicks());
+
 						trigger.setLastExecutionTick(currentTime);
 						activeTriggers.add(trigger.getId());
 					}
@@ -371,84 +376,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	}
 
 	public void executeCanvasAction(CanvasAction action, UUID componentId) {
-		switch (action) {
-		case DELETE -> handleDelete(componentId);
-		case COPY -> handleCopy(componentId);
-		}
-	}
-
-	private void handleDelete(UUID componentId) {
-		this.flowchart.components().remove(componentId);
-		this.flowchart.connections().removeIf(wire -> wire.getSourceComponentId().equals(componentId)
-				|| wire.getTargetComponentId().equals(componentId));
-		this.isDataDirty = true;
-		this.setChanged();
-		this.commandCount = this.flowchart.components().size();
-
-		broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, componentId,
-				SyncComponentDeltaPacket.DeltaType.REMOVE, new CompoundTag()));
-	}
-
-	private void handleCopy(UUID componentId) {
-		AbstractFlowComponent original = this.flowchart.components().get(componentId);
-		if (original != null && this.flowchart.components().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get()) {
-			UUID newId = UUID.randomUUID();
-			AbstractFlowComponent copy = original.getType().createComponent(newId);
-			CompoundTag settings = new CompoundTag();
-			original.saveData(settings);
-			copy.loadData(settings);
-
-			copy.setBaseProperties(new AbstractFlowComponent.BaseProperties(newId, copy.getX(), copy.getY(),
-					copy.getZ(), copy.getCustomName(), copy.getColorMask()));
-
-			int h = copy.getVisualHeight();
-			int nextX = original.getX() + 10;
-			int nextY = original.getY() + 10;
-
-			if (nextX + copy.getVisualWidth() > AbstractFlowComponent.CANVAS_MAX_X) {
-				nextX = original.getX() - 10;
-			}
-			nextX = Math.max(22, Math.min(nextX, AbstractFlowComponent.CANVAS_MAX_X - copy.getVisualWidth()));
-
-			if (nextY + h > AbstractFlowComponent.CANVAS_MAX_Y) {
-				nextY = original.getY() - 10;
-			}
-
-			int minY = copy.hasInputNodes() ? 10 : 4;
-			nextY = Math.max(minY, Math.min(nextY, AbstractFlowComponent.CANVAS_MAX_Y - h));
-
-			copy.setX(nextX);
-			copy.setY(nextY);
-			copy.setZ(original.getZ() + 1);
-			this.flowchart.components().put(newId, copy);
-			this.isDataDirty = true;
-			this.setChanged();
-			this.commandCount = this.flowchart.components().size();
-
-			CompoundTag tag = new CompoundTag();
-			copy.saveData(tag);
-			broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, newId,
-					SyncComponentDeltaPacket.DeltaType.ADD, tag));
-		}
+		// Delegate canvas mutation checks to CanvasActionHandler [3]
+		CanvasActionHandler.execute(this, action, componentId);
 	}
 
 	public void componentMoved(ComponentMoved pData, IPayloadContext context) {
-		for (ComponentMoved.Entry entry : pData.entries()) {
-			AbstractFlowComponent component = flowchart.components().get(entry.id());
-			if (component != null) {
-				component.setX(entry.x());
-				component.setY(entry.y());
-				component.setZ(entry.z());
-				this.isDataDirty = true;
-
-				CompoundTag dataTag = new CompoundTag();
-				dataTag.putInt("x", entry.x());
-				dataTag.putInt("y", entry.y());
-				dataTag.putInt("z", entry.z());
-				broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, entry.id(),
-						SyncComponentDeltaPacket.DeltaType.MOVE, dataTag));
-			}
-		}
+		// Delegate component movements to CanvasActionHandler [3]
+		CanvasActionHandler.move(this, pData, context);
 	}
 
 	@Override
