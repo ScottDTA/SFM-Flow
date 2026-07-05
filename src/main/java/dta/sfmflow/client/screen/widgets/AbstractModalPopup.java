@@ -4,6 +4,7 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
@@ -21,7 +22,6 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 			"textures/gui/submenu_bg.png");
 
 	public AbstractModalPopup(ManagerScreen parentScreen, int width, int height, Component title) {
-		// Dynamically center the modal relative to current game window dimensions [3]
 		super((parentScreen.width - width) / 2, (parentScreen.height - height) / 2, width, height, title);
 		this.parentScreen = parentScreen;
 	}
@@ -31,6 +31,32 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 	 */
 	public void close() {
 		this.parentScreen.setActiveModalPopup(null);
+	}
+
+	@Override
+	public void setX(int x) {
+		int dif = this.getX() - x;
+		super.setX(x);
+		updateChildrenXPositions(dif);
+	}
+
+	@Override
+	public void setY(int y) {
+		int dif = this.getY() - y;
+		super.setY(y);
+		updateChildrenYPositions(dif);
+	}
+
+	@Override
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		// Symmetrically delegate clicks to children and register focus so key inputs can propagate [3]
+		for (GuiEventListener child : children) {
+			if (child.mouseClicked(mouseX, mouseY, button)) {
+				this.setFocused(child); // Align container-focus mapping cleanly [3]
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -46,42 +72,23 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 	/**
 	 * Performs the 9-slice stretching calculations on the submenu background
 	 * textures [3].
-	 *
-	 * @param guiGraphics the drawing graphics pipeline context [3]
 	 */
 	protected void render9SliceBackground(GuiGraphics guiGraphics) {
-		int c = 6; // Corner border thickness in pixels
-		int m = 10; // Mid-section stretch dimensions
+		int c = 6;
+		int m = 10;
 		int x = getX();
 		int y = getY();
 
-		// Corner segments (6x6 px)
 		guiGraphics.blit(SUBMENU_BG, x, y, 0, 0, c, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + width - c, y, 16, 0, c, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x, y + height - c, 0, 16, c, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + width - c, y + height - c, 16, 16, c, c, 22, 22);
 
-		// Border segments stretched
 		guiGraphics.blit(SUBMENU_BG, x + c, y, width - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + c, y + height - c, width - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x, y + c, c, height - 2 * c, 0.0F, (float) c, c, m, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + width - c, y + c, c, height - 2 * c, 16.0F, (float) c, c, m, 22, 22);
 
-		// Stretched central segments
 		guiGraphics.blit(SUBMENU_BG, x + c, y + c, width - 2 * c, height - 2 * c, (float) c, (float) c, m, m, 22, 22);
-	}
-
-	@Override
-	public void setX(int x) {
-		int dif = this.getX() - x; // Standardized subtraction formula [3]
-		super.setX(x);
-		updateChildrenXPositions(dif);
-	}
-
-	@Override
-	public void setY(int y) {
-		int dif = this.getY() - y; // Standardized subtraction formula [3]
-		super.setY(y);
-		updateChildrenYPositions(dif);
 	}
 }

@@ -44,11 +44,13 @@ import java.util.function.Supplier;
 @OnlyIn(Dist.CLIENT)
 public class SFMFlowClient {
 
-	private SFMFlowClient() {}
+	private SFMFlowClient() {
+	}
 
 	/**
-	 * Safely registers all client-side event listeners and extension points on the physical client [3].
-	 * Called explicitly inside the main mod constructor context [3].
+	 * Safely registers all client-side event listeners and extension points on the
+	 * physical client [3]. Called explicitly inside the main mod constructor
+	 * context [3].
 	 *
 	 * @param modEventBus  the Mod-scoped event bus [3]
 	 * @param modContainer the current mod container [3]
@@ -61,7 +63,6 @@ public class SFMFlowClient {
 		modEventBus.addListener(SFMFlowClient::clientSetup);
 		modEventBus.addListener(SFMFlowClient::registerKeyMappings);
 
-		// Config screen factory extension point belongs on client startup [3]
 		modContainer.registerExtensionPoint(IConfigScreenFactory.class,
 				(container, parent) -> new ConfigurationScreen(container, parent));
 	}

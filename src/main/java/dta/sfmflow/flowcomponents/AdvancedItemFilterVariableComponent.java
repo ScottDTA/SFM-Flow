@@ -24,16 +24,19 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -64,9 +67,11 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 							Codec.BOOL.optionalFieldOf("useComponentFilter", false)
 									.forGetter(AdvancedItemFilterVariableComponent::isUseComponentFilter),
 							Codec.STRING.listOf().optionalFieldOf("enabledComponentTypes", List.of())
-									.forGetter(AdvancedItemFilterVariableComponent::getEnabledComponentTypes))
+									.forGetter(AdvancedItemFilterVariableComponent::getEnabledComponentTypes),
+							CompoundTag.CODEC.optionalFieldOf("customComponentSettings", new CompoundTag())
+									.forGetter(AdvancedItemFilterVariableComponent::getCustomComponentSettings))
 					.apply(instance, (baseProps, filterStack, useQuantity, quantity, filterColor, useModId, useTag,
-							selectedTag, useComponentFilter, enabledComponentTypes) -> {
+							selectedTag, useComponentFilter, enabledComponentTypes, customComponentSettings) -> {
 						AdvancedItemFilterVariableComponent comp = new AdvancedItemFilterVariableComponent(
 								baseProps.id());
 						comp.setBaseProperties(baseProps);
@@ -80,6 +85,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 						comp.useComponentFilter = useComponentFilter;
 						comp.enabledComponentTypes.clear();
 						comp.enabledComponentTypes.addAll(enabledComponentTypes);
+						comp.customComponentSettings = customComponentSettings;
 						return comp;
 					}));
 
@@ -90,8 +96,10 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 	private boolean useModId = false;
 	private boolean useTag = false;
 	private String selectedTag = "";
-	private boolean useComponentFilter = false; // Enabled data component matching [3]
-	private final List<String> enabledComponentTypes = new ArrayList<>(); // Enabled data component registry IDs [3]
+	private boolean useComponentFilter = false;
+	private final List<String> enabledComponentTypes = new ArrayList<>();
+
+	private CompoundTag customComponentSettings = new CompoundTag();
 
 	public AdvancedItemFilterVariableComponent(UUID uuid) {
 		super(uuid);
@@ -172,6 +180,10 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		return enabledComponentTypes;
 	}
 
+	public CompoundTag getCustomComponentSettings() {
+		return customComponentSettings;
+	}
+
 	/**
 	 * Matches an item stack based on the dynamic card configurations [3]. Performs
 	 * deep value-based equality checking on enabled data components [3].
@@ -201,7 +213,6 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 			return ItemStack.isSameItem(candidate, filterItem);
 		}
 
-		// Perform deep matching on checked/active data components [3]
 		if (varComp.isUseComponentFilter()) {
 			for (String typeStr : varComp.getEnabledComponentTypes()) {
 				ResourceLocation loc = ResourceLocation.tryParse(typeStr);
@@ -212,13 +223,114 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 						boolean filterHas = filterItem.has(type);
 						boolean candidateHas = candidate.has(type);
 						if (filterHas != candidateHas) {
-							return false; // Type mismatch
+							return false; // Type mismatch [3]
 						}
 						if (filterHas) {
+							if (type == DataComponents.DAMAGE) {
+								int candidateDmg = candidate.getDamageValue();
+								int maxDmgVal = candidate.getMaxDamage();
+								if (maxDmgVal > 0) {
+									CompoundTag dmgSettings = varComp.getCustomComponentSettings()
+											.getCompound("minecraft:damage");
+									if (!dmgSettings.isEmpty()) {
+										boolean usePct = dmgSettings.getBoolean("usePercentage");
+										if (usePct) {
+											int minPct = dmgSettings.contains("minPct") ? dmgSettings.getInt("minPct")
+													: 0;
+											int maxPct = dmgSettings.contains("maxPct") ? dmgSettings.getInt("maxPct")
+													: 100;
+											double candidatePct = ((double) candidate.getDamageValue()
+													/ (double) candidate.getMaxDamage()) * 100.0;
+											if (candidate.isDamageableItem()) {
+												candidatePct = ((double) candidateDamageValue(candidate)
+														/ (double) maxDmgVal) * 100.0;
+											}
+											if (candidatePct < minPct || candidatePct > maxPct) {
+												return false;
+											}
+										} else {
+											int minDmg = dmgSettings.contains("minDmg") ? dmgSettings.getInt("minDmg")
+													: 0;
+											int maxDmg = dmgSettings.contains("maxDmg") ? dmgSettings.getInt("maxDmg")
+													: maxDmgVal;
+											int actualDmg = candidateDamageValue(candidate);
+											if (actualDmg < minDmg || actualDmg > maxDmg) {
+												return false;
+											}
+										}
+										continue; // Match succeeded, bypass standard Objects.equals check [3]
+									}
+								}
+							}
+
+							// Custom evaluation pass for tool enchantment values [3]
+							if (type == DataComponents.ENCHANTMENTS) {
+								CompoundTag enchSettings = varComp.getCustomComponentSettings()
+										.getCompound("minecraft:enchantments");
+								if (!enchSettings.isEmpty()) {
+									ItemEnchantments candidateEnchs = candidate.getEnchantments();
+									String mode = Objects.requireNonNullElse(enchSettings.getString("mode"), "HAS_ANY");
+
+									if ("HAS_ANY".equals(mode)) {
+										if (candidateEnchs.isEmpty()) {
+											return false;
+										}
+									} else if ("HAS_NONE".equals(mode)) {
+										if (!candidateEnchs.isEmpty()) {
+											return false;
+										}
+									} else if ("CONTAINS".equals(mode) || "EXACT".equals(mode)) {
+										ListTag list = enchSettings.getList("enchantments", Tag.TAG_COMPOUND);
+										Map<String, int[]> filterMap = new HashMap<>();
+										for (int k = 0; k < list.size(); k++) {
+											CompoundTag entry = list.getCompound(k);
+											String id = entry.getString("id");
+											int minL = entry.contains("minL") ? entry.getInt("minL") : 1;
+											int maxL = entry.contains("maxL") ? entry.getInt("maxL") : 10;
+											filterMap.put(id, new int[] { minL, maxL });
+										}
+
+										// 1. Verify candidate has at least all the specified ones
+										for (var filterEntry : filterMap.entrySet()) {
+											String reqId = filterEntry.getKey();
+											int[] reqRange = filterEntry.getValue();
+
+											boolean candidateHasEnch = false;
+											for (var holder : candidateEnchs.keySet()) {
+												ResourceLocation locKey = holder.unwrapKey().map(ResourceKey::location)
+														.orElse(null);
+												if (locKey != null && locKey.toString().equals(reqId)) {
+													int lvl = candidateEnchs.getLevel(holder);
+													if (lvl >= reqRange[0] && lvl <= reqRange[1]) {
+														candidateHasEnch = true;
+														break;
+													}
+												}
+											}
+											if (!candidateHasEnch) {
+												return false;
+											}
+										}
+
+										// 2. For EXACT match, make sure candidate has NO other enchantments [3]
+										if ("EXACT".equals(mode)) {
+											for (var holder : candidateEnchs.keySet()) {
+												ResourceLocation locKey = holder.unwrapKey().map(ResourceKey::location)
+														.orElse(null);
+												if (locKey == null || !filterMap.containsKey(locKey.toString())) {
+													return false;
+												}
+											}
+										}
+									}
+									continue; // Match succeeded, bypass standard Objects.equals check [3]
+								}
+							}
+
 							Object filterVal = filterItem.get(type);
 							Object candidateVal = candidate.get(type);
 							if (!Objects.equals(filterVal, candidateVal)) {
-								return false; // Values differ
+								return false; // Values differ [3]
 							}
 						}
 					}
@@ -227,6 +339,10 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		}
 
 		return matchModId && matchTag;
+	}
+
+	private static int candidateDamageValue(ItemStack candidate) {
+		return candidate.isDamageableItem() ? candidate.getDamageValue() : 0;
 	}
 
 	public ItemStack toItemStack() {
@@ -239,6 +355,12 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 
 		stack.set(DataComponents.DYED_COLOR, new DyedItemColor(this.getFilterColor().getHexColor(), true));
 
+		// Symmetrically apply the standard vanilla enchantment glint override to the
+		// card item stack if component filtering is enabled [3]
+		if (this.useComponentFilter) {
+			stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
+		}
+
 		CompoundTag tag = new CompoundTag();
 		tag.putUUID("VariableId", this.getId());
 		tag.putBoolean("UseQuantity", this.useQuantity);
@@ -248,6 +370,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		tag.putBoolean("UseTag", this.useTag);
 		tag.putString("SelectedTag", this.selectedTag);
 		tag.putBoolean("UseComponentFilter", this.useComponentFilter);
+		tag.put("CustomComponentSettings", this.customComponentSettings);
 
 		ListTag typesList = new ListTag();
 		for (String type : this.enabledComponentTypes) {
@@ -258,6 +381,23 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 		stack.set(DataComponents.CUSTOM_NAME, this.getName());
 		return stack;
+	}
+
+	@Override
+	public ItemStack getGhostStack(int index) {
+		return index == 0 ? this.filterStack : ItemStack.EMPTY;
+	}
+
+	@Override
+	public void setGhostStack(int index, ItemStack stack) {
+		if (index == 0) {
+			this.setFilterStack(stack);
+		}
+	}
+
+	@Override
+	public int getGhostSlotCount() {
+		return 1;
 	}
 
 	@Override
@@ -276,6 +416,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		compoundTag.putBoolean("useTag", this.useTag);
 		compoundTag.putString("selectedTag", this.selectedTag);
 		compoundTag.putBoolean("useComponentFilter", this.useComponentFilter);
+		compoundTag.put("customComponentSettings", this.customComponentSettings);
 
 		ListTag typesList = new ListTag();
 		for (String type : this.enabledComponentTypes) {
@@ -304,6 +445,8 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 					this.setUseComponentFilter(decoded.isUseComponentFilter());
 					this.enabledComponentTypes.clear();
 					this.enabledComponentTypes.addAll(decoded.getEnabledComponentTypes());
+					this.customComponentSettings = decoded.getCustomComponentSettings(); // Safely load from parsed
+																							// codec [3]
 				});
 
 		if (compoundTag.contains("filterStack")) {
@@ -317,7 +460,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 			this.quantity = compoundTag.getInt("quantity");
 		}
 		if (compoundTag.contains("filterColor")) {
-			String nameVal = compoundTag.getString("filterColor").toUpperCase(Locale.ROOT);
+			String nameVal = compoundTag.getString("filterColor").toUpperCase(java.util.Locale.ROOT);
 			try {
 				this.filterColor = Color.valueOf(nameVal);
 			} catch (IllegalArgumentException e) {
@@ -344,6 +487,11 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 		} else if (compoundTag.contains("UseComponentFilter")) {
 			this.useComponentFilter = compoundTag.getBoolean("UseComponentFilter");
 		}
+		if (compoundTag.contains("customComponentSettings")) {
+			this.customComponentSettings = compoundTag.getCompound("customComponentSettings");
+		} else if (compoundTag.contains("CustomComponentSettings")) {
+			this.customComponentSettings = compoundTag.getCompound("CustomComponentSettings");
+		}
 		if (compoundTag.contains("enabledComponentTypes") || compoundTag.contains("EnabledComponentTypes")) {
 			ListTag list = compoundTag.contains("enabledComponentTypes")
 					? compoundTag.getList("enabledComponentTypes", Tag.TAG_STRING)
@@ -353,23 +501,6 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent i
 				this.enabledComponentTypes.add(list.getString(i));
 			}
 		}
-	}
-
-	@Override
-	public ItemStack getGhostStack(int index) {
-		return index == 0 ? this.filterStack : ItemStack.EMPTY;
-	}
-
-	@Override
-	public void setGhostStack(int index, ItemStack stack) {
-		if (index == 0) {
-			this.setFilterStack(stack);
-		}
-	}
-
-	@Override
-	public int getGhostSlotCount() {
-		return 1;
 	}
 
 	@Override

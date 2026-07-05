@@ -1,6 +1,10 @@
 package dta.sfmflow.api.client.widget;
 
 import java.util.function.Supplier;
+
+import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -56,7 +60,7 @@ public class FlowWidgetText extends AbstractFlowWidget {
 
 		int availableScaledWidth = (int) (getWidth() / scale);
 		int titleWidth = font.width(getMessage());
-		int textColor = this.colorSupplier.get(); // Dynamic color query [3]
+		int textColor = this.colorSupplier.get();
 
 		boolean tooLong = titleWidth > availableScaledWidth;
 
@@ -74,9 +78,13 @@ public class FlowWidgetText extends AbstractFlowWidget {
 		}
 		guiGraphics.pose().popPose();
 
-		// Symmetrical Immediate Hover Tooltip (drawn on top of the overlay correctly) [3]
+		// Symmetrical Immediate Hover Tooltip (gated behind our dynamic on-top panel check) [3]
 		if (tooLong && mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
-			guiGraphics.renderTooltip(font, getMessage(), mouseX, mouseY);
+			if (Minecraft.getInstance().screen instanceof ManagerScreen screen) {
+				if (FlowLayoutHelper.isWidgetActiveAndOnTop(this, screen)) {
+					guiGraphics.renderTooltip(font, getMessage(), mouseX, mouseY);
+				}
+			}
 		}
 	}
 }

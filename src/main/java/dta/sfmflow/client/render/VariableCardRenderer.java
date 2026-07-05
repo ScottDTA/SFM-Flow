@@ -10,20 +10,20 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.Sheets;
+import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
+import net.minecraft.tags.TagKey;
+import net.minecraft.core.registries.Registries;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -39,8 +39,6 @@ import javax.annotation.Nullable;
 public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 	private static VariableCardRenderer instance;
 
-	// Bypasses empty builtin model by pointing directly to the baked flat card
-	// standalone model [3]
 	private static final ModelResourceLocation FLAT_MODEL_RL = ModelResourceLocation
 			.standalone(ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item/variable_card_flat"));
 
@@ -61,15 +59,14 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 		Minecraft mc = Minecraft.getInstance();
 
 		// Layer 1: Core Dyed Card Frame Asset [3]
-		// Retrieve our pre-baked flat card model directly from the manager using
-		// standalone coordinates [3]
 		BakedModel baseModel = mc.getModelManager().getModel(FLAT_MODEL_RL);
 		poseStack.pushPose();
 
-		// renderModelLists bypasses the recursive BEWLR checks and renders the card
-		// frame [3]
+		boolean hasGlint = hasComponentFilter(stack);
+
+		// Fix: Wrap the base translucent consumer inside Minecraft's glint-foil shader on demand [3]
 		mc.getItemRenderer().renderModelLists(baseModel, stack, packedLight, packedOverlay, poseStack,
-				buffer.getBuffer(Sheets.translucentItemSheet()));
+				ItemRenderer.getFoilBuffer(buffer, Sheets.translucentItemSheet(), true, hasGlint));
 		poseStack.popPose();
 
 		// Layer 2: 50% Nested Inner Ghost Stack Icon [3]
@@ -77,14 +74,16 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 		if (ghost != null && !ghost.isEmpty()) {
 			poseStack.pushPose();
 
-			// Transform Matrix: Centers the item on X/Y (0.5f, 0.5f) [3]
-			// Translation on Z (0.03f) provides the perfect buffer space to clear the
-			// card's 3D extrusion depth cleanly [3]
 			poseStack.translate(0.5f, 0.5f, 1.0f);
 			poseStack.scale(0.5f, 0.5f, 0.5f);
 
-			// Standard renderStatic is safe here as the nested item is not a BEWLR card [3]
-			mc.getItemRenderer().renderStatic(ghost, displayContext, packedLight, packedOverlay, poseStack, buffer,
+			ItemStack renderStack = ghost;
+			if (hasGlint) {
+				renderStack = ghost.copy();
+				renderStack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true); // Symmetrical inner item glint [3]
+			}
+
+			mc.getItemRenderer().renderStatic(renderStack, displayContext, packedLight, packedOverlay, poseStack, buffer,
 					mc.level, 0);
 			poseStack.popPose();
 		}
@@ -116,7 +115,6 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 		var compVal = stack.get(ModDataComponents.FILTERED_ITEM.get());
 		ItemStack ghost = compVal != null ? compVal.stack() : ItemStack.EMPTY;
 
-		// Fallback to static components outside of screens [3]
 		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
 		if (customData != null) {
 			CompoundTag tag = customData.copyTag();
@@ -133,9 +131,21 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 		return ghost;
 	}
 
-	/**
-	 * Resolves all item stacks associated with a specified tag namespace cleanly [3].
-	 */
+	private boolean hasComponentFilter(ItemStack stack) {
+		UUID varId = getVariableId(stack);
+		if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
+			var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
+			if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
+				return advancedVar.isUseComponentFilter();
+			}
+		}
+		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+		if (customData != null) {
+			return customData.copyTag().getBoolean("UseComponentFilter");
+		}
+		return false;
+	}
+
 	private static List<ItemStack> getTagItems(String tagLocation) {
 		List<ItemStack> items = new ArrayList<>();
 		ResourceLocation tagLoc = ResourceLocation.tryParse(tagLocation);

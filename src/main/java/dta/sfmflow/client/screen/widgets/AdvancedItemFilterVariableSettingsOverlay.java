@@ -4,8 +4,9 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.DataComponentOverlayRegistry;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
-import dta.sfmflow.api.client.widget.FlowWidgetText; // Imported for dark gray labels [3]
+import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.client.screen.helper.MenuSlotRepositioner;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
@@ -34,7 +35,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Settings overlay enabling visual configuration of a single-slot item variable [3].
+ * Settings overlay enabling visual configuration of a single-slot item variable
+ * [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverlay {
@@ -52,8 +54,8 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 			AdvancedItemFilterVariableComponent component) {
 		super(parentScreen, component);
 		this.component = component;
-		this.width = 240; // Expanded to full settings overlay width [3]
-		this.height = 195; // Adjusted height for a balanced, compact footprint [3]
+		this.width = 240;
+		this.height = 195;
 		this.setX((parentScreen.width - this.width) / 2);
 		this.setY(parentScreen.getTopPos() + (256 - this.height) / 2);
 
@@ -66,7 +68,6 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 		repositionGhostSlot();
 
-		// Quantity Input Box (aligned to the right column) [3]
 		this.qtyEdit = new EditBox(parentScreen.getFont(), getX() + 90, getY() + 56, 120, 18,
 				Component.literal("Quantity"));
 		this.qtyEdit.setValue(String.valueOf(component.getQuantity()));
@@ -84,7 +85,6 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 			}
 		});
 
-		// Quantity Toggle Button (aligned to the right column) [3]
 		this.toggleQtyBtn = Button
 				.builder(Component.literal("Qty: " + (component.isUseQuantity() ? "ON" : "OFF")), btn -> {
 					component.setUseQuantity(!component.isUseQuantity());
@@ -94,28 +94,22 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 					sendSettingsUpdate();
 				}).pos(getX() + 90, getY() + 34).size(120, 18).build();
 
-		// Empty-label Checkboxes to prevent low-contrast white label rendering [3]
 		this.useModIdCheckbox = Checkbox.builder(Component.empty(), parentScreen.getFont())
-				.pos(getX() + 15, getY() + 80)
-				.selected(component.isUseModId())
-				.onValueChange((checkbox, selected) -> {
+				.pos(getX() + 15, getY() + 80).selected(component.isUseModId()).onValueChange((checkbox, selected) -> {
 					component.setUseModId(selected);
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
 				}).build();
 
-		this.useTagCheckbox = Checkbox.builder(Component.empty(), parentScreen.getFont())
-				.pos(getX() + 15, getY() + 96)
-				.selected(component.isUseTag())
-				.onValueChange((checkbox, selected) -> {
+		this.useTagCheckbox = Checkbox.builder(Component.empty(), parentScreen.getFont()).pos(getX() + 15, getY() + 96)
+				.selected(component.isUseTag()).onValueChange((checkbox, selected) -> {
 					component.setUseTag(selected);
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
 				}).build();
 
 		this.useComponentFilterCheckbox = Checkbox.builder(Component.empty(), parentScreen.getFont())
-				.pos(getX() + 125, getY() + 96)
-				.selected(component.isUseComponentFilter())
+				.pos(getX() + 125, getY() + 96).selected(component.isUseComponentFilter())
 				.onValueChange((checkbox, selected) -> {
 					component.setUseComponentFilter(selected);
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
@@ -128,18 +122,16 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 		this.children.add(new ApiWidgetAdapter<>(this.useTagCheckbox));
 		this.children.add(new ApiWidgetAdapter<>(this.useComponentFilterCheckbox));
 
-		// High-contrast dark gray text labels positioned next to checkboxes (Fixed coordinates for perfect vertical alignment) [3]
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 36, getY() + 86, 180, 10,
-				Component.literal("Use ModID (match all items belonging to same Mod namespace)"), 0.75F, false, () -> 0xFF404040));
+				Component.literal("Use ModID (match all items belonging to same Mod namespace)"), 0.75F, false,
+				() -> 0xFF404040));
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 36, getY() + 102, 80, 10,
 				Component.literal("Use Tag"), 0.75F, false, () -> 0xFF404040));
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 146, getY() + 102, 80, 10,
 				Component.literal("Use Comps"), 0.75F, false, () -> 0xFF404040));
 
-		// 16x16 Color Panel [3]
 		this.children.add(new ColorPanelWidget(getX() + 31, getY() + 56));
 
-		// Symmetrically aligned list columns (width increased to 100 pixels each!) [3]
 		this.children.add(new TagScrollListWidget(getX() + 15, getY() + 114, 100, 50));
 		this.children.add(new ComponentScrollListWidget(getX() + 125, getY() + 114, 100, 50));
 	}
@@ -218,14 +210,16 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 		@Override
 		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			if (this.visible && this.active && mouseX >= getX() && mouseX < getX() + 16 && mouseY >= getY() && mouseY < getY() + 16) {
+			if (this.visible && this.active && mouseX >= getX() && mouseX < getX() + 16 && mouseY >= getY()
+					&& mouseY < getY() + 16) {
 				if (button == 0) {
 					Color[] values = Color.values();
 					int nextIdx = (component.getFilterColor().ordinal() + 1) % values.length;
 					component.setFilterColor(values[nextIdx]);
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
-					Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+					Minecraft.getInstance().getSoundManager()
+							.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 					return true;
 				}
 			}
@@ -293,11 +287,15 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 				guiGraphics.fill(sbX, thumbY, sbX + 2, thumbY + thumbHeight, 0xFF8B8B8B);
 			}
 
-			// Render hover tooltip of the full tag name string [3]
+			// Render hover tooltip of the full tag name string (Fixed: Gated behind on-top
+			// check) [3]
 			if (mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
-				int row = (int) ((mouseY - getY() + scrollY - 4) / 12);
-				if (row >= 0 && row < tags.size()) {
-					guiGraphics.renderTooltip(parentScreen.getFont(), Component.literal(tags.get(row)), mouseX, mouseY);
+				if (FlowLayoutHelper.isWidgetActiveAndOnTop(this, parentScreen)) {
+					int row = (int) ((mouseY - getY() + scrollY - 4) / 12);
+					if (row >= 0 && row < tags.size()) {
+						guiGraphics.renderTooltip(parentScreen.getFont(), Component.literal(tags.get(row)), mouseX,
+								mouseY);
+					}
 				}
 			}
 		}
@@ -318,7 +316,8 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 						component.setSelectedTag(tags.get(i));
 						parentScreen.getMenu().getManagerBlockEntity().setChanged();
 						sendSettingsUpdate();
-						Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+						Minecraft.getInstance().getSoundManager()
+								.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 						return true;
 					}
 				}
@@ -328,7 +327,8 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 		@Override
 		public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-			if (this.visible && this.active && component.isUseTag() && mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
+			if (this.visible && this.active && component.isUseTag() && mouseX >= getX() && mouseX < getX() + width
+					&& mouseY >= getY() && mouseY < getY() + height) {
 				List<String> tags = getTags();
 				int maxScroll = Math.max(0, tags.size() * 12 - (height - 8));
 				if (maxScroll > 0) {
@@ -380,13 +380,16 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 			for (int i = 0; i < types.size(); i++) {
 				DataComponentType<?> type = types.get(i);
 				ResourceLocation loc = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(type);
-				if (loc == null) continue;
+				if (loc == null)
+					continue;
 
 				int itemY = startY + i * 12;
 
 				boolean isEnabled = component.getEnabledComponentTypes().contains(loc.toString());
-				boolean hoveredBox = mouseX >= getX() + 4 && mouseX < getX() + 12 && mouseY >= itemY && mouseY < itemY + 8;
-				boolean hoveredText = mouseX >= getX() + 14 && mouseX < getX() + width && mouseY >= itemY && mouseY < itemY + 11;
+				boolean hoveredBox = mouseX >= getX() + 4 && mouseX < getX() + 12 && mouseY >= itemY
+						&& mouseY < itemY + 8;
+				boolean hoveredText = mouseX >= getX() + 14 && mouseX < getX() + width && mouseY >= itemY
+						&& mouseY < itemY + 11;
 
 				int checkboxBorder = hoveredBox ? 0xFFD4AF37 : 0xFF8B8B8B;
 				guiGraphics.fill(getX() + 4, itemY + 2, getX() + 10, itemY + 8, isEnabled ? 0xFF39FF14 : 0xFF222222);
@@ -410,13 +413,17 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 				guiGraphics.fill(sbX, thumbY, sbX + 2, thumbY + thumbHeight, 0xFF8B8B8B);
 			}
 
-			// Render hover tooltip of the full component registry name string [3]
+			// Render hover tooltip of the full component registry name string (Fixed: Gated
+			// behind on-top check) [3]
 			if (mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
-				int row = (int) ((mouseY - getY() + scrollY - 4) / 12);
-				if (row >= 0 && row < types.size()) {
-					ResourceLocation loc = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(types.get(row));
-					if (loc != null) {
-						guiGraphics.renderTooltip(parentScreen.getFont(), Component.literal(loc.toString()), mouseX, mouseY);
+				if (FlowLayoutHelper.isWidgetActiveAndOnTop(this, parentScreen)) {
+					int row = (int) ((mouseY - getY() + scrollY - 4) / 12);
+					if (row >= 0 && row < types.size()) {
+						ResourceLocation loc = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(types.get(row));
+						if (loc != null) {
+							guiGraphics.renderTooltip(parentScreen.getFont(), Component.literal(loc.toString()), mouseX,
+									mouseY);
+						}
 					}
 				}
 			}
@@ -435,7 +442,8 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 				for (int i = 0; i < types.size(); i++) {
 					DataComponentType<?> type = types.get(i);
 					ResourceLocation loc = BuiltInRegistries.DATA_COMPONENT_TYPE.getKey(type);
-					if (loc == null) continue;
+					if (loc == null)
+						continue;
 
 					int itemY = startY + i * 12;
 
@@ -448,14 +456,17 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 						}
 						parentScreen.getMenu().getManagerBlockEntity().setChanged();
 						sendSettingsUpdate();
-						Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+						Minecraft.getInstance().getSoundManager()
+								.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 						return true;
 					}
 
 					if (mouseX >= getX() + 14 && mouseX < getX() + width && mouseY >= itemY && mouseY < itemY + 11) {
-						Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-						
-						AbstractModalPopup popup = DataComponentOverlayRegistry.createOverlay(type, parentScreen, component.getFilterStack());
+						Minecraft.getInstance().getSoundManager()
+								.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+
+						AbstractModalPopup popup = DataComponentOverlayRegistry.createOverlay(type, parentScreen,
+								component.getFilterStack());
 						if (popup == null) {
 							popup = new GenericDataComponentModal(parentScreen, type, component.getFilterStack());
 						}
@@ -469,7 +480,8 @@ public class AdvancedItemFilterVariableSettingsOverlay extends NodeSettingsOverl
 
 		@Override
 		public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-			if (this.visible && this.active && component.isUseComponentFilter() && mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
+			if (this.visible && this.active && component.isUseComponentFilter() && mouseX >= getX()
+					&& mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height) {
 				List<DataComponentType<?>> types = getComponents();
 				int maxScroll = Math.max(0, types.size() * 12 - (height - 8));
 				if (maxScroll > 0) {

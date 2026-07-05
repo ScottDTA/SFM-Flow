@@ -1,12 +1,19 @@
 7-5-2026
 
 ### [Added]
+* Dedicated settings sub-menus for item Damage (durability) and Enchantment properties.
+* Tool durability checks now support filtering based on raw values or custom percentage ranges (such as matching only pickaxes with less than 20% durability).
+* Enchantment checks now support advanced matching profiles: match any enchanted items, completely un-enchanted items, items containing specific enchantments with level bounds, or items containing exact matches.
+* Highlighted checklist entries in settings menus now display their full path in a tooltip when hovered.
 * Variable cards can now filter items based on their attached Data Components (such as matching items with specific damage values, enchantments, or custom names).
 * Added a component configuration system allowing developers to register custom settings menus for individual data components.
 * Added a scrollable list inside the variable settings panel to choose which item data components are validated.
 * Truncated UI text labels now display their full text in a popup tooltip when hovered.
 
 ### [Changed]
+* Sub-menus now properly capture input focus, resolving an issue where clicking text boxes inside configuration popups would fail to accept keyboard entries.
+* Obscured tooltips in the background are now muted while a settings panel or pop-up modal is actively open in the foreground.
+* Visual overlays now strictly check the visibility status of sub-elements before rendering them.
 * Redesigned the variable card settings panel to arrange the tag selector and the new data component list side-by-side for a more balanced layout.
 * Updated variable files saving to safely recycle system threads on server reloads.
 

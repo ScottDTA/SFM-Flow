@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.component.DataComponentType;
@@ -47,10 +48,11 @@ public class GenericDataComponentModal extends AbstractModalPopup {
 		render9SliceBackground(guiGraphics);
 
 		String path = componentLoc != null ? componentLoc.getPath().toUpperCase(Locale.ROOT) : "UNKNOWN";
-		guiGraphics.drawCenteredString(parentScreen.getFont(), path, getX() + width / 2, getY() + 6, 0xFFD4AF37);
-
-		guiGraphics.drawCenteredString(parentScreen.getFont(), "Standard value-based", getX() + width / 2, getY() + 22, 0xFF8B8B8B);
-		guiGraphics.drawCenteredString(parentScreen.getFont(), "matching is enabled.", getX() + width / 2, getY() + 34, 0xFF8B8B8B);
+		
+		// Draw all lines with no shadows to maximize readability [3]
+		drawStringWithoutShadow(guiGraphics, parentScreen.getFont(), path, getX() + width / 2, getY() + 6, 0xFFD4AF37);
+		drawStringWithoutShadow(guiGraphics, parentScreen.getFont(), "Standard value-based", getX() + width / 2, getY() + 22, 0xFF8B8B8B);
+		drawStringWithoutShadow(guiGraphics, parentScreen.getFont(), "matching is enabled.", getX() + width / 2, getY() + 34, 0xFF8B8B8B);
 
 		int btnX = getX() + (width - 80) / 2;
 		int btnY = getY() + height - 22;
@@ -59,5 +61,10 @@ public class GenericDataComponentModal extends AbstractModalPopup {
 		guiGraphics.fill(btnX, btnY, btnX + 80, btnY + 14, hovered ? 0xFF555555 : 0xFF222222);
 		guiGraphics.renderOutline(btnX, btnY, 80, 14, 0xFFD4AF37);
 		guiGraphics.drawCenteredString(parentScreen.getFont(), "Close", btnX + 40, btnY + 3, 0xFFFFFFFF);
+	}
+
+	private void drawStringWithoutShadow(GuiGraphics guiGraphics, Font font, String text, int x, int y, int color) {
+		int w = font.width(text);
+		guiGraphics.drawString(font, text, x - w / 2, y, color, false); // No shadow [3]
 	}
 }

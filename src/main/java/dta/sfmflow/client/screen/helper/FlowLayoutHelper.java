@@ -92,4 +92,18 @@ public final class FlowLayoutHelper {
         }
         return false;
     }
+    
+	/**
+	 * Verifies if a given widget belongs to the active, top-most interaction panel [3].
+	 * Used to block background tooltips from firing when modals or overlays are open [3].
+	 */
+	public static boolean isWidgetActiveAndOnTop(GuiEventListener widget, ManagerScreen screen) {
+		if (screen.getActiveModalPopup() != null && screen.getActiveModalPopup().visible) {
+			return isAncestorOf(screen.getActiveModalPopup(), widget);
+		}
+		if (screen.getActiveSettingsOverlay() != null && screen.getActiveSettingsOverlay().visible) {
+			return isAncestorOf(screen.getActiveSettingsOverlay(), widget);
+		}
+		return true;
+	}
 }

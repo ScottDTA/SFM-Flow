@@ -159,29 +159,31 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 	}
 
-	@Override
-	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		renderOverlayBackground(guiGraphics);
+    @Override
+    protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        renderOverlayBackground(guiGraphics);
 
-		int titleWidth = parentScreen.getFont().width(component.getName());
-		int titleX = getX() + (this.width - titleWidth) / 2;
-		guiGraphics.drawString(parentScreen.getFont(), component.getName(), titleX, getY() + 8, 0xFF404040, false);
+        int titleWidth = parentScreen.getFont().width(component.getName());
+        int titleX = getX() + (this.width - titleWidth) / 2;
+        guiGraphics.drawString(parentScreen.getFont(), component.getName(), titleX, getY() + 8, 0xFF404040, false);
 
-		for (GuiEventListener child : children) {
-			if (child instanceof AbstractFlowWidget widget) {
-				widget.visible = this.visible;
-				widget.active = this.active;
-				widget.render(guiGraphics, mouseX, mouseY, partialTick);
-			}
-		}
+        for (GuiEventListener child : children) {
+            if (child instanceof AbstractFlowWidget widget) {
+                // Fix: Evaluate individual child visibilities instead of overwriting them [3]
+                if (widget.visible) {
+                    widget.active = this.active;
+                    widget.render(guiGraphics, mouseX, mouseY, partialTick);
+                }
+            }
+        }
 
-		int btnX = getX() + (width - 80) / 2;
-		int btnY = getY() + height - 22;
-		boolean hovered = mouseX >= btnX && mouseX < btnX + 80 && mouseY >= btnY && mouseY < btnY + 14;
-		guiGraphics.fill(btnX, btnY, btnX + 80, btnY + 14, hovered ? 0xFF555555 : 0xFF222222);
-		guiGraphics.renderOutline(btnX, btnY, 80, 14, 0xFFD4AF37);
-		guiGraphics.drawCenteredString(parentScreen.getFont(), "Save & Close", btnX + 40, btnY + 3, 0xFFFFFFFF);
-	}
+        int btnX = getX() + (width - 80) / 2;
+        int btnY = getY() + height - 22;
+        boolean hovered = mouseX >= btnX && mouseX < btnX + 80 && mouseY >= btnY && mouseY < btnY + 14;
+        guiGraphics.fill(btnX, btnY, btnX + 80, btnY + 14, hovered ? 0xFF555555 : 0xFF222222);
+        guiGraphics.renderOutline(btnX, btnY, 80, 14, 0xFFD4AF37);
+        guiGraphics.drawCenteredString(parentScreen.getFont(), "Save & Close", btnX + 40, btnY + 3, 0xFFFFFFFF);
+    }
 
 	protected void renderOverlayBackground(GuiGraphics guiGraphics) {
 		int c = 6;
