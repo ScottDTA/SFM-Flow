@@ -7,6 +7,7 @@ import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
+import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
@@ -26,12 +27,16 @@ import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -109,7 +114,6 @@ public class ServerPayloadHandler {
 			}
 		});
 	}
-
 
 	public static void handleSyncClusterSlotDirection(final SyncClusterSlotDirectionPacket data,
 			final IPayloadContext context) {
@@ -197,19 +201,18 @@ public class ServerPayloadHandler {
 		});
 	}
 
-
 	public static void handleRequestInventorySlots(final RequestInventorySlotsPacket data,
 			final IPayloadContext context) {
 		context.enqueueWork(() -> {
 			ServerPlayer player = (ServerPlayer) context.player();
 			Level level = player.level();
 			if (level.hasChunkAt(data.pos())) {
-				IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
-				if (handler != null) {
+				IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
+				if (itemHandler != null) {
 					CompoundTag dataTag = new CompoundTag();
 					ListTag list = new ListTag();
-					for (int i = 0; i < handler.getSlots(); i++) {
-						ItemStack stack = handler.getStackInSlot(i);
+					for (int i = 0; i < itemHandler.getSlots(); i++) {
+						ItemStack stack = itemHandler.getStackInSlot(i);
 						if (!stack.isEmpty()) {
 							CompoundTag slotTag = new CompoundTag();
 							slotTag.putInt("slot", i);
@@ -218,9 +221,39 @@ public class ServerPayloadHandler {
 						}
 					}
 					dataTag.put("items", list);
-					dataTag.putInt("totalSlots", handler.getSlots());
+					dataTag.putInt("totalSlots", itemHandler.getSlots());
 
 					PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), dataTag));
+				} else {
+					// Fallback to fluid handler capability query for fluid layouts (such as
+					// Cauldrons)
+					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), null);
+					if (fluidHandler == null) {
+						fluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
+								level, data.pos(), level.getBlockState(data.pos()), null);
+					}
+
+					if (fluidHandler != null) {
+						CompoundTag dataTag = new CompoundTag();
+						ListTag list = new ListTag();
+						for (int i = 0; i < fluidHandler.getTanks(); i++) {
+							FluidStack fluid = fluidHandler.getFluidInTank(i);
+							if (!fluid.isEmpty()) {
+								Item bucket = fluid.getFluid().getBucket();
+								if (bucket != null && bucket != Items.AIR) {
+									ItemStack bucketStack = new ItemStack(bucket);
+									CompoundTag slotTag = new CompoundTag();
+									slotTag.putInt("slot", i);
+									slotTag.put("item", bucketStack.save(level.registryAccess()));
+									list.add(slotTag);
+								}
+							}
+						}
+						dataTag.put("items", list);
+						dataTag.putInt("totalSlots", fluidHandler.getTanks());
+
+						PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), dataTag));
+					}
 				}
 			}
 		});

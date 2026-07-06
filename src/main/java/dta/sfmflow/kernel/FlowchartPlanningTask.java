@@ -52,7 +52,7 @@ public class FlowchartPlanningTask {
 
 		@Override
 		public List<ConnectionBlock> getConnectedInventories() {
-			return manager.getInventories();
+			return snapshot.getCapturedInventories(); // Isolated captured inventories snapshot [3]
 		}
 
 		@Override

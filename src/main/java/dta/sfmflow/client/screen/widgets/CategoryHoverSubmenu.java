@@ -27,7 +27,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * A sliding hover submenu displaying creator nodes mapped to a hovered sidebar
  * category [3]. Features 9-slice background scaling, centered and dynamically
  * scaled FlowWidgetText headers [3], OpenGL scissor masking, customizable
- * width/column structures, and button hover states [3].
+ * width/column structures, and button hover states with custom padding [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class CategoryHoverSubmenu extends AbstractFlowWidget {
@@ -38,11 +38,17 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 	private final ManagerScreen parentScreen;
 	private final List<FlowComponentType> matchedTypes = new ArrayList<>();
 	private double scrollOffset = 0;
+	
 	private final int rows;
 	private final int numColumns;
 	private final int gridWidth;
+	private final int gridHeight;
 	private final int scrollbarWidth;
 	private final int startXOffset;
+
+	private final int cellSize = 14;
+	private final int cellPadding = 4;
+	private final int cellStride = cellSize + cellPadding;
 
 	/**
 	 * Submenu title label, powered by FlowWidgetText for scaled ellipsis support
@@ -63,35 +69,32 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 			}
 		}
 
-		// Dynamically calculate grid columns and scroll boundaries
+		// Dynamically calculate grid columns and scroll boundaries with padding [3]
 		this.numColumns = Math.max(1, Math.min(4, matchedTypes.size()));
-		this.gridWidth = numColumns * 14;
+		this.gridWidth = numColumns * cellSize + (numColumns - 1) * cellPadding;
 		this.scrollbarWidth = (matchedTypes.size() > 16) ? 8 : 0;
 
 		// Scale width dynamically (min 48px to prevent extreme title squeezing)
 		this.width = Math.max(48, 6 + gridWidth + scrollbarWidth + 6);
 
-		// Center grid columns horizontally if they don't occupy full 4-column space
+		// Center grid columns horizontally if they don't occupy full 4-column space [3]
 		int availableGridSpace = this.width - 12 - scrollbarWidth;
 		this.startXOffset = 6 + (availableGridSpace - gridWidth) / 2;
 
-		this.rows = (matchedTypes.size() + 3) / 4;
-		int gridHeight = Math.min(56, rows * 14);
+		this.rows = (matchedTypes.size() + numColumns - 1) / numColumns;
+		this.gridHeight = Math.min(50, rows * cellStride - cellPadding);
 		this.height = 6 + 12 + gridHeight + 6;
 
-		// Ensure layout coordinates clamp perfectly inside vertical viewport boundaries
-		// to prevent cutoff
+		// Ensure layout coordinates clamp perfectly inside vertical viewport boundaries to prevent cutoff
 		int maxY = parentScreen.height - this.height - 4;
 		this.setY(Math.max(4, Math.min(y, maxY)));
 
 		// Set up dynamically scaled FlowWidgetText for the category name header
-		// (positioned 4px below top edge)
 		Component titleText = Component
 				.translatable("gui.sfmflow.menu." + category.name().toLowerCase(Locale.ROOT));
 		int titleWidth = parentScreen.getFont().width(titleText);
 		float titleScale = 0.8F;
 
-		// Width set to exactly 8px less of total width (leaving 4px side paddings)
 		int availableTitleWidth = this.width - 8;
 		int titleX = this.getX() + 4;
 		int titleY = this.getY() + 4;
@@ -102,22 +105,14 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 		}
 
 		this.titleWidget = new FlowWidgetText(parentScreen.getFont(), titleX, titleY, availableTitleWidth, 10,
-				titleText, titleScale, true // Centered!
+				titleText, titleScale, true
 		);
 	}
 
-	/**
-	 * Retrieves the logical category this hover submenu displays [3].
-	 *
-	 * @return the active NodeCategory enum value [3]
-	 */
 	public NodeCategory getCategory() {
 		return category;
 	}
 
-	/**
-	 * Checks if the mouse coordinates hover over the submenu area [3].
-	 */
 	public boolean isHoveredOrFocused(double mouseX, double mouseY) {
 		return mouseX >= getX() && mouseX < getX() + width && mouseY >= getY() && mouseY < getY() + height;
 	}
@@ -132,30 +127,48 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 	}
 
 	private int maxScroll() {
-		return Math.max(0, rows * 14 - 56);
+		return Math.max(0, rows * cellStride - cellPadding - 50);
 	}
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (this.visible && isHoveredOrFocused(mouseX, mouseY)) {
-			// Identify cell click matches inside the customized column layout
 			int gridX = getX() + startXOffset;
 			int gridY = getY() + 18;
 
-			if (mouseX >= gridX && mouseX < gridX + gridWidth && mouseY >= gridY && mouseY < gridY + 56) {
-				int col = (int) ((mouseX - gridX) / 14);
-				int row = (int) ((mouseY - gridY + scrollOffset) / 14);
-				int index = row * numColumns + col;
+			if (mouseX >= gridX && mouseX < gridX + gridWidth && mouseY >= gridY && mouseY < gridY + this.gridHeight) {
+				int col = -1;
+				int row = -1;
 
-				if (index >= 0 && index < matchedTypes.size()) {
-					FlowComponentType clickedType = matchedTypes.get(index);
-					ResourceLocation typeLoc = FlowComponentType.REGISTRY.getKey(clickedType);
-					if (typeLoc != null) {
-						// Dynamic registry resolution supports dynamic third-party registrations [3]
-						PacketDistributor.sendToServer(new CreateNodePacket(
-								parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), typeLoc));
+				// Evaluate columns cleanly [3]
+				for (int c = 0; c < numColumns; c++) {
+					int cellX = gridX + c * cellStride;
+					if (mouseX >= cellX && mouseX < cellX + cellSize) {
+						col = c;
+						break;
 					}
-					return true;
+				}
+
+				// Evaluate rows cleanly [3]
+				for (int r = 0; r < rows; r++) {
+					int cellY = gridY + r * cellStride - (int) scrollOffset;
+					if (mouseY >= cellY && mouseY < cellY + cellSize) {
+						row = r;
+						break;
+					}
+				}
+
+				if (col != -1 && row != -1) {
+					int index = row * numColumns + col;
+					if (index >= 0 && index < matchedTypes.size()) {
+						FlowComponentType clickedType = matchedTypes.get(index);
+						ResourceLocation typeLoc = FlowComponentType.REGISTRY.getKey(clickedType);
+						if (typeLoc != null) {
+							PacketDistributor.sendToServer(new CreateNodePacket(
+									parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), typeLoc));
+						}
+						return true;
+					}
 				}
 			}
 		}
@@ -164,101 +177,102 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Reset GL shader color to prevent contamination from maps or other screens [3]
 		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-
-		// 1. Draw 9-slice background texture (submenu_bg.png)
 		render9SliceBackground(guiGraphics);
 
-		// 2. Render centered category title using FlowWidgetText
 		this.titleWidget.render(guiGraphics, mouseX, mouseY, partialTick);
 
-		// 3. Grid cell render sequence
 		int gridX = getX() + startXOffset;
 		int gridY = getY() + 18;
 
-		// Enable hardware OpenGL scissor mask to clamp grid items cleanly within their
-		// 56x56 view bounding box
-		guiGraphics.enableScissor(getX() + 6, gridY, getX() + 6 + 56, gridY + 56);
+		// Expanded horizontal scissor limits to fully support centered layout columns [3]
+		guiGraphics.enableScissor(getX() + 6, gridY, getX() + width - 6, gridY + this.gridHeight);
 
 		for (int i = 0; i < matchedTypes.size(); i++) {
 			int col = i % numColumns;
 			int row = i / numColumns;
 
-			int itemX = gridX + col * 14;
-			int itemY = gridY + row * 14 - (int) scrollOffset;
+			int itemX = gridX + col * cellStride;
+			int itemY = gridY + row * cellStride - (int) scrollOffset;
 
 			FlowComponentType type = matchedTypes.get(i);
 			INodeClientProperties props = FlowClientRegistry.getProperties(type);
 			if (props != null) {
-				// Button textures files are a 14x14 stacked texture. V-offset is 14 if hovered,
-				// 0 otherwise [3].
 				int vOffset = 0;
-				if (mouseX >= itemX && mouseX < itemX + 14 && mouseY >= itemY && mouseY < itemY + 14) {
-					vOffset = 14;
+				if (mouseX >= itemX && mouseX < itemX + cellSize && mouseY >= itemY && mouseY < itemY + cellSize) {
+					vOffset = cellSize;
 				}
-				guiGraphics.blit(props.getIconTexture(), itemX, itemY, 0, vOffset, 14, 14, 14, 28);
+				guiGraphics.blit(props.getIconTexture(), itemX, itemY, 0, vOffset, cellSize, cellSize, cellSize, cellSize * 2);
 			}
 		}
 
 		guiGraphics.disableScissor();
 
-		// 4. Scrollbar rendering
+		// Scrollbar rendering
 		if (maxScroll() > 0) {
 			int scrollbarX = getX() + width - 6 - 2;
 			int scrollbarY = getY() + 18;
-			int scrollbarHeight = 56;
+			int scrollbarHeight = this.gridHeight;
 
-			// Track background path
 			guiGraphics.fill(scrollbarX, scrollbarY, scrollbarX + 4, scrollbarY + scrollbarHeight, 0x40000000);
 
-			// Scrollbar thumb size and vertical scroll position calculations
-			int thumbHeight = (int) ((56.0 / (rows * 14.0)) * 56.0);
-			thumbHeight = Math.max(10, Math.min(56, thumbHeight));
-			int thumbY = scrollbarY + (int) ((scrollOffset / maxScroll()) * (56 - thumbHeight));
+			int thumbHeight = (int) (((double) this.gridHeight / (rows * cellStride - cellPadding)) * this.gridHeight);
+			thumbHeight = Math.max(10, Math.min(this.gridHeight, thumbHeight));
+			int thumbY = scrollbarY + (int) ((scrollOffset / maxScroll()) * (this.gridHeight - thumbHeight));
 
 			guiGraphics.fill(scrollbarX, thumbY, scrollbarX + 4, thumbY + thumbHeight, 0xFF8B8B8B);
 		}
 
-		// 5. Grid hovering cell tooltip rendering pass
-		if (mouseX >= gridX && mouseX < gridX + gridWidth && mouseY >= gridY && mouseY < gridY + 56) {
-			int col = (mouseX - gridX) / 14;
-			int row = (int) ((mouseY - gridY + scrollOffset) / 14);
-			int index = row * numColumns + col;
+		// Grid hovering cell tooltip rendering pass
+		if (mouseX >= gridX && mouseX < gridX + gridWidth && mouseY >= gridY && mouseY < gridY + this.gridHeight) {
+			int col = -1;
+			int row = -1;
 
-			if (index >= 0 && index < matchedTypes.size()) {
-				FlowComponentType hoveredType = matchedTypes.get(index);
-				INodeClientProperties props = FlowClientRegistry.getProperties(hoveredType);
-				if (props != null) {
-					guiGraphics.renderTooltip(parentScreen.getFont(), props.getDisplayName(), mouseX, mouseY);
+			for (int c = 0; c < numColumns; c++) {
+				int cellX = gridX + c * cellStride;
+				if (mouseX >= cellX && mouseX < cellX + cellSize) {
+					col = c;
+					break;
+				}
+			}
+
+			for (int r = 0; r < rows; r++) {
+				int cellY = gridY + r * cellStride - (int) scrollOffset;
+				if (mouseY >= cellY && mouseY < cellY + cellSize) {
+					row = r;
+					break;
+				}
+			}
+
+			if (col != -1 && row != -1) {
+				int index = row * numColumns + col;
+				if (index >= 0 && index < matchedTypes.size()) {
+					FlowComponentType hoveredType = matchedTypes.get(index);
+					INodeClientProperties props = FlowClientRegistry.getProperties(hoveredType);
+					if (props != null) {
+						guiGraphics.renderTooltip(parentScreen.getFont(), props.getDisplayName(), mouseX, mouseY);
+					}
 				}
 			}
 		}
 	}
 
-	/**
-	 * Performs the 9-slice background matrix stretching calculations on the submenu
-	 * background textures [3].
-	 */
 	private void render9SliceBackground(GuiGraphics guiGraphics) {
-		int c = 6; // Corner border thickness in pixels
-		int m = 10; // Mid-section stretch dimensions
+		int c = 6;
+		int m = 10;
 		int x = getX();
 		int y = getY();
 
-		// Corner segments (6x6 px)
 		guiGraphics.blit(SUBMENU_BG, x, y, 0, 0, c, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + width - c, y, 16, 0, c, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x, y + height - c, 0, 16, c, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + width - c, y + height - c, 16, 16, c, c, 22, 22);
 
-		// Border segments stretched
 		guiGraphics.blit(SUBMENU_BG, x + c, y, width - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + c, y + height - c, width - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x, y + c, c, height - 2 * c, 0.0F, (float) c, c, m, 22, 22);
 		guiGraphics.blit(SUBMENU_BG, x + width - c, y + c, c, height - 2 * c, 16.0F, (float) c, c, m, 22, 22);
 
-		// Stretched central segments
 		guiGraphics.blit(SUBMENU_BG, x + c, y + c, width - 2 * c, height - 2 * c, (float) c, (float) c, m, m, 22, 22);
 	}
 }

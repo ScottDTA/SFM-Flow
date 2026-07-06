@@ -6,8 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.HashMap;
+import java.util.Set;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -27,14 +28,12 @@ import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
+import dta.sfmflow.kernel.ExecutionRingBuffer;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
-import dta.sfmflow.util.ConnectionBlockType;
-import dta.sfmflow.kernel.ExecutionRingBuffer;
-import dta.sfmflow.kernel.FlowExecutionKernel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
@@ -50,6 +49,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -64,8 +64,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Backing BlockEntity class for the Manager block [3]. Tracks active logical elements 
- * and delegates external layout saves/loads to DataStateManager [3].
+ * Backing BlockEntity class for the Manager block [3]. Tracks active logical
+ * elements and delegates external layout saves/loads to DataStateManager [3].
  */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
@@ -241,7 +241,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 			if (!activeTriggers.isEmpty()) {
 				var snapshot = ThreadSafeInventorySnapshot.create(this);
-				FlowExecutionKernel.submitTask(this, snapshot, activeTriggers);
+				dta.sfmflow.kernel.FlowExecutionKernel.submitTask(this, snapshot, activeTriggers);
 			}
 
 			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
@@ -310,8 +310,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 		if (this.level != null && !this.level.isClientSide() && this.level.getServer() != null) {
 			if (this.isDataDirty) {
-				DataStateManager.saveAsync(this.level.getServer(), this.managerId, this.flowchart,
-						this.groupVariables, this.filterVariables, pRegistries);
+				DataStateManager.saveAsync(this.level.getServer(), this.managerId, this.flowchart, this.groupVariables,
+						this.filterVariables, pRegistries);
 				this.isDataDirty = false;
 			}
 		}
@@ -333,8 +333,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			invTag.putInt("distance", inv.getCableDistance());
 
 			ListTag typeList = new ListTag();
-			for (ConnectionBlockType type : inv.getTypes()) {
-				typeList.add(StringTag.valueOf(type.name()));
+			for (ResourceLocation type : inv.getTypes()) {
+				typeList.add(StringTag.valueOf(type.toString()));
 			}
 			invTag.put("types", typeList);
 			invList.add(invTag);
@@ -488,12 +488,27 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				ConnectionBlock inv = new ConnectionBlock(pos, distance);
 				inv.setId(id);
 
-				EnumSet<ConnectionBlockType> types = EnumSet.noneOf(ConnectionBlockType.class);
+				Set<ResourceLocation> types = new HashSet<>();
 				ListTag typeList = invTag.getList("types", Tag.TAG_STRING);
 				for (int k = 0; k < typeList.size(); k++) {
-					try {
-						types.add(ConnectionBlockType.valueOf(typeList.getString(k)));
-					} catch (IllegalArgumentException e) {
+					String strVal = typeList.getString(k);
+					// Retroactively translate legacy enum names to correct ResourceLocation
+					// registry keys
+					if ("ITEM".equals(strVal)) {
+						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"));
+					} else if ("FLUID".equals(strVal)) {
+						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
+					} else if ("ENERGY".equals(strVal)) {
+						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
+					} else if ("CHEMICAL".equals(strVal)) {
+						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "chemical"));
+					} else if ("REDSTONE".equals(strVal)) {
+						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
+					} else {
+						ResourceLocation res = ResourceLocation.tryParse(strVal);
+						if (res != null) {
+							types.add(res);
+						}
 					}
 				}
 				inv.setTypes(types);

@@ -3,11 +3,11 @@ package dta.sfmflow.api.client.widget;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.util.ConnectionBlock;
-import dta.sfmflow.util.ConnectionBlockType;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -22,19 +22,19 @@ import java.util.function.Consumer;
 
 /**
  * Reusable side-scrolling UI selector list allowing users to find, search, and
- * select target blocks matching a specific capability type [3].
+ * select target blocks matching a specific capability registry key [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class InventorySelectorWidget extends AbstractFlowWidget {
 	private final IInventoryTarget model;
-	private final ConnectionBlockType capabilityType;
+	private final ResourceLocation capabilityType;
 	private final ManagerScreen parentScreen;
 	private final EditBox searchEdit;
 	private final Consumer<ConnectionBlock> onSelected;
 
 	private float scrollX = 0.0F;
 
-	public InventorySelectorWidget(int x, int y, IInventoryTarget model, ConnectionBlockType capabilityType,
+	public InventorySelectorWidget(int x, int y, IInventoryTarget model, ResourceLocation capabilityType,
 			ManagerScreen parentScreen, Consumer<ConnectionBlock> onSelected) {
 		super(x, y, 260, 52, Component.literal("Inventory Selector"));
 		this.model = model;
@@ -56,7 +56,7 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 		List<ConnectionBlock> filtered = new ArrayList<>();
 		for (ConnectionBlock inv : list) {
-			// Pre-filter by our target capability type first [3]
+			// Pre-filter by our target capability type ResourceLocation first [3]
 			if (inv.getTypes().contains(capabilityType)) {
 				String name = inv.getDisplayName(level).getString().toLowerCase(Locale.ROOT);
 				if (query.isEmpty() || name.contains(query)) {

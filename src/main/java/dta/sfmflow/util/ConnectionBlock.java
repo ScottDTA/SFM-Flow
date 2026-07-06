@@ -1,24 +1,30 @@
 package dta.sfmflow.util;
 
-import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
+
+import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 
 /**
  * Declares scannable target inventory indices mapped to physical coordinates
  * [3].
  */
 public class ConnectionBlock implements IContainerSelection {
+	private Level level;
 	private BlockPos blockPos;
 	private int cableDistance;
-	private EnumSet<ConnectionBlockType> types;
+	private Set<ResourceLocation> types;
 	private int id;
 	private boolean sleeping = false;
 
@@ -28,14 +34,19 @@ public class ConnectionBlock implements IContainerSelection {
 	public ConnectionBlock(BlockPos blockPos, int cableDistance) {
 		this.blockPos = blockPos;
 		this.cableDistance = cableDistance;
-		types = EnumSet.noneOf(ConnectionBlockType.class);
+		types = new HashSet<>();
+	}
+
+	public ConnectionBlock(Level level, BlockPos blockPos, int cableDistance) {
+		this(blockPos, cableDistance);
+		this.level = level;
 	}
 
 	public BlockPos getBlockPos() {
 		return blockPos;
 	}
 
-	public void setTypes(EnumSet<ConnectionBlockType> caps) {
+	public void setTypes(Set<ResourceLocation> caps) {
 		types = caps;
 	}
 
@@ -55,7 +66,7 @@ public class ConnectionBlock implements IContainerSelection {
 		return this.cableDistance;
 	}
 
-	public EnumSet<ConnectionBlockType> getTypes() {
+	public Set<ResourceLocation> getTypes() {
 		return this.types;
 	}
 
@@ -86,32 +97,46 @@ public class ConnectionBlock implements IContainerSelection {
 		} else {
 			baseName = Component.literal("Inventory #" + this.id);
 		}
-		// Append coordinates directly inside display name to let player identify chest
-		// locations [3]
 		return Component.literal(baseName.getString() + " at (" + this.blockPos.getX() + ", " + this.blockPos.getY()
 				+ ", " + this.blockPos.getZ() + ")");
 	}
 
 	public @Nullable IItemHandler getItemHandler(@Nullable Direction side) {
-		if (this.sleeping || this.itemCache == null) {
+		if (this.sleeping) {
 			return null;
 		}
-		try {
-			return this.itemCache.getCapability();
-		} catch (IllegalStateException e) {
-			return null;
+		IItemHandler handler = null;
+		if (this.itemCache != null) {
+			try {
+				handler = this.itemCache.getCapability();
+			} catch (IllegalStateException e) {
+			}
 		}
+		if (handler == null && this.level != null) {
+			// Consult the capability bridge fallback [3]
+			handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK, this.level,
+					this.blockPos, this.level.getBlockState(this.blockPos), side);
+		}
+		return handler;
 	}
 
 	public @Nullable IFluidHandler getFluidHandler(@Nullable Direction side) {
-		if (this.sleeping || this.fluidCache == null) {
+		if (this.sleeping) {
 			return null;
 		}
-		try {
-			return this.fluidCache.getCapability();
-		} catch (IllegalStateException e) {
-			return null;
+		IFluidHandler handler = null;
+		if (this.fluidCache != null) {
+			try {
+				handler = this.fluidCache.getCapability();
+			} catch (IllegalStateException e) {
+			}
 		}
+		if (handler == null && this.level != null) {
+			// Consult the capability bridge fallback [3]
+			handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK, this.level,
+					this.blockPos, this.level.getBlockState(this.blockPos), side);
+		}
+		return handler;
 	}
 
 	@Override

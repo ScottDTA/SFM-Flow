@@ -5,9 +5,11 @@ import dta.sfmflow.api.client.DataComponentOverlayRegistry;
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
+import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import net.minecraft.core.component.DataComponents;
@@ -46,6 +48,20 @@ public class VanillaSFMFlowClientPlugin {
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ADVANCED_ITEM_FILTER_VARIABLE.get(), (screen, component) -> {
 			if (component instanceof AdvancedItemFilterVariableComponent advancedVar) {
 				return new AdvancedItemFilterVariableSettingsOverlay(screen, advancedVar);
+			}
+			return null;
+		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.FLUID_INPUT.get(), (screen, component) -> {
+			if (component instanceof FluidTransferComponent transfer) {
+				return new FluidTransferSettingsOverlay(screen, transfer);
+			}
+			return null;
+		});
+
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.FLUID_OUTPUT.get(), (screen, component) -> {
+			if (component instanceof FluidTransferComponent transfer) {
+				return new FluidTransferSettingsOverlay(screen, transfer);
 			}
 			return null;
 		});

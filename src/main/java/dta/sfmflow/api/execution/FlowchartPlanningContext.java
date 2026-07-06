@@ -1,5 +1,6 @@
 package dta.sfmflow.api.execution;
 
+import dta.sfmflow.api.capability.FluidTransferParams;
 import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
@@ -8,6 +9,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.fluids.FluidStack;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -77,5 +80,35 @@ public interface FlowchartPlanningContext {
 	default boolean tryWriteTask(BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, ItemStack stack, int amount) {
 		ResourceLocation itemCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
 		return tryWriteTask(itemCapId, src, srcSlot, srcSide, dest, destSlot, destSide, new ItemTransferParams(srcSlot, destSlot, stack, amount));
+	}
+	
+	/**
+	 * Default convenience helper for standard fluid transfers, delegating to the generic pipeline map [3].
+	 */
+	default FlowFluidBuffer getFluidComponentBuffer(UUID componentId) {
+		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
+		Object buffer = getPipelineBuffer(componentId, fluidCapId);
+		if (buffer instanceof FlowFluidBuffer fluidBuffer) {
+			return fluidBuffer;
+		}
+		FlowFluidBuffer newBuffer = new FlowFluidBuffer();
+		setPipelineBuffer(componentId, fluidCapId, newBuffer);
+		return newBuffer;
+	}
+
+	/**
+	 * Default convenience helper for standard fluid transfers, delegating to the generic pipeline map [3].
+	 */
+	default void setFluidComponentBuffer(UUID componentId, FlowFluidBuffer buffer) {
+		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
+		setPipelineBuffer(componentId, fluidCapId, buffer);
+	}
+
+	/**
+	 * Default convenience helper for standard fluid transfer tasks, delegating to the generic pipeline map [3].
+	 */
+	default boolean tryWriteFluidTask(BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, FluidStack stack, int amount) {
+		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
+		return tryWriteTask(fluidCapId, src, srcSlot, srcSide, dest, destSlot, destSide, new FluidTransferParams(stack, amount));
 	}
 }

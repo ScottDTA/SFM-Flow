@@ -3,7 +3,7 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.api.client.layout.SlotLayout;
 import dta.sfmflow.api.client.layout.SlotEntry;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.ServerConfig;
+import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.client.layout.FlowLayoutRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.component.ISlotConfigurable; // Standardized slot configuration [3]
@@ -11,6 +11,7 @@ import dta.sfmflow.api.logging.FlowLogger;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.network.ClientInventoryCache;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
+import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -30,6 +31,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.HashSet;
@@ -39,14 +41,13 @@ import javax.annotation.Nullable;
 
 /**
  * Symmetrical slot configuration modal popup that allows players to toggle
- * which slots in an inventory are active for a specific side [3].
+ * which slots or tanks in an inventory are active for a specific side [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class SlotLayoutModalPopup extends AbstractModalPopup {
 	private static final ResourceLocation SLOT_TEXTURE = ResourceLocation
-			.fromNamespaceAndPath(dta.sfmflow.SFMFlow.MODID, "textures/gui/flowcomponents/generic_slot.png");
+			.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/flowcomponents/generic_slot.png");
 
-	private static final int GRID_START_X = 10;
 	private static final int GRID_START_Y = 20;
 
 	private final ISideConfigurable sideModel;
@@ -57,7 +58,9 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 	private final int totalSlots;
 	private final Set<Integer> accessibleSlots = new HashSet<>();
 	private @Nullable IItemHandler nullHandler = null;
+	private @Nullable IFluidHandler nullFluidHandler = null;
 	private @Nullable SlotLayout layout = null;
+	private final boolean isFluid;
 
 	private final int unscaledWidth;
 	private final int unscaledHeight;
@@ -69,22 +72,45 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		this.side = side;
 		this.blockPos = blockPos;
 		this.onChanged = onChanged;
+		this.isFluid = sideModel instanceof FluidTransferComponent;
 
 		Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 		IItemHandler sideHandler = null;
+		IFluidHandler sideFluidHandler = null;
 		BlockEntity be = null;
 
 		if (level != null && blockPos != null) {
-			this.nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, null);
-			sideHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, side);
 			be = level.getBlockEntity(blockPos);
-
 			BlockState state = level.getBlockState(blockPos);
 			ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
 			if (blockId != null) {
 				this.layout = FlowLayoutRegistry.getLayout(blockId);
 				if (this.layout == null) {
 					this.layout = SlotLayoutManager.getLayout(blockId);
+				}
+			}
+
+			if (isFluid) {
+				this.nullFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, blockPos, null);
+				if (this.nullFluidHandler == null) {
+					this.nullFluidHandler = SpecialBlockCapabilityRegistry.getCapability(
+							Capabilities.FluidHandler.BLOCK, level, blockPos, state, null);
+				}
+				sideFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, blockPos, side);
+				if (sideFluidHandler == null) {
+					sideFluidHandler = SpecialBlockCapabilityRegistry.getCapability(
+							Capabilities.FluidHandler.BLOCK, level, blockPos, state, side);
+				}
+			} else {
+				this.nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, null);
+				if (this.nullHandler == null) {
+					this.nullHandler = SpecialBlockCapabilityRegistry.getCapability(
+							Capabilities.ItemHandler.BLOCK, level, blockPos, state, null);
+				}
+				sideHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, side);
+				if (sideHandler == null) {
+					sideHandler = SpecialBlockCapabilityRegistry.getCapability(
+							Capabilities.ItemHandler.BLOCK, level, blockPos, state, side);
 				}
 			}
 		}
@@ -98,24 +124,33 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		this.totalSlots = this.nullHandler != null ? this.nullHandler.getSlots() : 0;
-
-		if (be instanceof WorldlyContainer worldly && side != null) {
-			int[] slots = worldly.getSlotsForFace(side);
-			if (slots != null) {
-				for (int s : slots) {
-					accessibleSlots.add(s);
-				}
-			}
-		} else if (sideHandler != null) {
-			int sideCount = sideHandler.getSlots();
-			if (sideCount == this.totalSlots) {
-				for (int i = 0; i < this.totalSlots; i++) {
-					accessibleSlots.add(i);
-				}
-			} else {
+		if (isFluid) {
+			this.totalSlots = this.nullFluidHandler != null ? this.nullFluidHandler.getTanks() : 0;
+			if (sideFluidHandler != null) {
+				int sideCount = sideFluidHandler.getTanks();
 				for (int i = 0; i < sideCount; i++) {
 					accessibleSlots.add(i);
+				}
+			}
+		} else {
+			this.totalSlots = this.nullHandler != null ? this.nullHandler.getSlots() : 0;
+			if (be instanceof WorldlyContainer worldly && side != null) {
+				int[] slots = worldly.getSlotsForFace(side);
+				if (slots != null) {
+					for (int s : slots) {
+						accessibleSlots.add(s);
+					}
+				}
+			} else if (sideHandler != null) {
+				int sideCount = sideHandler.getSlots();
+				if (sideCount == this.totalSlots) {
+					for (int i = 0; i < this.totalSlots; i++) {
+						accessibleSlots.add(i);
+					}
+				} else {
+					for (int i = 0; i < sideCount; i++) {
+						accessibleSlots.add(i);
+					}
 				}
 			}
 		}
@@ -124,15 +159,16 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			this.unscaledWidth = this.layout.width();
 			this.unscaledHeight = this.layout.height();
 		} else {
-			int cols = 9;
-			int rows = (this.totalSlots + 8) / 9;
+			int cols = Math.min(9, this.totalSlots);
+			if (cols <= 0) cols = 9;
+			int rows = (this.totalSlots + cols - 1) / cols;
 			if (rows <= 0)
 				rows = 1;
 
 			int gridW = cols * 20 - 2;
 			int gridH = rows * 20 - 2;
 
-			this.unscaledWidth = 10 + gridW + 10;
+			this.unscaledWidth = Math.max(110, 10 + gridW + 10);
 			this.unscaledHeight = 20 + gridH + 30;
 		}
 
@@ -186,11 +222,16 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		}
 
 		if (button == 0 && this.layout == null && this.totalSlots > 0) {
-			for (int i = 0; i < this.totalSlots; i++) {
-				int row = i / 9;
-				int col = i % 9;
+			int cols = Math.min(9, this.totalSlots);
+			if (cols <= 0) cols = 9;
+			int gridW = cols * 20 - 2;
+			int startGridX = (this.unscaledWidth - gridW) / 2;
 
-				int slotX = GRID_START_X + col * 20;
+			for (int i = 0; i < this.totalSlots; i++) {
+				int row = i / cols;
+				int col = i % cols;
+
+				int slotX = startGridX + col * 20;
 				int slotY = GRID_START_Y + row * 20;
 
 				if (localX >= slotX && localX < slotX + 18 && localY >= slotY && localY < slotY + 18) {
@@ -242,7 +283,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		}
 
 		String sideName = side != null ? side.name() : "GENERAL";
-		Component titleComponent = Component.literal(sideName + " SLOTS");
+		String suffix = isFluid ? " TANKS" : " SLOTS";
+		Component titleComponent = Component.literal(sideName + suffix);
 		guiGraphics.drawCenteredString(parentScreen.getFont(), titleComponent, w / 2, 6, 0xFFD4AF37);
 
 		ItemStack[] cachedItems = ClientInventoryCache.get(this.blockPos);
@@ -287,11 +329,16 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				}
 			}
 		} else {
-			for (int i = 0; i < this.totalSlots; i++) {
-				int row = i / 9;
-				int col = i % 9;
+			int cols = Math.min(9, this.totalSlots);
+			if (cols <= 0) cols = 9;
+			int gridW = cols * 20 - 2;
+			int startGridX = (this.unscaledWidth - gridW) / 2;
 
-				int slotX = GRID_START_X + col * 20;
+			for (int i = 0; i < this.totalSlots; i++) {
+				int row = i / cols;
+				int col = i % cols;
+
+				int slotX = startGridX + col * 20;
 				int slotY = GRID_START_Y + row * 20;
 
 				guiGraphics.blit(SLOT_TEXTURE, slotX, slotY, 0, 0, 18, 18, 18, 18);
@@ -361,14 +408,18 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					}
 				}
 			} else {
-				int unscaledStartX = getX() + (int) (GRID_START_X * 0.5);
+				int cols = Math.min(9, this.totalSlots);
+				if (cols <= 0) cols = 9;
+				int gridW = cols * 20 - 2;
+				int startGridX = (this.unscaledWidth - gridW) / 2;
+				int scaledStartX = getX() + (int) (startGridX * 0.5);
 				int unscaledStartY = getY() + (int) (GRID_START_Y * 0.5);
 
 				for (int i = 0; i < this.totalSlots; i++) {
-					int row = i / 9;
-					int col = i % 9;
+					int row = i / cols;
+					int col = i % cols;
 
-					int slotX = unscaledStartX + col * 10;
+					int slotX = scaledStartX + col * 10;
 					int slotY = unscaledStartY + row * 10;
 
 					if (mouseX >= slotX && mouseX < slotX + 9 && mouseY >= slotY && mouseY < slotY + 9) {

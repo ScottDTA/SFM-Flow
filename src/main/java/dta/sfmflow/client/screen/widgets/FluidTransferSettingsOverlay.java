@@ -4,7 +4,7 @@ import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
 import dta.sfmflow.api.client.widget.InventorySelectorWidget;
 import dta.sfmflow.api.client.widget.ItemFilterWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
@@ -19,17 +19,15 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Screen interface mapping slots to directional faces via instant feedback
- * widgets [3]. Redesigned with dynamic panel metrics to eliminate visual
- * overlaps completely [3].
+ * Screen interface mapping slots to directional faces for fluid components [3].
  */
 @OnlyIn(Dist.CLIENT)
-public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
+public class FluidTransferSettingsOverlay extends NodeSettingsOverlay {
 	private final InventorySelectorWidget selectorWidget;
 	private final BlockPreview3DWidget previewWidget;
 	private final ItemFilterWidget filterWidget;
 
-	public ItemTransferSettingsOverlay(ManagerScreen parentScreen, ItemTransferComponent component) {
+	public FluidTransferSettingsOverlay(ManagerScreen parentScreen, FluidTransferComponent component) {
 		super(parentScreen, component);
 		this.width = 300;
 		this.height = 360;
@@ -39,16 +37,17 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		component.setUseAll(false);
 		component.setTargetSlot(-1);
 
-		// Activate the ghost slots on the client menu [3]
-		parentScreen.getMenu().setActiveFilterComponent(component);
+		parentScreen.getMenu().setActiveComponent(component);
 
-		// Activate the ghost slots on the server menu [3]
 		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId()));
+				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
+						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
+						: null,
+				component.getId()));
 
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 210,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
-				face -> sideSupportsItems(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
+				face -> sideSupportsFluids(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
 						getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, face),
 				parentScreen, () -> {
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
@@ -56,12 +55,11 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 				});
 
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
-				ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
+				ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"),
 				parentScreen, newInv -> {
-					// Reset side selection settings to default when binding a different inventory [3]
-					component.setActiveSidesMask(0); // Reset side selection mask to 0 (all sides disabled) [3]
+					component.setActiveSidesMask(0); // Reset side selection to default (all disabled) [3]
 					for (Direction dir : Direction.values()) {
-						component.setEnabledSlotsMask(dir, -1L); // Reset per-side slot exclusions to all enabled [3]
+						component.setEnabledSlotsMask(dir, -1L); // Reset enabled slot masks to default [3]
 					}
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
@@ -81,7 +79,7 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 	}
 
 	private ConnectionBlock getSelectedInventory() {
-		int selectedId = ((ItemTransferComponent) component).getInventoryId();
+		int selectedId = ((FluidTransferComponent) component).getInventoryId();
 		if (selectedId != -1) {
 			for (ConnectionBlock block : parentScreen.getMenu().getManagerBlockEntity().getInventories()) {
 				if (block.getId() == selectedId) {
@@ -92,11 +90,11 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		return null;
 	}
 
-	private boolean sideSupportsItems(Level level, BlockPos pos, Direction side) {
+	private boolean sideSupportsFluids(Level level, BlockPos pos, Direction side) {
 		if (level == null || pos == null) {
 			return false;
 		}
-		return level.getCapability(Capabilities.ItemHandler.BLOCK, pos, side) != null;
+		return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side) != null;
 	}
 
 	private void sendSettingsUpdate() {
@@ -108,10 +106,7 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 
 	@Override
 	public void closeAndSave() {
-		// Reset active filter component on the client menu [3]
-		parentScreen.getMenu().setActiveFilterComponent(null);
-
-		// Reset active filter component on the server menu [3]
+		parentScreen.getMenu().setActiveComponent(null);
 		PacketDistributor.sendToServer(
 				new SetActiveFilterComponentPacket(parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), null));
 		super.closeAndSave();

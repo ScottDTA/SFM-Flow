@@ -1,11 +1,7 @@
 package dta.sfmflow.block;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
@@ -17,7 +13,6 @@ import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.common.network.NetworkMutationEngine;
 import dta.sfmflow.common.network.CableNetworkRegistry;
 import dta.sfmflow.registry.ModTags;
-import dta.sfmflow.util.ConnectionBlockType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -44,15 +39,14 @@ public class CableBlock extends Block {
 				PhysicalNetwork network = manager.getPhysicalNetwork();
 				if (!network.isDirty()) {
 					boolean touchesCapability = false;
-					// Check if any newly connected neighbor exposes inventory/fluid capabilities
-					// [3]
+					// Check if any newly connected neighbor exposes registry capabilities [3]
 					for (Direction dir : Direction.values()) {
 						BlockPos neighbor = pos.relative(dir);
 						BlockState nState = level.getBlockState(neighbor);
 						if (!nState.is(ModTags.CABLES) && !nState.is(ModBlocks.MANAGER_BLOCK.get())) {
 							BlockEntity be = level.getBlockEntity(neighbor);
-							for (ConnectionBlockType type : ConnectionBlockType.values()) {
-								if (type.isPresentAnywhere(level, neighbor, nState, be)) {
+							for (var cap : dta.sfmflow.api.capability.FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
+								if (cap.isPresentAnywhere(level, neighbor, nState, be)) {
 									touchesCapability = true;
 									break;
 								}

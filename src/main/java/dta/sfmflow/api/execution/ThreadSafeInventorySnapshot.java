@@ -2,16 +2,20 @@ package dta.sfmflow.api.execution;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.util.ConnectionBlock;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -34,13 +38,18 @@ public final class ThreadSafeInventorySnapshot {
 		}
 	}
 
-	// Composite key mapping coordinates and active sides to their respective slots [3]
-	public record SnapshotKey(BlockPos pos, @Nullable Direction side) {}
+	// Composite key mapping coordinates and active sides to their respective slots
+	// [3]
+	public record SnapshotKey(BlockPos pos, @Nullable Direction side) {
+	}
 
 	private final Map<SnapshotKey, InventorySnapshot> snapshotMap;
+	private final List<ConnectionBlock> capturedInventories;
 
-	private ThreadSafeInventorySnapshot(Map<SnapshotKey, InventorySnapshot> snapshotMap) {
+	private ThreadSafeInventorySnapshot(Map<SnapshotKey, InventorySnapshot> snapshotMap,
+			List<ConnectionBlock> capturedInventories) {
 		this.snapshotMap = Collections.unmodifiableMap(new HashMap<>(snapshotMap));
+		this.capturedInventories = Collections.unmodifiableList(new ArrayList<>(capturedInventories));
 	}
 
 	/**
@@ -52,12 +61,14 @@ public final class ThreadSafeInventorySnapshot {
 	 */
 	public static ThreadSafeInventorySnapshot create(ManagerBlockEntity manager) {
 		Map<SnapshotKey, InventorySnapshot> map = new HashMap<>();
+		List<ConnectionBlock> capturedList = new ArrayList<>();
 		Level level = manager.getLevel();
 		if (level != null && !level.isClientSide()) {
 			for (ConnectionBlock block : manager.getInventories()) {
+				capturedList.add(block);
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
-					net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
+					BlockEntity be = level.getBlockEntity(pos);
 					// Index the block's non-directional state [3]
 					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
 					if (nullHandler != null) {
@@ -73,16 +84,17 @@ public final class ThreadSafeInventorySnapshot {
 				}
 			}
 		}
-		return new ThreadSafeInventorySnapshot(map);
+		return new ThreadSafeInventorySnapshot(map, capturedList);
 	}
 
-	private static InventorySnapshot createInventorySnapshot(IItemHandler handler, @Nullable net.minecraft.world.level.block.entity.BlockEntity be, @Nullable Direction side) {
+	private static InventorySnapshot createInventorySnapshot(IItemHandler handler, @Nullable BlockEntity be,
+			@Nullable Direction side) {
 		Map<Integer, SlotSnapshot> slots = new HashMap<>();
 		int count = handler.getSlots();
 		int[] faceSlots = null;
 
 		// Resolve WorldlyContainer accessible slot indexes for side-specific mapping
-		if (be instanceof net.minecraft.world.WorldlyContainer worldly && side != null) {
+		if (be instanceof WorldlyContainer worldly && side != null) {
 			faceSlots = worldly.getSlotsForFace(side);
 		}
 
@@ -104,5 +116,9 @@ public final class ThreadSafeInventorySnapshot {
 		}
 		// Fallback to non-directional if side-specific capability is absent [3]
 		return snapshotMap.get(new SnapshotKey(pos, null));
+	}
+
+	public List<ConnectionBlock> getCapturedInventories() {
+		return this.capturedInventories;
 	}
 }

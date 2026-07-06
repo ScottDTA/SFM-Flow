@@ -209,7 +209,7 @@ import javax.imageio.ImageIO
  */
 tasks.register('copyStudioPrompt') {
     group = "automation"
-    description = "Aggregates source, asset map, and texture dimensions to clipboard."
+    description = "Aggregates critical source files, asset maps, and texture dimensions to clipboard while pruning token bloat."
     outputs.upToDateWhen { false }
 
     def rootDir = layout.projectDirectory
@@ -219,9 +219,21 @@ tasks.register('copyStudioPrompt') {
         rootDir.dir("src/generated/resources")
     ]
 
+    // Code files we always want to read completely
+    def criticalTextExtensions = ['.java', '.json', '.toml', '.cfg', '.txt']
+    
+    // Paths we want to summarize rather than reading fully (Massive token savers)
+    def highlyRepetitivePaths = [
+        'src/generated/resources/data/sfmflow/advancement',
+        'src/generated/resources/data/sfmflow/loot_table',
+        'src/main/resources/assets/sfmflow/lang' // Keep main lang, prune others if multi-lingual bloat
+    ]
+
     doLast {
         def snapshotBuilder = new StringBuilder()
         def timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
+        def skippedFilesCount = 0
+        def regularFilesCount = 0
         
         snapshotBuilder.append("[CURRENT CODEBASE SNAPSHOT - SYNCED: ${timestamp}]\n")
         
@@ -231,30 +243,47 @@ tasks.register('copyStudioPrompt') {
                 dirFile.eachFileRecurse { file ->
                     if (file.isFile() && !file.path.contains(".gradle") && !file.path.contains("bin")) {
                         def relPath = rootDir.asFile.toPath().relativize(file.toPath())
-                        def isPng = file.name.endsWith('.png')
-                        def isBinary = isPng || file.name.endsWith('.ogg') || file.name.endsWith('.bbmodel')
+                        def pathString = relPath.toString().replace('\\', '/')
+                        def fileName = file.name.toLowerCase()
+                        
+                        def isPng = fileName.endsWith('.png')
+                        def isBinary = isPng || fileName.endsWith('.ogg') || fileName.endsWith('.bbmodel') || fileName.endsWith('.jar')
 
-                        snapshotBuilder.append("\n--- FILE: ${relPath} ---\n")
+                        // Check if file belongs to a massive auto-generated category
+                        def isRepetitiveData = highlyRepetitivePaths.any { pathString.contains(it) }
+
+                        snapshotBuilder.append("\n--- FILE: ${pathString} ---\n")
                         
                         if (isBinary) {
                             snapshotBuilder.append("[BINARY ASSET DETECTED]\n")
                             snapshotBuilder.append("FILE_NAME: ${file.name}\n")
-                            snapshotBuilder.append("VERIFIED_PATH: resources/${relPath.toString().replace('\\', '/')}\n")
+                            snapshotBuilder.append("VERIFIED_PATH: resources/${pathString}\n")
                             
-                            // Image Dimension Extraction
                             if (isPng) {
                                 try {
                                     def img = ImageIO.read(file)
                                     if (img != null) {
                                         snapshotBuilder.append("DIMENSIONS: ${img.width}x${img.height}px\n")
-                                        img.flush() // Free resources
+                                        img.flush()
                                     }
                                 } catch (Exception e) {
                                     snapshotBuilder.append("DIMENSIONS: [Unknown/Readable Error]\n")
                                 }
                             }
+                        } else if (isRepetitiveData && fileName.endsWith('.json')) {
+                            // Token Saver: Give Studio the structural existence of the asset without thousands of JSON lines
+                            snapshotBuilder.append("[AUTO-GENERATED REPETITIVE DATA PRUNED]\n")
+                            snapshotBuilder.append("SUMMARY: This file exists to register game data registry mechanics.\n")
+                            skippedFilesCount++
                         } else {
-                            snapshotBuilder.append(file.getText('UTF-8'))
+                            // Only append text if it matches our dev extensions
+                            def hasValidExtension = criticalTextExtensions.any { fileName.endsWith(it) }
+                            if (hasValidExtension) {
+                                snapshotBuilder.append(file.getText('UTF-8'))
+                                regularFilesCount++
+                            } else {
+                                snapshotBuilder.append("[UNKNOWN TEXT ASSET SKIPPED]\n")
+                            }
                         }
                         snapshotBuilder.append("\n--- END FILE ---\n")
                     }
@@ -267,13 +296,13 @@ tasks.register('copyStudioPrompt') {
         try {
             def selection = new StringSelection(snapshotBuilder.toString())
             Toolkit.defaultToolkit.systemClipboard.setContents(selection, selection)
-            println "Snapshot synced (with Texture Specs) at ${timestamp}."
+            println "Snapshot synced to clipboard at ${timestamp}."
+            println "Processed: ${regularFilesCount} files fully | Structural Summaries: ${skippedFilesCount} data maps."
         } catch (Exception e) {
             System.err.println("Clipboard failure: ${e.message}")
         }
     }
 }
-
 
 
 

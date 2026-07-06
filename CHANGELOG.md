@@ -1,11 +1,24 @@
 7-5-2026-2
 
 ### [Added]
+* Fluid Input and Fluid Output Nodes: Flowchart nodes designed to extract, deposit, and route liquids across network cables.
+* Vanilla Cauldron Support: Water, lava, and empty cauldrons are now recognized as valid fluid network terminals, allowing players to fill or drain them automatically.
+* Special Block Capability Registry: A developer API allowing third-party add-ons to bridge standard blocks that do not natively implement NeoForge capabilities to the physical cable network.
+* Ench and Damage settings overlays: Sub-panels inside the advanced item filter cards now feature custom configurations.
 * New unified execution logging channel to cleanly monitor flowchart triggers, item routing, and settings warnings in debug logs.
 
 ### [Changed]
+* Topological Capability Registry: Hardcoded network checks have been migrated to a registry-based pattern, laying the groundwork for energy and chemical integration.
+* Submenu Layouts: Category hover menus are now wider, centering their columns and incorporating better vertical spacing.
+* Planning Safety: Asynchronous flowchart planning now runs against immutable thread-safe snapshots of scanned block configurations to prevent state desyncs.
 * Refactored core internal logic to completely separate flowchart data models from their pathfinding planners, making the codebase more modular.
 * Moved copy, delete, and movement canvas actions out of the main block controller into a dedicated canvas actions handler.
+
+### [Fixed]
+* Symmetrical Grid Centering: Custom slot configuration popups now align and center their grids relative to the number of available slots.
+
+### [Removed]
+* Hardcoded Capability Enums: Eliminated the legacy ConnectionBlockType enum to prevent system constraints on future capability additions.
 
 
 7-5-2026

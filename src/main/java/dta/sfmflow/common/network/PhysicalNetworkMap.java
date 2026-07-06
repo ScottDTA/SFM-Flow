@@ -1,15 +1,17 @@
 package dta.sfmflow.common.network;
 
-import dta.sfmflow.util.ConnectionBlockType;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
 
+import java.util.BitSet;
 import java.util.Collection;
-import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Backing graph map that converts coordinates to primitive ID sequences [3].
@@ -25,20 +27,16 @@ public class PhysicalNetworkMap {
 
 	// Spatial Chunk-Boundary Groupings [3]
 	private final Long2ObjectOpenHashMap<IntArrayList> chunkToNodeGroup = new Long2ObjectOpenHashMap<>();
-	private final java.util.BitSet sleepingNodes = new java.util.BitSet();
+	private final BitSet sleepingNodes = new BitSet();
 
 	// Multi-Capability Sorting Indices [3]
-	private final EnumMap<ConnectionBlockType, IntArrayList> capabilityIndices = new EnumMap<>(
-			ConnectionBlockType.class);
+	private final Map<ResourceLocation, IntArrayList> capabilityIndices = new HashMap<>();
 
 	/**
-	 * Initializes the PhysicalNetworkMap and populates the capability lists [3].
+	 * Initializes the PhysicalNetworkMap [3].
 	 */
 	public PhysicalNetworkMap() {
 		this.posToId.defaultReturnValue(-1); // Safety bounds: represent unassigned positions
-		for (ConnectionBlockType type : ConnectionBlockType.values()) {
-			capabilityIndices.put(type, new IntArrayList());
-		}
 	}
 
 	public int getOrAddNode(BlockPos pos) {
@@ -82,25 +80,22 @@ public class PhysicalNetworkMap {
 	/**
 	 * Registers a node ID under its scanned capability classification list [3].
 	 *
-	 * @param type the capability classification [3]
+	 * @param type the capability classification ResourceLocation [3]
 	 * @param id   the registered node ID [3]
 	 */
-	public void indexCapability(ConnectionBlockType type, int id) {
-		IntArrayList list = capabilityIndices.get(type);
-		if (list != null && !list.contains(id)) {
-			list.add(id);
-		}
+	public void indexCapability(ResourceLocation type, int id) {
+		capabilityIndices.computeIfAbsent(type, k -> new IntArrayList()).add(id);
 	}
 
 	/**
 	 * Retrieves all registered node IDs matching a target capability classification
 	 * [3].
 	 *
-	 * @param type capability classification [3]
+	 * @param type capability classification ResourceLocation [3]
 	 * @return primitive list of node IDs [3]
 	 */
-	public IntArrayList getNodesWithCapability(ConnectionBlockType type) {
-		return capabilityIndices.get(type);
+	public IntArrayList getNodesWithCapability(ResourceLocation type) {
+		return capabilityIndices.getOrDefault(type, new IntArrayList());
 	}
 
 	/**

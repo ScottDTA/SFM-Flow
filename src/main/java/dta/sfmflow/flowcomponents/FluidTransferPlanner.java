@@ -1,0 +1,400 @@
+package dta.sfmflow.flowcomponents;
+
+import dta.sfmflow.api.execution.FlowFluidBuffer;
+import dta.sfmflow.api.execution.FlowchartPlanningContext;
+import dta.sfmflow.api.logging.FlowLogger;
+import dta.sfmflow.util.ConnectionBlock;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.jetbrains.annotations.Nullable;
+
+/**
+ * Common, stateless helper consolidating fluid transfer simulation, extraction,
+ * and deposition planning routines [3].
+ */
+public final class FluidTransferPlanner {
+
+	/**
+	 * Unique key tracking a specific fluid tank coordinate during the simulation
+	 * sweep [3].
+	 */
+	public record TankKey(BlockPos pos, @Nullable Direction side, int tankIndex) {
+	}
+
+	private FluidTransferPlanner() {
+	}
+
+	@SuppressWarnings("unchecked")
+	private static Map<TankKey, FluidStack> getSimulatedTanks(FlowchartPlanningContext context) {
+		ResourceLocation fluidTanksKey = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid_tanks_snapshot");
+		Object obj = context.getPipelineBuffer(new UUID(0, 0), fluidTanksKey);
+		if (obj instanceof Map) {
+			return (Map<TankKey, FluidStack>) obj;
+		}
+		Map<TankKey, FluidStack> map = new HashMap<>();
+		context.setPipelineBuffer(new UUID(0, 0), fluidTanksKey, map);
+		return map;
+	}
+
+	private static FluidStack getSimulatedFluid(IFluidHandler handler, BlockPos pos, @Nullable Direction side,
+			int tankIndex, Map<TankKey, FluidStack> simulatedTanks) {
+		TankKey key = new TankKey(pos, side, tankIndex);
+		return simulatedTanks.computeIfAbsent(key, k -> handler.getFluidInTank(tankIndex).copy());
+	}
+
+	private static FluidStack simulateDrain(IFluidHandler handler, BlockPos pos, @Nullable Direction side,
+			int tankIndex, int maxDrain, Map<TankKey, FluidStack> simulatedTanks) {
+		TankKey key = new TankKey(pos, side, tankIndex);
+		FluidStack simulated = simulatedTanks.computeIfAbsent(key, k -> handler.getFluidInTank(tankIndex).copy());
+		if (simulated.isEmpty() || maxDrain <= 0) {
+			return FluidStack.EMPTY;
+		}
+		int toDrain = Math.min(simulated.getAmount(), maxDrain);
+		FluidStack drained = simulated.copy();
+		drained.setAmount(toDrain);
+
+		simulated.shrink(toDrain);
+		return drained;
+	}
+
+	private static int simulateFill(IFluidHandler handler, BlockPos pos, @Nullable Direction side, int tankIndex,
+			FluidStack resource, Map<TankKey, FluidStack> simulatedTanks) {
+		if (resource.isEmpty())
+			return 0;
+		TankKey key = new TankKey(pos, side, tankIndex);
+		FluidStack simulated = simulatedTanks.computeIfAbsent(key, k -> handler.getFluidInTank(tankIndex).copy());
+
+		int capacity = handler.getTankCapacity(tankIndex);
+		if (simulated.isEmpty()) {
+			if (handler.isFluidValid(tankIndex, resource)) {
+				int toFill = Math.min(capacity, resource.getAmount());
+				FluidStack filled = resource.copy();
+				filled.setAmount(toFill);
+				simulatedTanks.put(key, filled);
+				return toFill;
+			}
+			return 0;
+		}
+
+		if (FluidStack.isSameFluid(simulated, resource)) {
+			int space = capacity - simulated.getAmount();
+			int toFill = Math.min(space, resource.getAmount());
+			simulated.grow(toFill);
+			return toFill;
+		}
+
+		return 0;
+	}
+
+	public static void planInput(FlowchartPlanningContext context, FluidTransferComponent component) {
+		FlowFluidBuffer myOutputBuffer = new FlowFluidBuffer();
+
+		// Carry over any incoming fluids passed from upstream input nodes
+		FlowFluidBuffer myInputBuffer = context.getFluidComponentBuffer(component.getId());
+		if (!myInputBuffer.isEmpty()) {
+			for (FlowFluidBuffer.BufferedFluid fluid : myInputBuffer.getFluids()) {
+				myOutputBuffer.add(fluid.srcPos(), fluid.srcSlot(), fluid.srcSide(), fluid.stack().copy());
+			}
+		}
+
+		// Extract our own configured fluid tanks into the combined buffer
+		extractFluidsIntoBuffer(context, component, myOutputBuffer);
+
+		// Copy extracted buffer contents onto connected target input buffers
+		// sequentially
+		if (!myOutputBuffer.isEmpty()) {
+			for (var conn : context.getConnections()) {
+				if (conn.getSourceComponentId().equals(component.getId())) {
+					UUID targetId = conn.getTargetComponentId();
+					FlowFluidBuffer targetInputBuffer = context.getFluidComponentBuffer(targetId);
+
+					for (FlowFluidBuffer.BufferedFluid fluid : myOutputBuffer.getFluids()) {
+						targetInputBuffer.add(fluid.srcPos(), fluid.srcSlot(), fluid.srcSide(), fluid.stack().copy());
+					}
+					context.enqueue(targetId);
+				}
+			}
+		}
+	}
+
+	public static void planOutput(FlowchartPlanningContext context, FluidTransferComponent component) {
+		FlowFluidBuffer myInputBuffer = context.getFluidComponentBuffer(component.getId());
+
+		if (!myInputBuffer.isEmpty()) {
+			FlowFluidBuffer myOutputBuffer = new FlowFluidBuffer();
+			depositFluidsFromBuffer(context, component, myInputBuffer, myOutputBuffer);
+
+			// Propagate remaining un-deposited leftovers downstream along the connection
+			// lines
+			for (var conn : context.getConnections()) {
+				if (conn.getSourceComponentId().equals(component.getId())) {
+					UUID targetId = conn.getTargetComponentId();
+					FlowFluidBuffer targetInputBuffer = context.getFluidComponentBuffer(targetId);
+
+					for (FlowFluidBuffer.BufferedFluid fluid : myOutputBuffer.getFluids()) {
+						targetInputBuffer.add(fluid.srcPos(), fluid.srcSlot(), fluid.srcSide(), fluid.stack().copy());
+					}
+					context.enqueue(targetId);
+				}
+			}
+		}
+	}
+
+	private static void extractFluidsIntoBuffer(FlowchartPlanningContext context, FluidTransferComponent component,
+			FlowFluidBuffer buffer) {
+		var inventories = context.getConnectedInventories();
+		ConnectionBlock srcInventory = null;
+
+		for (var block : inventories) {
+			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
+				srcInventory = block;
+				break;
+			}
+		}
+
+		if (srcInventory == null) {
+			return;
+		}
+
+		List<Direction> activeSrcSides = new ArrayList<>();
+		for (Direction dir : Direction.values()) {
+			if (component.isSideActive(dir)) {
+				activeSrcSides.add(dir);
+			}
+		}
+		if (activeSrcSides.isEmpty()) {
+			activeSrcSides.add(null);
+		}
+
+		Map<TankKey, FluidStack> simulatedTanks = getSimulatedTanks(context);
+
+		for (Direction srcSide : activeSrcSides) {
+			IFluidHandler srcHandler = srcInventory.getFluidHandler(srcSide);
+			if (srcHandler == null) {
+				continue;
+			}
+
+			int tankCount = srcHandler.getTanks();
+			for (int tankIndex = 0; tankIndex < tankCount; tankIndex++) {
+				if (component.getTargetSlot() != -1 && component.getTargetSlot() != tankIndex) {
+					continue;
+				}
+
+				if (!component.isSlotEnabled(srcSide, tankIndex)) {
+					continue;
+				}
+
+				FluidStack fluidInTank = getSimulatedFluid(srcHandler, srcInventory.getBlockPos(), srcSide, tankIndex,
+						simulatedTanks);
+				if (fluidInTank.isEmpty()) {
+					continue;
+				}
+
+				if (!matchesFilter(component, fluidInTank)) {
+					continue;
+				}
+
+				int totalInSource = fluidInTank.getAmount();
+				int srcLimit = getFilterLimit(component, fluidInTank);
+				int srcRemaining = totalInSource;
+
+				if (component.isWhitelist()) {
+					if (srcLimit > 0) {
+						srcRemaining = Math.min(srcRemaining, srcLimit);
+					}
+				} else {
+					if (srcLimit > 0) {
+						int availableOverLimit = totalInSource - srcLimit;
+						if (availableOverLimit <= 0) {
+							continue;
+						}
+						srcRemaining = Math.min(srcRemaining, availableOverLimit);
+					}
+				}
+
+				if (srcRemaining > 0) {
+					// Simulate the drain in-memory during planning [3]
+					FluidStack extracted = simulateDrain(srcHandler, srcInventory.getBlockPos(), srcSide, tankIndex,
+							srcRemaining, simulatedTanks);
+					if (!extracted.isEmpty()) {
+						FlowLogger.execution("Simulated Extracting Fluid from Tank %d: Side=%s, Amount=%d", tankIndex,
+								srcSide, extracted.getAmount());
+						buffer.add(srcInventory.getBlockPos(), tankIndex, srcSide, extracted);
+					}
+				}
+			}
+		}
+	}
+
+	private static void depositFluidsFromBuffer(FlowchartPlanningContext context, FluidTransferComponent component,
+			FlowFluidBuffer inputBuffer, FlowFluidBuffer outputBuffer) {
+		var inventories = context.getConnectedInventories();
+		ConnectionBlock tgtInventory = null;
+
+		for (var block : inventories) {
+			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
+				tgtInventory = block;
+				break;
+			}
+		}
+
+		if (tgtInventory == null) {
+			for (FlowFluidBuffer.BufferedFluid fluid : inputBuffer.getFluids()) {
+				outputBuffer.add(fluid.srcPos(), fluid.srcSlot(), fluid.srcSide(), fluid.stack().copy());
+			}
+			return;
+		}
+
+		List<Direction> activeTgtSides = new ArrayList<>();
+		for (Direction dir : Direction.values()) {
+			if (component.isSideActive(dir)) {
+				activeTgtSides.add(dir);
+			}
+		}
+		if (activeTgtSides.isEmpty()) {
+			activeTgtSides.add(null);
+		}
+
+		Map<TankKey, FluidStack> simulatedTanks = getSimulatedTanks(context);
+
+		for (FlowFluidBuffer.BufferedFluid incomingFluid : inputBuffer.getFluids()) {
+			FluidStack incoming = incomingFluid.stack();
+			if (incoming.isEmpty())
+				continue;
+
+			if (!matchesFilter(component, incoming)) {
+				outputBuffer.add(incomingFluid.srcPos(), incomingFluid.srcSlot(), incomingFluid.srcSide(),
+						incoming.copy());
+				continue;
+			}
+
+			int remainingToDeposit = incoming.getAmount();
+			int tgtLimit = getFilterLimit(component, incoming);
+
+			for (Direction tgtSide : activeTgtSides) {
+				if (remainingToDeposit <= 0)
+					break;
+
+				IFluidHandler tgtHandler = tgtInventory.getFluidHandler(tgtSide);
+				if (tgtHandler == null) {
+					continue;
+				}
+
+				int tankCount = tgtHandler.getTanks();
+				for (int tankIndex = 0; tankIndex < tankCount; tankIndex++) {
+					if (remainingToDeposit <= 0)
+						break;
+
+					if (component.getTargetSlot() != -1 && component.getTargetSlot() != tankIndex) {
+						continue;
+					}
+
+					if (!component.isSlotEnabled(tgtSide, tankIndex)) {
+						continue;
+					}
+
+					FluidStack fluidInTank = getSimulatedFluid(tgtHandler, tgtInventory.getBlockPos(), tgtSide,
+							tankIndex, simulatedTanks);
+					int totalInTarget = fluidInTank.getAmount();
+					int maxToDeposit = incoming.getAmount();
+
+					if (component.isWhitelist()) {
+						if (tgtLimit > 0) {
+							maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
+							if (maxToDeposit <= 0) {
+								continue;
+							}
+						}
+					}
+
+					FluidStack sample = incoming.copy();
+					sample.setAmount(Math.min(remainingToDeposit, maxToDeposit));
+
+					// Simulate the fill in-memory during planning [3]
+					int filled = simulateFill(tgtHandler, tgtInventory.getBlockPos(), tgtSide, tankIndex, sample,
+							simulatedTanks);
+					if (filled > 0) {
+						boolean success = context.tryWriteFluidTask(incomingFluid.srcPos(), incomingFluid.srcSlot(),
+								incomingFluid.srcSide(), tgtInventory.getBlockPos(), tankIndex, tgtSide, incoming,
+								filled);
+						if (success) {
+							FlowLogger.execution("Simulated Depositing Fluid to Tank %d: Side=%s, Amount=%d", tankIndex,
+									tgtSide, filled);
+							remainingToDeposit -= filled;
+						}
+					}
+				}
+			}
+
+			if (remainingToDeposit > 0) {
+				FluidStack remainingStack = incoming.copy();
+				remainingStack.setAmount(remainingToDeposit);
+				outputBuffer.add(incomingFluid.srcPos(), incomingFluid.srcSlot(), incomingFluid.srcSide(),
+						remainingStack);
+			}
+		}
+	}
+
+	private static boolean matchesFilter(FluidTransferComponent component, FluidStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+
+		boolean found = false;
+		for (ItemStack filter : component.getFilterItems()) {
+			if (filter == null || filter.isEmpty()) {
+				continue;
+			}
+
+			FluidStack filterFluid = getFluidFromItem(filter);
+			if (!filterFluid.isEmpty() && FluidStack.isSameFluid(stack, filterFluid)) {
+				found = true;
+				break;
+			}
+		}
+
+		if (component.isWhitelist()) {
+			return found;
+		} else {
+			return !found;
+		}
+	}
+
+	private static int getFilterLimit(FluidTransferComponent component, FluidStack stack) {
+		for (int i = 0; i < component.getFilterItems().size(); i++) {
+			ItemStack filter = component.getFilterItems().get(i);
+			if (filter == null || filter.isEmpty()) {
+				continue;
+			}
+
+			FluidStack filterFluid = getFluidFromItem(filter);
+			if (!filterFluid.isEmpty() && FluidStack.isSameFluid(stack, filterFluid)) {
+				int limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
+				return limit;
+			}
+		}
+		return -1;
+	}
+
+	public static FluidStack getFluidFromItem(ItemStack stack) {
+		if (stack.isEmpty()) {
+			return FluidStack.EMPTY;
+		}
+		var handler = stack.getCapability(Capabilities.FluidHandler.ITEM);
+		if (handler != null) {
+			return handler.getFluidInTank(0);
+		}
+		return FluidStack.EMPTY;
+	}
+}
