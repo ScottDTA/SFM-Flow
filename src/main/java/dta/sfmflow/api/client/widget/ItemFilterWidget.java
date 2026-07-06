@@ -1,21 +1,29 @@
 package dta.sfmflow.api.client.widget;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.util.MenuSlotRepositioner;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.neoforged.neoforge.fluids.FluidStack;
 
 /**
  * Reusable UI widget managing Whitelist/Blacklist filtering and a 1x12 ghost
@@ -24,8 +32,8 @@ import net.neoforged.api.distmarker.OnlyIn;
  */
 @OnlyIn(Dist.CLIENT)
 public class ItemFilterWidget extends AbstractFlowWidget {
-	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation
-			.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/flowcomponents/filter_slot.png");
+	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/filter_slot.png");
 
 	private final IFilterable model;
 	private final ManagerScreen parentScreen;
@@ -113,7 +121,41 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			}
 
 			if (hasItem) {
-				guiGraphics.renderFakeItem(stack, slotX + 1, slotY + 1);
+				boolean renderAsFluid = model instanceof FluidTransferComponent;
+				boolean drewFluid = false;
+
+				if (renderAsFluid) {
+					var fluidHandler = stack.getCapability(Capabilities.FluidHandler.ITEM);
+					if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+						FluidStack fluidStack = fluidHandler.getFluidInTank(0);
+						if (!fluidStack.isEmpty()) {
+							IClientFluidTypeExtensions clientFluid = IClientFluidTypeExtensions
+									.of(fluidStack.getFluid());
+							ResourceLocation stillTexture = clientFluid.getStillTexture(fluidStack);
+							if (stillTexture != null) {
+								int tintColor = clientFluid.getTintColor(fluidStack);
+								TextureAtlasSprite fluidSprite = Minecraft.getInstance()
+										.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTexture);
+
+								float r = ((tintColor >> 16) & 0xFF) / 255.0F;
+								float g = ((tintColor >> 8) & 0xFF) / 255.0F;
+								float b = (tintColor & 0xFF) / 255.0F;
+								float a = ((tintColor >> 24) & 0xFF) / 255.0F;
+								if (a <= 0.0F)
+									a = 1.0F;
+
+								RenderSystem.setShaderColor(r, g, b, a);
+								guiGraphics.blit(slotX + 1, slotY + 1, 0, 16, 16, fluidSprite);
+								RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+								drewFluid = true;
+							}
+						}
+					}
+				}
+
+				if (!drewFluid) {
+					guiGraphics.renderFakeItem(stack, slotX + 1, slotY + 1);
+				}
 				guiGraphics.renderItemDecorations(parentScreen.getFont(), stack, slotX + 1, slotY + 1);
 
 				// Render "MID" overlay on variable cards that have UseModId enabled [3]
@@ -156,7 +198,6 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			}
 		}
 	}
-
 
 	@Override
 	public void setX(int x) {

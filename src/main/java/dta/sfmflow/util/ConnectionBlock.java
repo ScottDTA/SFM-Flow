@@ -1,6 +1,8 @@
 package dta.sfmflow.util;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import net.minecraft.core.BlockPos;
@@ -8,12 +10,13 @@ import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
 
+import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 
 /**
@@ -28,8 +31,9 @@ public class ConnectionBlock implements IContainerSelection {
 	private int id;
 	private boolean sleeping = false;
 
-	private BlockCapabilityCache<IItemHandler, Direction> itemCache;
-	private BlockCapabilityCache<IFluidHandler, Direction> fluidCache;
+	// Dynamic capability cache matrix replacing hardcoded item and fluid cache
+	// fields [3]
+	private final Map<ResourceLocation, BlockCapabilityCache<?, Direction>> capabilityCaches = new HashMap<>();
 
 	public ConnectionBlock(BlockPos blockPos, int cableDistance) {
 		this.blockPos = blockPos;
@@ -70,12 +74,61 @@ public class ConnectionBlock implements IContainerSelection {
 		return this.types;
 	}
 
-	public void setItemCache(BlockCapabilityCache<IItemHandler, Direction> itemCache) {
-		this.itemCache = itemCache;
+	/**
+	 * Registers a dynamically allocated BlockCapabilityCache under its capability
+	 * registry ID [3].
+	 */
+	public void registerCache(ResourceLocation capId, BlockCapabilityCache<?, Direction> cache) {
+		this.capabilityCaches.put(capId, cache);
 	}
 
-	public void setFluidCache(BlockCapabilityCache<IFluidHandler, Direction> fluidCache) {
-		this.fluidCache = fluidCache;
+	/**
+	 * Safely retrieves an active capability handler, utilizing the dynamic caches
+	 * on demand with automatic single-threaded level lookups as an invalidation
+	 * fallback [3].
+	 */
+	@SuppressWarnings("unchecked")
+	public @Nullable <T> T getHandler(ResourceLocation capId, Class<T> clazz, @Nullable Direction side) {
+		if (this.sleeping) {
+			return null;
+		}
+
+		BlockCapabilityCache<?, Direction> cache = this.capabilityCaches.get(capId);
+		if (cache != null) {
+			try {
+				Object handler = cache.getCapability();
+				if (clazz.isInstance(handler)) {
+					return clazz.cast(handler);
+				}
+			} catch (IllegalStateException e) {
+				// Fallback dynamically if the cache is temporarily invalidated [3]
+			}
+		}
+
+		// Live lookup fallback for dynamically loaded components and special capability
+		// bridges [3]
+		var flowCap = FlowCapabilityRegistry.get(capId);
+		if (flowCap != null && flowCap.getCapability() != null && this.level != null) {
+			Object handler = this.level.getCapability((BlockCapability<Object, Direction>) flowCap.getCapability(),
+					this.blockPos, side);
+			if (handler == null) {
+				handler = SpecialBlockCapabilityRegistry.getCapability(
+						(BlockCapability<Object, Direction>) flowCap.getCapability(), this.level, this.blockPos,
+						this.level.getBlockState(this.blockPos), side);
+			}
+			if (clazz.isInstance(handler)) {
+				return clazz.cast(handler);
+			}
+		}
+		return null;
+	}
+
+	public @Nullable IItemHandler getItemHandler(@Nullable Direction side) {
+		return getHandler(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"), IItemHandler.class, side);
+	}
+
+	public @Nullable IFluidHandler getFluidHandler(@Nullable Direction side) {
+		return getHandler(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"), IFluidHandler.class, side);
 	}
 
 	/**
@@ -99,44 +152,6 @@ public class ConnectionBlock implements IContainerSelection {
 		}
 		return Component.literal(baseName.getString() + " at (" + this.blockPos.getX() + ", " + this.blockPos.getY()
 				+ ", " + this.blockPos.getZ() + ")");
-	}
-
-	public @Nullable IItemHandler getItemHandler(@Nullable Direction side) {
-		if (this.sleeping) {
-			return null;
-		}
-		IItemHandler handler = null;
-		if (this.itemCache != null) {
-			try {
-				handler = this.itemCache.getCapability();
-			} catch (IllegalStateException e) {
-			}
-		}
-		if (handler == null && this.level != null) {
-			// Consult the capability bridge fallback [3]
-			handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK, this.level,
-					this.blockPos, this.level.getBlockState(this.blockPos), side);
-		}
-		return handler;
-	}
-
-	public @Nullable IFluidHandler getFluidHandler(@Nullable Direction side) {
-		if (this.sleeping) {
-			return null;
-		}
-		IFluidHandler handler = null;
-		if (this.fluidCache != null) {
-			try {
-				handler = this.fluidCache.getCapability();
-			} catch (IllegalStateException e) {
-			}
-		}
-		if (handler == null && this.level != null) {
-			// Consult the capability bridge fallback [3]
-			handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK, this.level,
-					this.blockPos, this.level.getBlockState(this.blockPos), side);
-		}
-		return handler;
 	}
 
 	@Override

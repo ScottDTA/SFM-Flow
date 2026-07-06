@@ -14,8 +14,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
-import net.neoforged.neoforge.capabilities.Capabilities;
 
 import java.util.*;
 
@@ -102,7 +102,7 @@ public class PhysicalNetwork {
 		this.scannedInventories.clear();
 		this.networkMap.clear();
 
-		java.util.BitSet visited = new java.util.BitSet();
+		BitSet visited = new BitSet();
 		Queue<ScanNode> queue = new ArrayDeque<>();
 
 		int startId = this.networkMap.getOrAddNode(startPos);
@@ -179,6 +179,7 @@ public class PhysicalNetwork {
 				this.scannedCables.size(), this.scannedInventories.size());
 	}
 
+	@SuppressWarnings("unchecked")
 	private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth,
 			java.util.BitSet visited, boolean isCableComponent) {
 		int posId = this.networkMap.getOrAddNode(pos);
@@ -212,10 +213,17 @@ public class PhysicalNetwork {
 			connection.setTypes(discoveredTypes);
 
 			if (level instanceof ServerLevel serverLevel) {
-				connection.setItemCache(
-						BlockCapabilityCache.create(Capabilities.ItemHandler.BLOCK, serverLevel, pos, Direction.UP));
-				connection.setFluidCache(
-						BlockCapabilityCache.create(Capabilities.FluidHandler.BLOCK, serverLevel, pos, Direction.UP));
+				// Dynamically allocate and register BlockCapabilityCache for each discovered
+				// capability [3]
+				for (ResourceLocation capId : discoveredTypes) {
+					var flowCap = FlowCapabilityRegistry.get(capId);
+					if (flowCap != null && flowCap.getCapability() != null) {
+						var cache = BlockCapabilityCache.create(
+								(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos,
+								Direction.UP);
+						connection.registerCache(capId, cache);
+					}
+				}
 			}
 
 			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent

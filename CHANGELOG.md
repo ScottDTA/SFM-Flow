@@ -1,3 +1,17 @@
+7-6-2026
+
+### [Added]
+* Dynamic Fluid Renderers: Ghost filter slots and slot preview panels now dynamically render actual fluids (such as water or lava) rather than generic bucket items, facilitating fluid transfer configurations.
+* Multi-Level Cauldron Transfers: Fluid networks can now fill or drain multiple levels of a cauldron in a single operation.
+
+### [Changed]
+* Dynamic Network Cache Matrix: Replaced hardcoded capability caching with a dynamic, registry-driven caching engine to optimize network scans and facilitate future energy or custom capability expansions.
+
+### [Fixed]
+* Cauldron Fluid Fractional Losses: Resolved a rounding desync where completely draining or filling a cauldron reported a microscopic 1 mB fraction loss (999 mB instead of 1000 mB), which previously caused filter desyncs.
+
+
+
 7-5-2026-2
 
 ### [Added]

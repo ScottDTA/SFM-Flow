@@ -15,6 +15,7 @@ import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -23,6 +24,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -30,7 +32,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.network.PacketDistributor;
 
@@ -39,14 +43,16 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+
 /**
  * Symmetrical slot configuration modal popup that allows players to toggle
- * which slots or tanks in an inventory are active for a specific side [3].
+ * which slots in an inventory are active for a specific side [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class SlotLayoutModalPopup extends AbstractModalPopup {
-	private static final ResourceLocation SLOT_TEXTURE = ResourceLocation
-			.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/flowcomponents/generic_slot.png");
+	private static final ResourceLocation SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/generic_slot.png");
 
 	private static final int GRID_START_Y = 20;
 
@@ -93,24 +99,24 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			if (isFluid) {
 				this.nullFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, blockPos, null);
 				if (this.nullFluidHandler == null) {
-					this.nullFluidHandler = SpecialBlockCapabilityRegistry.getCapability(
-							Capabilities.FluidHandler.BLOCK, level, blockPos, state, null);
+					this.nullFluidHandler = SpecialBlockCapabilityRegistry
+							.getCapability(Capabilities.FluidHandler.BLOCK, level, blockPos, state, null);
 				}
 				sideFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, blockPos, side);
 				if (sideFluidHandler == null) {
-					sideFluidHandler = SpecialBlockCapabilityRegistry.getCapability(
-							Capabilities.FluidHandler.BLOCK, level, blockPos, state, side);
+					sideFluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
+							level, blockPos, state, side);
 				}
 			} else {
 				this.nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, null);
 				if (this.nullHandler == null) {
-					this.nullHandler = SpecialBlockCapabilityRegistry.getCapability(
-							Capabilities.ItemHandler.BLOCK, level, blockPos, state, null);
+					this.nullHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
+							level, blockPos, state, null);
 				}
 				sideHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, blockPos, side);
 				if (sideHandler == null) {
-					sideHandler = SpecialBlockCapabilityRegistry.getCapability(
-							Capabilities.ItemHandler.BLOCK, level, blockPos, state, side);
+					sideHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK, level,
+							blockPos, state, side);
 				}
 			}
 		}
@@ -160,7 +166,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			this.unscaledHeight = this.layout.height();
 		} else {
 			int cols = Math.min(9, this.totalSlots);
-			if (cols <= 0) cols = 9;
+			if (cols <= 0)
+				cols = 9;
 			int rows = (this.totalSlots + cols - 1) / cols;
 			if (rows <= 0)
 				rows = 1;
@@ -223,7 +230,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 		if (button == 0 && this.layout == null && this.totalSlots > 0) {
 			int cols = Math.min(9, this.totalSlots);
-			if (cols <= 0) cols = 9;
+			if (cols <= 0)
+				cols = 9;
 			int gridW = cols * 20 - 2;
 			int startGridX = (this.unscaledWidth - gridW) / 2;
 
@@ -330,7 +338,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		} else {
 			int cols = Math.min(9, this.totalSlots);
-			if (cols <= 0) cols = 9;
+			if (cols <= 0)
+				cols = 9;
 			int gridW = cols * 20 - 2;
 			int startGridX = (this.unscaledWidth - gridW) / 2;
 
@@ -354,7 +363,38 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					if (cachedItems != null && i >= 0 && i < cachedItems.length) {
 						ItemStack stack = cachedItems[i];
 						if (stack != null && !stack.isEmpty()) {
-							guiGraphics.renderItem(stack, slotX + 1, slotY + 1);
+							boolean drewFluid = false;
+							if (isFluid) {
+								var fluidHandler = stack.getCapability(Capabilities.FluidHandler.ITEM);
+								if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+									FluidStack fluidStack = fluidHandler.getFluidInTank(0);
+									if (!fluidStack.isEmpty()) {
+										IClientFluidTypeExtensions clientFluid = IClientFluidTypeExtensions
+												.of(fluidStack.getFluid());
+										ResourceLocation stillTexture = clientFluid.getStillTexture(fluidStack);
+										if (stillTexture != null) {
+											int tintColor = clientFluid.getTintColor(fluidStack);
+											TextureAtlasSprite fluidSprite = Minecraft.getInstance()
+													.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTexture);
+
+											float r = ((tintColor >> 16) & 0xFF) / 255.0F;
+											float g = ((tintColor >> 8) & 0xFF) / 255.0F;
+											float b = (tintColor & 0xFF) / 255.0F;
+											float a = ((tintColor >> 24) & 0xFF) / 255.0F;
+											if (a <= 0.0F)
+												a = 1.0F;
+
+											RenderSystem.setShaderColor(r, g, b, a);
+											guiGraphics.blit(slotX + 1, slotY + 1, 0, 16, 16, fluidSprite);
+											RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+											drewFluid = true;
+										}
+									}
+								}
+							}
+							if (!drewFluid) {
+								guiGraphics.renderItem(stack, slotX + 1, slotY + 1);
+							}
 						}
 					}
 
@@ -409,7 +449,8 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				}
 			} else {
 				int cols = Math.min(9, this.totalSlots);
-				if (cols <= 0) cols = 9;
+				if (cols <= 0)
+					cols = 9;
 				int gridW = cols * 20 - 2;
 				int startGridX = (this.unscaledWidth - gridW) / 2;
 				int scaledStartX = getX() + (int) (startGridX * 0.5);
