@@ -7,9 +7,11 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
-import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.energy.IEnergyStorage;
-import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry; // Added import [3]
+import net.neoforged.neoforge.capabilities.Capabilities;
+import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.util.ConnectionBlock;
 import org.jetbrains.annotations.Nullable;
@@ -22,9 +24,8 @@ import java.util.Map;
 
 /**
  * Immutable thread-safe snapshot container holding deep copies of target
- * inventory slot configurations [3]. Instantiated strictly on the main server
- * thread to prevent concurrency collisions during evaluation runs [3]. Upgraded
- * to support side-specific capability indexing and main slot mapping [3].
+ * inventory, fluid tank, and energy configurations [3]. Instantiated strictly on the main server
+ * thread to prevent concurrency collisions during evaluation runs [3].
  */
 public final class ThreadSafeInventorySnapshot {
 
@@ -39,22 +40,38 @@ public final class ThreadSafeInventorySnapshot {
 			this.slots = new HashMap<>(slots);
 		}
 	}
-	
+
+	// Capture fluid tank data thread-safely [3]
+	public record TankSnapshot(FluidStack stack, int capacity) {
+		public TankSnapshot {
+			stack = stack.copy(); // Ensure a deep copy of the FluidStack [3]
+		}
+	}
+
+	public record FluidInventorySnapshot(Map<Integer, TankSnapshot> tanks) {
+		public FluidInventorySnapshot(Map<Integer, TankSnapshot> tanks) {
+			this.tanks = new HashMap<>(tanks);
+		}
+	}
+
+	// Capture Forge Energy parameters thread-safely [3]
 	public record EnergySnapshot(int energyStored, int maxEnergyStored, boolean canExtract, boolean canReceive) {}
-	
-	// Composite key mapping coordinates and active sides to their respective slots
-	// [3]
+
+	// Composite key mapping coordinates and active sides to their respective slots [3]
 	public record SnapshotKey(BlockPos pos, @Nullable Direction side) {
 	}
 
 	private final Map<SnapshotKey, InventorySnapshot> snapshotMap;
+	private final Map<SnapshotKey, FluidInventorySnapshot> fluidSnapshotMap;
 	private final Map<SnapshotKey, EnergySnapshot> energySnapshotMap;
 	private final List<ConnectionBlock> capturedInventories;
 
 	private ThreadSafeInventorySnapshot(Map<SnapshotKey, InventorySnapshot> snapshotMap,
+			Map<SnapshotKey, FluidInventorySnapshot> fluidSnapshotMap,
 			Map<SnapshotKey, EnergySnapshot> energySnapshotMap,
 			List<ConnectionBlock> capturedInventories) {
 		this.snapshotMap = Collections.unmodifiableMap(new HashMap<>(snapshotMap));
+		this.fluidSnapshotMap = Collections.unmodifiableMap(new HashMap<>(fluidSnapshotMap));
 		this.energySnapshotMap = Collections.unmodifiableMap(new HashMap<>(energySnapshotMap));
 		this.capturedInventories = Collections.unmodifiableList(new ArrayList<>(capturedInventories));
 	}
@@ -68,6 +85,7 @@ public final class ThreadSafeInventorySnapshot {
 	 */
 	public static ThreadSafeInventorySnapshot create(ManagerBlockEntity manager) {
 		Map<SnapshotKey, InventorySnapshot> map = new HashMap<>();
+		Map<SnapshotKey, FluidInventorySnapshot> fluidMap = new HashMap<>();
 		Map<SnapshotKey, EnergySnapshot> energyMap = new HashMap<>();
 		List<ConnectionBlock> capturedList = new ArrayList<>();
 		Level level = manager.getLevel();
@@ -78,7 +96,7 @@ public final class ThreadSafeInventorySnapshot {
 				if (level.hasChunkAt(pos)) {
 					BlockEntity be = level.getBlockEntity(pos);
 					
-					// Index non-directional item capability
+					// Snapshot Item Handlers (non-directional)
 					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
 					if (nullHandler == null) {
 						nullHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
@@ -88,14 +106,29 @@ public final class ThreadSafeInventorySnapshot {
 						map.put(new SnapshotKey(pos, null), createInventorySnapshot(nullHandler, be, null));
 					}
 					
-					// Index non-directional energy capability [3]
+					// Snapshot Fluid Handlers (non-directional)
+					IFluidHandler nullFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null);
+					if (nullFluidHandler == null) {
+						nullFluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
+								level, pos, level.getBlockState(pos), null);
+					}
+					if (nullFluidHandler != null) {
+						fluidMap.put(new SnapshotKey(pos, null), createFluidInventorySnapshot(nullFluidHandler));
+					}
+
+					// Snapshot Energy Storages (non-directional)
 					IEnergyStorage nullEnergy = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null);
+					if (nullEnergy == null) {
+						nullEnergy = SpecialBlockCapabilityRegistry.getCapability(Capabilities.EnergyStorage.BLOCK,
+								level, pos, level.getBlockState(pos), null);
+					}
 					if (nullEnergy != null) {
 						energyMap.put(new SnapshotKey(pos, null), new EnergySnapshot(nullEnergy.getEnergyStored(), nullEnergy.getMaxEnergyStored(), nullEnergy.canExtract(), nullEnergy.canReceive()));
 					}
 
 					// Index all 6 active directions independently [3]
 					for (Direction dir : Direction.values()) {
+						// Item Snapshots
 						IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
 						if (handler == null) {
 							handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
@@ -105,8 +138,22 @@ public final class ThreadSafeInventorySnapshot {
 							map.put(new SnapshotKey(pos, dir), createInventorySnapshot(handler, be, dir));
 						}
 						
-						// Index directional energy capability [3]
+						// Fluid Snapshots
+						IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, dir);
+						if (fluidHandler == null) {
+							fluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
+									level, pos, level.getBlockState(pos), dir);
+						}
+						if (fluidHandler != null) {
+							fluidMap.put(new SnapshotKey(pos, dir), createFluidInventorySnapshot(fluidHandler));
+						}
+						
+						// Energy Snapshots
 						IEnergyStorage energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir);
+						if (energy == null) {
+							energy = SpecialBlockCapabilityRegistry.getCapability(Capabilities.EnergyStorage.BLOCK,
+									level, pos, level.getBlockState(pos), dir);
+						}
 						if (energy != null) {
 							energyMap.put(new SnapshotKey(pos, dir), new EnergySnapshot(energy.getEnergyStored(), energy.getMaxEnergyStored(), energy.canExtract(), energy.canReceive()));
 						}
@@ -114,15 +161,7 @@ public final class ThreadSafeInventorySnapshot {
 				}
 			}
 		}
-		return new ThreadSafeInventorySnapshot(map, energyMap, capturedList);
-	}
-
-	public @Nullable EnergySnapshot getEnergy(BlockPos pos, @Nullable Direction side) {
-		EnergySnapshot direct = energySnapshotMap.get(new SnapshotKey(pos, side));
-		if (direct != null) {
-			return direct;
-		}
-		return energySnapshotMap.get(new SnapshotKey(pos, null));
+		return new ThreadSafeInventorySnapshot(map, fluidMap, energyMap, capturedList);
 	}
 
 	private static InventorySnapshot createInventorySnapshot(IItemHandler handler, @Nullable BlockEntity be,
@@ -131,7 +170,6 @@ public final class ThreadSafeInventorySnapshot {
 		int count = handler.getSlots();
 		int[] faceSlots = null;
 
-		// Resolve WorldlyContainer accessible slot indexes for side-specific mapping
 		if (be instanceof WorldlyContainer worldly && side != null) {
 			faceSlots = worldly.getSlotsForFace(side);
 		}
@@ -147,13 +185,38 @@ public final class ThreadSafeInventorySnapshot {
 		return new InventorySnapshot(slots);
 	}
 
+	private static FluidInventorySnapshot createFluidInventorySnapshot(IFluidHandler handler) {
+		Map<Integer, TankSnapshot> tanks = new HashMap<>();
+		int count = handler.getTanks();
+		for (int i = 0; i < count; i++) {
+			FluidStack stack = handler.getFluidInTank(i);
+			tanks.put(i, new TankSnapshot(stack, handler.getTankCapacity(i)));
+		}
+		return new FluidInventorySnapshot(tanks);
+	}
+
 	public @Nullable InventorySnapshot getInventory(BlockPos pos, @Nullable Direction side) {
 		InventorySnapshot direct = snapshotMap.get(new SnapshotKey(pos, side));
 		if (direct != null) {
 			return direct;
 		}
-		// Fallback to non-directional if side-specific capability is absent [3]
 		return snapshotMap.get(new SnapshotKey(pos, null));
+	}
+
+	public @Nullable FluidInventorySnapshot getFluidInventory(BlockPos pos, @Nullable Direction side) {
+		FluidInventorySnapshot direct = fluidSnapshotMap.get(new SnapshotKey(pos, side));
+		if (direct != null) {
+			return direct;
+		}
+		return fluidSnapshotMap.get(new SnapshotKey(pos, null));
+	}
+
+	public @Nullable EnergySnapshot getEnergy(BlockPos pos, @Nullable Direction side) {
+		EnergySnapshot direct = energySnapshotMap.get(new SnapshotKey(pos, side));
+		if (direct != null) {
+			return direct;
+		}
+		return energySnapshotMap.get(new SnapshotKey(pos, null));
 	}
 
 	public List<ConnectionBlock> getCapturedInventories() {

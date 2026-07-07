@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.UUID;
 
 /**
  * Common, stateless helper consolidating energy transfer simulation, extraction, and
- * deposition planning routines [3].
+ * deposition planning routines utilizing thread-safe snapshots [3].
  */
 public final class EnergyTransferPlanner {
 
@@ -45,6 +46,7 @@ public final class EnergyTransferPlanner {
 	public static void planInput(FlowchartPlanningContext context, EnergyTransferComponent component) {
 		FlowEnergyBuffer myOutputBuffer = new FlowEnergyBuffer();
 
+		// Carry over any incoming energy from upstream nodes [3]
 		FlowEnergyBuffer myInputBuffer = context.getEnergyComponentBuffer(component.getId());
 		if (!myInputBuffer.isEmpty()) {
 			for (FlowEnergyBuffer.BufferedEnergy energy : myInputBuffer.getEnergies()) {
@@ -52,8 +54,10 @@ public final class EnergyTransferPlanner {
 			}
 		}
 
+		// Extract energy from our configured energy block into the combined buffer [3]
 		extractEnergyIntoBuffer(context, component, myOutputBuffer);
 
+		// Copy extracted buffer contents onto connected target input buffers sequentially [3]
 		if (!myOutputBuffer.isEmpty()) {
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
@@ -76,6 +80,7 @@ public final class EnergyTransferPlanner {
 			FlowEnergyBuffer myOutputBuffer = new FlowEnergyBuffer();
 			depositEnergyFromBuffer(context, component, myInputBuffer, myOutputBuffer);
 
+			// Propagate remaining un-deposited leftovers downstream along the connection lines [3]
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
 					UUID targetId = conn.getTargetComponentId();
@@ -133,6 +138,7 @@ public final class EnergyTransferPlanner {
 			if (toExtract > 0) {
 				FlowLogger.execution("Simulating Energy Extract from %s: Side=%s, Amount=%d", srcPos, srcSide, toExtract);
 
+				// Track simulated extraction changes [3]
 				EnergyKey key = new EnergyKey(srcPos, srcSide);
 				simulatedEnergy.put(key, currentEnergy - toExtract);
 
@@ -199,6 +205,7 @@ public final class EnergyTransferPlanner {
 					if (success) {
 						FlowLogger.execution("Simulating Energy Deposit to %s: Side=%s, Amount=%d", tgtPos, tgtSide, toDeposit);
 
+						// Track simulated deposit changes [3]
 						EnergyKey key = new EnergyKey(tgtPos, tgtSide);
 						simulatedEnergy.put(key, currentEnergy + toDeposit);
 
