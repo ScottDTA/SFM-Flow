@@ -4,8 +4,8 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
-import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.api.flowchart.Flowchart;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -15,23 +15,20 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * Cooperative state-machine planning task executing flowchart logic off-thread
- * [3]. Implements a 1000-node traversal limit to prevent stack overflows and
- * cyclic loop lockups [3]. Dynamically delegates planning actions
- * polymorphically to AbstractFlowComponent.plan [3].
+ * Cooperative state-machine planning task executing flowchart logic off-thread [3].
+ * Operates purely on thread-safe isolated snapshots and copies [3].
  */
 public class FlowchartPlanningTask {
-	private final ManagerBlockEntity manager;
+	private final ExecutionRingBuffer executionBuffer;
 	private final ThreadSafeInventorySnapshot snapshot;
 	private final List<FlowComponentConnections> connections;
 	private final Map<UUID, AbstractFlowComponent> components;
+	private final Runnable onCircuitBreakerTripped;
 
 	private final Queue<UUID> evaluationQueue = new ArrayDeque<>();
 	private int nodesTraversed = 0;
 	private boolean completed = false;
 
-	// Dynamic multi-capability pipeline buffer registry mapping components and
-	// their active capability streams [3]
 	private final Map<UUID, Map<ResourceLocation, Object>> pipelineBuffers = new HashMap<>();
 
 	private final FlowchartPlanningContext planningContext = new FlowchartPlanningContext() {
@@ -52,7 +49,7 @@ public class FlowchartPlanningTask {
 
 		@Override
 		public List<ConnectionBlock> getConnectedInventories() {
-			return snapshot.getCapturedInventories(); // Isolated captured inventories snapshot [3]
+			return snapshot.getCapturedInventories();
 		}
 
 		@Override
@@ -66,7 +63,7 @@ public class FlowchartPlanningTask {
 		public boolean tryWriteTask(ResourceLocation capabilityId, BlockPos src, int srcSlot,
 				@Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide,
 				Object taskParams) {
-			return manager.getExecutionBuffer().tryWrite(capabilityId, src, srcSlot, srcSide, dest, destSlot, destSide,
+			return executionBuffer.tryWrite(capabilityId, src, srcSlot, srcSide, dest, destSlot, destSide,
 					taskParams);
 		}
 
@@ -82,12 +79,18 @@ public class FlowchartPlanningTask {
 		}
 	};
 
-	public FlowchartPlanningTask(ManagerBlockEntity manager, ThreadSafeInventorySnapshot snapshot,
-			List<UUID> activeTriggers) {
-		this.manager = manager;
+	public FlowchartPlanningTask(
+			ExecutionRingBuffer executionBuffer,
+			Runnable onCircuitBreakerTripped,
+			ThreadSafeInventorySnapshot snapshot,
+			Flowchart flowchart,
+			List<UUID> activeTriggers
+	) {
+		this.executionBuffer = executionBuffer;
+		this.onCircuitBreakerTripped = onCircuitBreakerTripped;
 		this.snapshot = snapshot;
-		this.connections = new ArrayList<>(manager.getFlowConnections());
-		this.components = new HashMap<>(manager.getFlowComponents());
+		this.connections = flowchart.connections(); // Isolated connection list [3]
+		this.components = flowchart.components();     // Isolated components map [3]
 
 		for (UUID id : activeTriggers) {
 			if (id != null && this.components.containsKey(id)) {
@@ -100,7 +103,7 @@ public class FlowchartPlanningTask {
 		long start = System.nanoTime();
 		while (!evaluationQueue.isEmpty() && (System.nanoTime() - start < budgetNs)) {
 			if (nodesTraversed >= 1000) {
-				manager.incrementBreakerTrips();
+				onCircuitBreakerTripped.run(); // Concurrency-safe atomic callback [3]
 				SFMFlow.LOGGER.error(
 						"[SFM-Flow] Circuit breaker tripped! Flowchart exceeded the 1000-node traversal limit, canceling planning task [3].");
 				completed = true;
@@ -111,7 +114,7 @@ public class FlowchartPlanningTask {
 			AbstractFlowComponent current = components.get(currentId);
 			if (current != null) {
 				nodesTraversed++;
-				current.plan(this.planningContext); // Polymorphic delegation [3]
+				current.plan(this.planningContext);
 			}
 		}
 		if (evaluationQueue.isEmpty()) {

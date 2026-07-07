@@ -7,12 +7,16 @@
 * **Custom Slot Sizes and Textures:** Machine slot layout configurations now support rectangular dimensions and custom textures (such as specific machine backgrounds or colored slot borders) rather than being limited to standard 18x18 squares.
 
 ### [Changed]
+* Thread-Safe Flowchart Planning: Flowchart structure evaluation has been completely isolated from live block entities. By cloning the active flowchart layout on the main thread and parsing it on background worker threads, the mod prevents data corruption and concurrency-related server crashes when editing layouts while they are running.
 * **Thread-Isolated Fluid Simulation:** Enhanced fluid transfer simulations to run entirely within isolated thread-safe snapshots of the world. This isolates the background planner from the active game world, eliminating potential multi-threaded crashes or lag spikes when planning complex liquid movements.
 * **Hardened Energy Snapshots:** Energy snapshots now consult custom capability bridges upon creation, allowing the system to accurately snapshot and simulate energy storage blocks that do not natively expose standard capabilities.
 * **Parity Canvas Limits:** Restored the default workspace node capacity limit to 512 nodes (raised from 100) and increased the maximum config ceiling to 2048 nodes to support massive, complex factory automation layouts with legacy parity.
 * **Energy Input and Energy Output Nodes:** Players can now configure flowchart nodes to extract, route, and deposit Forge Energy (FE/RF) dynamically across connected network machines.
 * **FE Compatibility Settings Panel:** Introduced dedicated settings interfaces for energy nodes, enabling side-specific connection toggles and custom maximum energy transfer rate limitations.
 * **Underlying Energy Simulation:** Standardized thread-safe snapshots and background execution loops to index, simulate, and plan energy movements off-thread before applying them to the world.
+
+### [Fixed]
+* Concurrency Race Conditions: Resolved potential write collisions and thread conflicts by replacing the live breaker-trip counter with a thread-safe atomic counter.
 
 
 7-6-2026

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Set;
@@ -29,6 +30,7 @@ import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
+import dta.sfmflow.kernel.FlowExecutionKernel;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
@@ -89,7 +91,9 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private transient long rollingExecutionTimeNs = 0;
 	private transient int rollingExecutedTasks = 0;
 	private transient int rollingTicks = 0;
-	private transient int planningBreakerTrips = 0;
+	
+	// Atomic counter to avoid raw concurrency writes from background callback sweeps [3]
+	private final AtomicInteger planningBreakerTrips = new AtomicInteger(0);
 
 	public List<InventoryGroupVariable> getGroupVariables() {
 		return this.groupVariables;
@@ -155,11 +159,11 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	}
 
 	public int getBreakerTrips() {
-		return this.planningBreakerTrips;
+		return this.planningBreakerTrips.get();
 	}
 
 	public void incrementBreakerTrips() {
-		this.planningBreakerTrips++;
+		this.planningBreakerTrips.incrementAndGet();
 	}
 
 	private void updateProfiling(long elapsedNs, int tasksExecuted) {
@@ -227,7 +231,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					if (elapsedTrigger < 0) {
 						trigger.setLastExecutionTick(currentTime);
 					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
-						// Centralized execution log routing [3]
 						FlowLogger.execution(
 								"Trigger Fired: ID=%s, Hash=%d, GameTime=%d, LastExecuted=%d, Elapsed=%d, Total=%d",
 								trigger.getId(), System.identityHashCode(trigger), currentTime,
@@ -241,7 +244,23 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 			if (!activeTriggers.isEmpty()) {
 				var snapshot = ThreadSafeInventorySnapshot.create(this);
-				dta.sfmflow.kernel.FlowExecutionKernel.submitTask(this, snapshot, activeTriggers);
+
+				// 1. Clone the active flowchart structure on the main thread using Mojang NBT Codecs [3]
+				var registries = pLevel.registryAccess();
+				var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+				Tag flowchartNbt = Flowchart.CODEC.encodeStart(ops, this.flowchart)
+						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to clone flowchart state for planning: {}", err))
+						.orElse(new CompoundTag());
+
+				// 2. Submit task using decentralized thread-safe parameters and callbacks [3]
+				FlowExecutionKernel.submitTask(
+						this.executionBuffer,
+						this::incrementBreakerTrips,
+						snapshot,
+						flowchartNbt,
+						registries,
+						activeTriggers
+				);
 			}
 
 			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
