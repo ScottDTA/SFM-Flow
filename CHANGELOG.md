@@ -1,10 +1,15 @@
 7-6-2026
 
 ### [Added]
+* Advanced Fluid Filter Card: A new logical component type allowing players to configure standalone, reusable fluid filters with volume limits (in mB), ModID namespace matching, and fluid tag checks.
+* Polymorphic Variable Drawer: Re-engineered the sliding variable drawer to display both items and fluids together in a single, searchable list.
+* Glint and Fluid Card Renders: Dynamic filter cards carrying fluid properties now programmatically render the still texture of their contained fluid on the card's face at 50% scale.
+* Full-Bright 3D Previews: Rewrote the 3D block renderer to force a consistent maximum light level, preventing environmental shadows from making block previews look dark or obscure.
 * Dynamic Fluid Renderers: Ghost filter slots and slot preview panels now dynamically render actual fluids (such as water or lava) rather than generic bucket items, facilitating fluid transfer configurations.
 * Multi-Level Cauldron Transfers: Fluid networks can now fill or drain multiple levels of a cauldron in a single operation.
 
 ### [Changed]
+* Dynamic Variable Tooltips: Refactored filter card tooltips to dynamically format text based on the variable content, displaying fluid names and millibucket (mB) volumes when a fluid filter is bound.
 * Bridge-Aware Snapshot Scanning: The thread-safe background planner now queries the dynamic capability registry fallbacks when capturing inventories. This ensures that bridged blocks—such as Cauldrons—have their contents properly indexed during logical execution loops.
 * Unified Side-Support Validation: The 3D in-GUI block preview now dynamically queries registered capability bridges to identify and highlight active sides, ensuring correct visual feedback for bridged blocks.
 * Dynamic Network Cache Matrix: Replaced hardcoded capability caching with a dynamic, registry-driven caching engine to optimize network scans and facilitate future energy or custom capability expansions.
