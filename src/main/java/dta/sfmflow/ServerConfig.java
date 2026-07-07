@@ -24,7 +24,6 @@ public class ServerConfig {
 	 */
 	public static final ModConfigSpec.IntValue MAX_EXECUTION_BUDGET_US;
 
-	// Typos fixed: changed ModConfigSpec.SPEC to ModConfigSpec [3]
 	public static final ModConfigSpec SPEC;
 
 	static {
@@ -39,9 +38,10 @@ public class ServerConfig {
 				.translation("sfmflow.configuration.maxCableLength")
 				.defineInRange("maxCableLength", 128, 16, 512);
 
+		// Restored the default canvas limit to 512 nodes to match the hardcoded 1.7.10 limit [3]
 		MAX_COMPONENT_AMOUNT = BUILDER.comment("The maximum number of flow control components/nodes that can be placed on a single Manager layout canvas.")
 				.translation("sfmflow.configuration.maxComponentAmount")
-				.defineInRange("maxComponentAmount", 100, 10, 500);
+				.defineInRange("maxComponentAmount", 512, 10, 2048);
 
 		MIN_INTERVAL_TICKS = BUILDER.comment("The absolute minimum duration (in ticks) allowed for Interval Triggers.")
 				.translation("sfmflow.configuration.minIntervalTicks")

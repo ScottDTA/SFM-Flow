@@ -1,6 +1,11 @@
 7-7-2026
 
 ### [Added]
+* **Side Configuration Registry:** Added a developer-facing registry allowing custom settings screens to be opened when shift-clicking specific block faces inside the 3D machine previews.
+* **Custom Slot Sizes and Textures:** Machine slot layout configurations now support rectangular dimensions and custom textures (such as specific machine backgrounds or colored slot borders) rather than being limited to standard 18x18 squares.
+
+### [Changed]
+* **Parity Canvas Limits:** Restored the default workspace node capacity limit to 512 nodes (raised from 100) and increased the maximum config ceiling to 2048 nodes to support massive, complex factory automation layouts with legacy parity.
 * **Energy Input and Energy Output Nodes:** Players can now configure flowchart nodes to extract, route, and deposit Forge Energy (FE/RF) dynamically across connected network machines.
 * **FE Compatibility Settings Panel:** Introduced dedicated settings interfaces for energy nodes, enabling side-specific connection toggles and custom maximum energy transfer rate limitations.
 * **Underlying Energy Simulation:** Standardized thread-safe snapshots and background execution loops to index, simulate, and plan energy movements off-thread before applying them to the world.

@@ -6,8 +6,7 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.client.layout.FlowLayoutRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
-import dta.sfmflow.api.component.ISlotConfigurable; // Standardized slot configuration [3]
-import dta.sfmflow.api.logging.FlowLogger;
+import dta.sfmflow.api.component.ISlotConfigurable;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.network.ClientInventoryCache;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
@@ -40,15 +39,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.HashSet;
 import java.util.Set;
-
-import javax.annotation.Nullable;
-
+import org.jetbrains.annotations.Nullable;
 import com.mojang.blaze3d.systems.RenderSystem;
 
-/**
- * Symmetrical slot configuration modal popup that allows players to toggle
- * which slots in an inventory are active for a specific side [3].
- */
 @OnlyIn(Dist.CLIENT)
 public class SlotLayoutModalPopup extends AbstractModalPopup {
 	private static final ResourceLocation SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
@@ -118,15 +111,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					sideHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK, level,
 							blockPos, state, side);
 				}
-			}
-		}
-
-		if (this.layout == null) {
-			try {
-				FlowLogger.execution(
-						"Inventory at %s does not have a registered slot layout; falling back to generic grid.",
-						this.blockPos);
-			} catch (Exception ignored) {
 			}
 		}
 
@@ -207,15 +191,17 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			return true;
 		}
 
+		// Hit checks now respect dynamic width and height properties [3]
 		if (button == 0 && this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {
 				int i = entry.index();
 				int slotX = entry.x();
 				int slotY = entry.y();
+				int sWidth = entry.width();
+				int sHeight = entry.height();
 
-				if (localX >= slotX && localX < slotX + 18 && localY >= slotY && localY < slotY + 18) {
+				if (localX >= slotX && localX < slotX + sWidth && localY >= slotY && localY < slotY + sHeight) {
 					if (accessibleSlots.contains(i)) {
-						// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
 						if (sideModel instanceof ISlotConfigurable transfer) {
 							transfer.toggleSlot(side, i);
 							this.onChanged.run();
@@ -244,7 +230,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 				if (localX >= slotX && localX < slotX + 18 && localY >= slotY && localY < slotY + 18) {
 					if (accessibleSlots.contains(i)) {
-						// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
 						if (sideModel instanceof ISlotConfigurable transfer) {
 							transfer.toggleSlot(side, i);
 							this.onChanged.run();
@@ -302,37 +287,78 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				int i = entry.index();
 				int slotX = entry.x();
 				int slotY = entry.y();
+				int sWidth = entry.width();
+				int sHeight = entry.height();
 
-				guiGraphics.blit(SLOT_TEXTURE, slotX, slotY, 0, 0, 18, 18, 18, 18);
+				// Handles optional generic vs custom texture bindings dynamically [3]
+				if (entry.useGenericTexture()) {
+					guiGraphics.blit(SLOT_TEXTURE, slotX, slotY, 0, 0, sWidth, sHeight, 18, 18);
+				} else if (entry.customTexture().isPresent()) {
+					guiGraphics.blit(entry.customTexture().get(), slotX, slotY, 0, 0, sWidth, sHeight, sWidth, sHeight);
+				}
 
 				boolean isAccessible = accessibleSlots.contains(i);
 
 				if (!isAccessible) {
-					guiGraphics.fill(slotX + 1, slotY + 1, slotX + 17, slotY + 17, 0x80151515);
+					guiGraphics.fill(slotX + 1, slotY + 1, slotX + sWidth - 1, slotY + sHeight - 1, 0x80151515);
 
-					for (int k = 0; k < 12; k++) {
-						guiGraphics.fill(slotX + 3 + k, slotY + 3 + k, slotX + 5 + k, slotY + 4 + k, 0xFFFF0000);
-						guiGraphics.fill(slotX + 3 + k, slotY + 14 - k, slotX + 5 + k, slotY + 15 - k, 0xFFFF0000);
+					// Dynamic scaled blocking cross [3]
+					for (int k = 0; k < Math.min(sWidth, sHeight) - 4; k++) {
+						guiGraphics.fill(slotX + 2 + k, slotY + 2 + k, slotX + 3 + k, slotY + 3 + k, 0xFFFF0000);
+						guiGraphics.fill(slotX + 2 + k, slotY + sHeight - 3 - k, slotX + 3 + k, slotY + sHeight - 2 - k, 0xFFFF0000);
 					}
 				} else {
 					if (cachedItems != null && i >= 0 && i < cachedItems.length) {
 						ItemStack stack = cachedItems[i];
 						if (stack != null && !stack.isEmpty()) {
-							guiGraphics.renderItem(stack, slotX + 1, slotY + 1);
+							boolean drewFluid = false;
+							if (isFluid) {
+								var fluidHandler = stack.getCapability(Capabilities.FluidHandler.ITEM);
+								if (fluidHandler != null && fluidHandler.getTanks() > 0) {
+									FluidStack fluidStack = fluidHandler.getFluidInTank(0);
+									if (!fluidStack.isEmpty()) {
+										IClientFluidTypeExtensions clientFluid = IClientFluidTypeExtensions
+												.of(fluidStack.getFluid());
+										ResourceLocation stillTexture = clientFluid.getStillTexture(fluidStack);
+										if (stillTexture != null) {
+											int tintColor = clientFluid.getTintColor(fluidStack);
+											TextureAtlasSprite fluidSprite = Minecraft.getInstance()
+													.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTexture);
+
+											float r = ((tintColor >> 16) & 0xFF) / 255.0F;
+											float g = ((tintColor >> 8) & 0xFF) / 255.0F;
+											float b = (tintColor & 0xFF) / 255.0F;
+											float a = ((tintColor >> 24) & 0xFF) / 255.0F;
+											if (a <= 0.0F)
+												a = 1.0F;
+
+											RenderSystem.setShaderColor(r, g, b, a);
+											guiGraphics.blit(slotX + 1, slotY + 1, 0, sWidth - 2, sHeight - 2, fluidSprite);
+											RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+											drewFluid = true;
+										}
+									}
+								}
+							}
+							if (!drewFluid) {
+								// Center real item representation within rectangular dimensions [3]
+								int centeredItemX = slotX + (sWidth - 16) / 2;
+								int centeredItemY = slotY + (sHeight - 16) / 2;
+								guiGraphics.renderItem(stack, centeredItemX, centeredItemY);
+							}
 						}
 					}
 
 					boolean isEnabled = true;
-					// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
 					if (sideModel instanceof ISlotConfigurable transfer) {
 						isEnabled = transfer.isSlotEnabled(side, i);
 					}
 					if (isEnabled) {
-						guiGraphics.fill(slotX + 1, slotY + 1, slotX + 17, slotY + 17, 0x5039FF14);
-						guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF39FF14);
+						guiGraphics.fill(slotX + 1, slotY + 1, slotX + sWidth - 1, slotY + sHeight - 1, 0x5039FF14);
+						guiGraphics.renderOutline(slotX, slotY, sWidth, sHeight, 0xFF39FF14);
 					} else {
-						guiGraphics.fill(slotX + 1, slotY + 1, slotX + 17, slotY + 17, 0x50FF0000);
-						guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFFFF0000);
+						guiGraphics.fill(slotX + 1, slotY + 1, slotX + sWidth - 1, slotY + sHeight - 1, 0x50FF0000);
+						guiGraphics.renderOutline(slotX, slotY, sWidth, sHeight, 0xFFFF0000);
 					}
 				}
 			}
@@ -399,7 +425,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					}
 
 					boolean isEnabled = true;
-					// Decoupled cast: support any sideModel that implements ISlotConfigurable [3]
 					if (sideModel instanceof ISlotConfigurable transfer) {
 						isEnabled = transfer.isSlotEnabled(side, i);
 					}
@@ -431,8 +456,11 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					int i = entry.index();
 					int slotX = getX() + (int) (entry.x() * 0.5);
 					int slotY = getY() + (int) (entry.y() * 0.5);
+					int scaledW = (int) (entry.width() * 0.5);
+					int scaledH = (int) (entry.height() * 0.5);
 
-					if (mouseX >= slotX && mouseX < slotX + 9 && mouseY >= slotY && mouseY < slotY + 9) {
+					// Dynamic scaled hovering tooltip bounds calculation [3]
+					if (mouseX >= slotX && mouseX < slotX + scaledW && mouseY >= slotY && mouseY < slotY + scaledH) {
 						boolean isAccessible = accessibleSlots.contains(i);
 						if (!isAccessible) {
 							guiGraphics.renderTooltip(parentScreen.getFont(),

@@ -1,10 +1,12 @@
 package dta.sfmflow.api.client.widget;
 
 import dta.sfmflow.SFMFlow;
+import dta.sfmflow.api.client.SideConfigPopupRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.Preview3DRenderer;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.widgets.AbstractModalPopup;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -158,9 +160,15 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 	}
 
 	private void openSlotLayoutGui(Direction face) {
-		SlotLayoutModalPopup popup = new SlotLayoutModalPopup(this.parentScreen, this.sideModel, face,
-				this.posSupplier.get(), this.onChanged);
-		this.parentScreen.setActiveModalPopup(popup);
+		BlockPos currentPos = this.posSupplier.get();
+		if (currentPos != null) {
+			// Resolve custom configuration popups through the side config registry [3]
+			AbstractModalPopup popup = SideConfigPopupRegistry.createPopup(
+					this.parentScreen, this.sideModel, face, currentPos, this.onChanged);
+			if (popup != null) {
+				this.parentScreen.setActiveModalPopup(popup);
+			}
+		}
 	}
 
 	@Override
