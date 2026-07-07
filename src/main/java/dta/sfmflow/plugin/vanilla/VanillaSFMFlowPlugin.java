@@ -4,6 +4,7 @@ import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.compat.MekanismCompat;
+import dta.sfmflow.api.capability.EnergyTransferParams;
 import dta.sfmflow.api.capability.FlowCapability;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.FluidTransferParams;
@@ -11,6 +12,7 @@ import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
@@ -38,6 +40,8 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_INPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_OUTPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ADVANCED_FLUID_FILTER_VARIABLE;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INPUT;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_OUTPUT;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively [3]
@@ -80,6 +84,49 @@ public class VanillaSFMFlowPlugin {
 				.displayName("gui.sfmflow.advanced_fluid_filter_variable")
 				.codec(AdvancedFluidFilterVariableComponent.CODEC).build(registry);
 		
+		ENERGY_INPUT = FlowComponentBuilder.create("energy_input", uuid -> new EnergyTransferComponent(uuid, true))
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
+				.displayName("gui.sfmflow.energy_input").codec(EnergyTransferComponent.INPUT_CODEC).build(registry);
+
+		ENERGY_OUTPUT = FlowComponentBuilder.create("energy_output", uuid -> new EnergyTransferComponent(uuid, false))
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
+				.displayName("gui.sfmflow.energy_output").codec(EnergyTransferComponent.OUTPUT_CODEC).build(registry);
+	}
+
+	private void registerEnergyCapability() {
+		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
+		FlowCapabilityRegistry
+				.register(new FlowCapability<>(energyCapId, Capabilities.EnergyStorage.BLOCK, "gui.sfmflow.type_energy"));
+
+		// Registered Transfer task executor to execute actual Forge Energy modifications on the server thread [3]
+		FlowCapabilityRegistry.registerTransfer(energyCapId, (level, src, srcSide, dest, destSide, params) -> {
+			if (params instanceof EnergyTransferParams task) {
+				var source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, srcSide);
+				var target = level.getCapability(Capabilities.EnergyStorage.BLOCK, dest, destSide);
+
+				if (source == null) {
+					source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, null);
+				}
+				if (target == null) {
+					target = level.getCapability(Capabilities.EnergyStorage.BLOCK, dest, null);
+				}
+
+				if (source != null && target != null) {
+					int simDrained = source.extractEnergy(task.maxAmount(), true);
+					if (simDrained > 0) {
+						int accepted = target.receiveEnergy(simDrained, true);
+						if (accepted > 0) {
+							int realDrain = source.extractEnergy(accepted, false);
+							if (realDrain > 0) {
+								target.receiveEnergy(realDrain, false);
+								return true;
+							}
+						}
+					}
+				}
+			}
+			return false;
+		});
 	}
 
 	private void registerFluidCapability() {
@@ -160,12 +207,6 @@ public class VanillaSFMFlowPlugin {
 			}
 			return false;
 		});
-	}
-
-	private void registerEnergyCapability() {
-		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
-		FlowCapabilityRegistry.register(
-				new FlowCapability<>(energyCapId, Capabilities.EnergyStorage.BLOCK, "gui.sfmflow.type_energy"));
 	}
 
 	@SuppressWarnings("unchecked")

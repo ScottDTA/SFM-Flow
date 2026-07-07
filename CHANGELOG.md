@@ -1,3 +1,11 @@
+7-7-2026
+
+### [Added]
+* **Energy Input and Energy Output Nodes:** Players can now configure flowchart nodes to extract, route, and deposit Forge Energy (FE/RF) dynamically across connected network machines.
+* **FE Compatibility Settings Panel:** Introduced dedicated settings interfaces for energy nodes, enabling side-specific connection toggles and custom maximum energy transfer rate limitations.
+* **Underlying Energy Simulation:** Standardized thread-safe snapshots and background execution loops to index, simulate, and plan energy movements off-thread before applying them to the world.
+
+
 7-6-2026
 
 ### [Added]

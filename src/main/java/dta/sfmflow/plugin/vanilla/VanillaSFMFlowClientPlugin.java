@@ -6,11 +6,13 @@ import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOver
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
+import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
@@ -71,6 +73,20 @@ public class VanillaSFMFlowClientPlugin {
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get(), (screen, component) -> {
 			if (component instanceof AdvancedFluidFilterVariableComponent advancedVar) {
 				return new AdvancedFluidFilterVariableSettingsOverlay(screen, advancedVar);
+			}
+			return null;
+		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ENERGY_INPUT.get(), (screen, component) -> {
+			if (component instanceof EnergyTransferComponent transfer) {
+				return new EnergyTransferSettingsOverlay(screen, transfer);
+			}
+			return null;
+		});
+
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ENERGY_OUTPUT.get(), (screen, component) -> {
+			if (component instanceof EnergyTransferComponent transfer) {
+				return new EnergyTransferSettingsOverlay(screen, transfer);
 			}
 			return null;
 		});

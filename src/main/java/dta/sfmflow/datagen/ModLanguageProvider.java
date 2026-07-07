@@ -40,6 +40,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.advanced_item_filter_variable", "Advanced Item Filter");
 		add("gui.sfmflow.fluid_input", "Fluid Input");
 		add("gui.sfmflow.fluid_output", "Fluid Output");
+		add("gui.sfmflow.energy_input", "Energy Input");
+		add("gui.sfmflow.energy_output", "Energy Output");
 		add("gui.sfmflow.advanced_fluid_filter_variable", "Advanced Fluid Filter");
 		add("gui.sfmflow.loading", "%1$s REQUESTS LOADING...");
 

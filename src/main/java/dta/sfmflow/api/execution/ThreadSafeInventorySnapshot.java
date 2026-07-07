@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry; // Added import [3]
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.util.ConnectionBlock;
@@ -38,18 +39,23 @@ public final class ThreadSafeInventorySnapshot {
 			this.slots = new HashMap<>(slots);
 		}
 	}
-
+	
+	public record EnergySnapshot(int energyStored, int maxEnergyStored, boolean canExtract, boolean canReceive) {}
+	
 	// Composite key mapping coordinates and active sides to their respective slots
 	// [3]
 	public record SnapshotKey(BlockPos pos, @Nullable Direction side) {
 	}
 
 	private final Map<SnapshotKey, InventorySnapshot> snapshotMap;
+	private final Map<SnapshotKey, EnergySnapshot> energySnapshotMap;
 	private final List<ConnectionBlock> capturedInventories;
 
 	private ThreadSafeInventorySnapshot(Map<SnapshotKey, InventorySnapshot> snapshotMap,
+			Map<SnapshotKey, EnergySnapshot> energySnapshotMap,
 			List<ConnectionBlock> capturedInventories) {
 		this.snapshotMap = Collections.unmodifiableMap(new HashMap<>(snapshotMap));
+		this.energySnapshotMap = Collections.unmodifiableMap(new HashMap<>(energySnapshotMap));
 		this.capturedInventories = Collections.unmodifiableList(new ArrayList<>(capturedInventories));
 	}
 
@@ -62,6 +68,7 @@ public final class ThreadSafeInventorySnapshot {
 	 */
 	public static ThreadSafeInventorySnapshot create(ManagerBlockEntity manager) {
 		Map<SnapshotKey, InventorySnapshot> map = new HashMap<>();
+		Map<SnapshotKey, EnergySnapshot> energyMap = new HashMap<>();
 		List<ConnectionBlock> capturedList = new ArrayList<>();
 		Level level = manager.getLevel();
 		if (level != null && !level.isClientSide()) {
@@ -70,32 +77,52 @@ public final class ThreadSafeInventorySnapshot {
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
 					BlockEntity be = level.getBlockEntity(pos);
-					// Index the block's non-directional state [3]
+					
+					// Index non-directional item capability
 					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
 					if (nullHandler == null) {
-						// Check the dynamic capability bridge fallback registry [3]
 						nullHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
 								level, pos, level.getBlockState(pos), null);
 					}
 					if (nullHandler != null) {
 						map.put(new SnapshotKey(pos, null), createInventorySnapshot(nullHandler, be, null));
 					}
+					
+					// Index non-directional energy capability [3]
+					IEnergyStorage nullEnergy = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, null);
+					if (nullEnergy != null) {
+						energyMap.put(new SnapshotKey(pos, null), new EnergySnapshot(nullEnergy.getEnergyStored(), nullEnergy.getMaxEnergyStored(), nullEnergy.canExtract(), nullEnergy.canReceive()));
+					}
+
 					// Index all 6 active directions independently [3]
 					for (Direction dir : Direction.values()) {
 						IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
 						if (handler == null) {
-							// Check the dynamic capability bridge fallback registry [3]
 							handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
 									level, pos, level.getBlockState(pos), dir);
 						}
 						if (handler != null) {
 							map.put(new SnapshotKey(pos, dir), createInventorySnapshot(handler, be, dir));
 						}
+						
+						// Index directional energy capability [3]
+						IEnergyStorage energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, pos, dir);
+						if (energy != null) {
+							energyMap.put(new SnapshotKey(pos, dir), new EnergySnapshot(energy.getEnergyStored(), energy.getMaxEnergyStored(), energy.canExtract(), energy.canReceive()));
+						}
 					}
 				}
 			}
 		}
-		return new ThreadSafeInventorySnapshot(map, capturedList);
+		return new ThreadSafeInventorySnapshot(map, energyMap, capturedList);
+	}
+
+	public @Nullable EnergySnapshot getEnergy(BlockPos pos, @Nullable Direction side) {
+		EnergySnapshot direct = energySnapshotMap.get(new SnapshotKey(pos, side));
+		if (direct != null) {
+			return direct;
+		}
+		return energySnapshotMap.get(new SnapshotKey(pos, null));
 	}
 
 	private static InventorySnapshot createInventorySnapshot(IItemHandler handler, @Nullable BlockEntity be,

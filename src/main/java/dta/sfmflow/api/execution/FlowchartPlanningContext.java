@@ -1,5 +1,6 @@
 package dta.sfmflow.api.execution;
 
+import dta.sfmflow.api.capability.EnergyTransferParams;
 import dta.sfmflow.api.capability.FluidTransferParams;
 import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.component.AbstractFlowComponent;
@@ -111,4 +112,29 @@ public interface FlowchartPlanningContext {
 		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
 		return tryWriteTask(fluidCapId, src, srcSlot, srcSide, dest, destSlot, destSide, new FluidTransferParams(stack, amount));
 	}
+	
+	/**
+	 * Default convenience helper for standard energy transfers, delegating to the generic pipeline map [3].
+	 */
+	default FlowEnergyBuffer getEnergyComponentBuffer(UUID componentId) {
+		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
+		Object buffer = getPipelineBuffer(componentId, energyCapId);
+		if (buffer instanceof FlowEnergyBuffer energyBuffer) {
+			return energyBuffer;
+		}
+		FlowEnergyBuffer newBuffer = new FlowEnergyBuffer();
+		setPipelineBuffer(componentId, energyCapId, newBuffer);
+		return newBuffer;
+	}
+
+	default void setEnergyComponentBuffer(UUID componentId, FlowEnergyBuffer buffer) {
+		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
+		setPipelineBuffer(componentId, energyCapId, buffer);
+	}
+
+	default boolean tryWriteEnergyTask(BlockPos src, @Nullable Direction srcSide, BlockPos dest, @Nullable Direction destSide, int amount) {
+		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
+		return tryWriteTask(energyCapId, src, 0, srcSide, dest, 0, destSide, new EnergyTransferParams(amount));
+	}
+	
 }
