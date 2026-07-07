@@ -3,6 +3,7 @@
 
 
 ### [Added]
+* Task Coalescing System: Added an atomic background-planning state lock. If a planning cycle is running slowly due to heavy server load, subsequent ticks will gracefully skip scheduling redundant sweeps instead of piling up tasks in the background executor pool.
 * **Side Configuration Registry:** Added a developer-facing registry allowing custom settings screens to be opened when shift-clicking specific block faces inside the 3D machine previews.
 * **Custom Slot Sizes and Textures:** Machine slot layout configurations now support rectangular dimensions and custom textures (such as specific machine backgrounds or colored slot borders) rather than being limited to standard 18x18 squares.
 
@@ -16,6 +17,7 @@
 * **Underlying Energy Simulation:** Standardized thread-safe snapshots and background execution loops to index, simulate, and plan energy movements off-thread before applying them to the world.
 
 ### [Fixed]
+* Thread-Pool Bottlenecks: Guaranteed that the planning state lock is always safely released even if the off-thread planning task fails or throws an exception, preventing permanent automation freezes.
 * Concurrency Race Conditions: Resolved potential write collisions and thread conflicts by replacing the live breaker-trip counter with a thread-safe atomic counter.
 
 

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashSet;
 import java.util.HashMap;
@@ -82,6 +83,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
+	private final AtomicBoolean planningActive = new AtomicBoolean(false);
 
 	private final List<InventoryGroupVariable> groupVariables = new ArrayList<>();
 	private final List<ItemFilterVariable> filterVariables = new ArrayList<>();
@@ -243,24 +245,31 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			}
 
 			if (!activeTriggers.isEmpty()) {
-				var snapshot = ThreadSafeInventorySnapshot.create(this);
+				// Atomically attempt to acquire the lock before submitting a background task [3]
+				if (this.planningActive.compareAndSet(false, true)) {
+					var snapshot = ThreadSafeInventorySnapshot.create(this);
 
-				// 1. Clone the active flowchart structure on the main thread using Mojang NBT Codecs [3]
-				var registries = pLevel.registryAccess();
-				var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-				Tag flowchartNbt = Flowchart.CODEC.encodeStart(ops, this.flowchart)
-						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to clone flowchart state for planning: {}", err))
-						.orElse(new CompoundTag());
+					// 1. Clone the active flowchart structure on the main thread using Mojang NBT Codecs [3]
+					var registries = pLevel.registryAccess();
+					var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
+					Tag flowchartNbt = Flowchart.CODEC.encodeStart(ops, this.flowchart)
+							.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to clone flowchart state for planning: {}", err))
+							.orElse(new CompoundTag());
 
-				// 2. Submit task using decentralized thread-safe parameters and callbacks [3]
-				FlowExecutionKernel.submitTask(
-						this.executionBuffer,
-						this::incrementBreakerTrips,
-						snapshot,
-						flowchartNbt,
-						registries,
-						activeTriggers
-				);
+					// 2. Submit task using decentralized thread-safe parameters and callbacks [3]
+					FlowExecutionKernel.submitTask(
+							this.executionBuffer,
+							this::incrementBreakerTrips,
+							snapshot,
+							flowchartNbt,
+							registries,
+							activeTriggers,
+							() -> this.planningActive.set(false) // Release lock callback on task complete [3]
+					);
+				} else {
+					// Task coalescing: Skip scheduling this sweep to prevent memory leaks [3]
+					FlowLogger.execution("Skipping planning sweep for manager at %s as a background task is already active.", this.worldPosition);
+				}
 			}
 
 			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);

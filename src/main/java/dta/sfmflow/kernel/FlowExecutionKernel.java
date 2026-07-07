@@ -49,6 +49,7 @@ public final class FlowExecutionKernel {
 	 * @param flowchartNbt    cloned NBT tag holding isolated component properties [3]
 	 * @param registries      registry provider context required for deserialization [3]
 	 * @param activeTriggers  active triggers list [3]
+	 * @param onComplete      concurrency-safe lock release callback [3]
 	 */
 	public static void submitTask(
 			ExecutionRingBuffer executionBuffer,
@@ -56,11 +57,12 @@ public final class FlowExecutionKernel {
 			ThreadSafeInventorySnapshot snapshot,
 			Tag flowchartNbt,
 			HolderLookup.Provider registries,
-			List<UUID> activeTriggers
+			List<UUID> activeTriggers,
+			Runnable onComplete // Addition
 	) {
 		getExecutor().submit(() -> {
 			try {
-				// 1. Offload the CPU-heavy Codec parsing from the main server tick loop [3]
+				// 1. Offload the CPU-heavy Codec parsing cleanly onto the background thread!
 				var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 				Flowchart flowchart = Flowchart.CODEC.parse(ops, flowchartNbt)
 						.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode cloned flowchart: {}", err))
@@ -87,6 +89,9 @@ public final class FlowExecutionKernel {
 				Thread.currentThread().interrupt();
 			} catch (Exception e) {
 				SFMFlow.LOGGER.error("Exception occurred inside background flowchart planning executor", e);
+			} finally {
+				// Always release the planning lock to avoid permanent worker lockouts [3]
+				onComplete.run();
 			}
 		});
 	}
