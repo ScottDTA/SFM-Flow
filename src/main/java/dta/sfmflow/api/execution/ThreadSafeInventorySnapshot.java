@@ -8,6 +8,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry; // Added import [3]
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.util.ConnectionBlock;
 import org.jetbrains.annotations.Nullable;
@@ -71,12 +72,22 @@ public final class ThreadSafeInventorySnapshot {
 					BlockEntity be = level.getBlockEntity(pos);
 					// Index the block's non-directional state [3]
 					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
+					if (nullHandler == null) {
+						// Check the dynamic capability bridge fallback registry [3]
+						nullHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
+								level, pos, level.getBlockState(pos), null);
+					}
 					if (nullHandler != null) {
 						map.put(new SnapshotKey(pos, null), createInventorySnapshot(nullHandler, be, null));
 					}
 					// Index all 6 active directions independently [3]
 					for (Direction dir : Direction.values()) {
 						IItemHandler handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, dir);
+						if (handler == null) {
+							// Check the dynamic capability bridge fallback registry [3]
+							handler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.ItemHandler.BLOCK,
+									level, pos, level.getBlockState(pos), dir);
+						}
 						if (handler != null) {
 							map.put(new SnapshotKey(pos, dir), createInventorySnapshot(handler, be, dir));
 						}

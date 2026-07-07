@@ -5,6 +5,7 @@ import dta.sfmflow.api.client.widget.InventorySelectorWidget;
 import dta.sfmflow.api.client.widget.ItemFilterWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
+import dta.sfmflow.api.capability.FlowCapabilityRegistry; // Added import [3]
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
@@ -15,7 +16,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
@@ -94,7 +94,12 @@ public class FluidTransferSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
-		return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, side) != null;
+		// Symmetrically check the registered FlowCapability to support bridges natively [3]
+		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
+		if (flowCap != null) {
+			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);
+		}
+		return false;
 	}
 
 	private void sendSettingsUpdate() {
