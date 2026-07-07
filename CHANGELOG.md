@@ -5,6 +5,8 @@
 * Multi-Level Cauldron Transfers: Fluid networks can now fill or drain multiple levels of a cauldron in a single operation.
 
 ### [Changed]
+* Bridge-Aware Snapshot Scanning: The thread-safe background planner now queries the dynamic capability registry fallbacks when capturing inventories. This ensures that bridged blocks—such as Cauldrons—have their contents properly indexed during logical execution loops.
+* Unified Side-Support Validation: The 3D in-GUI block preview now dynamically queries registered capability bridges to identify and highlight active sides, ensuring correct visual feedback for bridged blocks.
 * Dynamic Network Cache Matrix: Replaced hardcoded capability caching with a dynamic, registry-driven caching engine to optimize network scans and facilitate future energy or custom capability expansions.
 
 ### [Fixed]

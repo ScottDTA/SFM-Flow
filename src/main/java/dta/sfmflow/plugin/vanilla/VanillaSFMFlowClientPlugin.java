@@ -2,12 +2,14 @@ package dta.sfmflow.plugin.vanilla;
 
 import dta.sfmflow.api.client.FlowOverlayRegistry;
 import dta.sfmflow.api.client.DataComponentOverlayRegistry;
+import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
+import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
@@ -51,7 +53,7 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.FLUID_INPUT.get(), (screen, component) -> {
 			if (component instanceof FluidTransferComponent transfer) {
 				return new FluidTransferSettingsOverlay(screen, transfer);
@@ -66,10 +68,18 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});
 
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get(), (screen, component) -> {
+			if (component instanceof AdvancedFluidFilterVariableComponent advancedVar) {
+				return new AdvancedFluidFilterVariableSettingsOverlay(screen, advancedVar);
+			}
+			return null;
+		});
+
 		// Register the custom modal popup for standard vanilla damage values [3]
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE,
 				(screen, stack) -> new DamageComponentSettingsModal(screen, stack));
-		// Register the custom modal popup for standard vanilla enchantment value configurations [3]
+		// Register the custom modal popup for standard vanilla enchantment value
+		// configurations [3]
 		DataComponentOverlayRegistry.register(DataComponents.ENCHANTMENTS,
 				(screen, stack) -> new EnchantmentsComponentSettingsModal(screen, stack));
 	}

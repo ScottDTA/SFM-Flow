@@ -1,13 +1,18 @@
 package dta.sfmflow.flowcomponents;
 
+import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.execution.FlowFluidBuffer;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.api.logging.FlowLogger;
+import dta.sfmflow.item.ModItems;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -20,8 +25,8 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Common, stateless helper consolidating fluid transfer simulation, extraction,
- * and deposition planning routines [3].
+ * Common, stateless helper consolidating fluid transfer simulation, extraction, and
+ * deposition planning routines [3].
  */
 public final class FluidTransferPlanner {
 
@@ -100,7 +105,7 @@ public final class FluidTransferPlanner {
 	public static void planInput(FlowchartPlanningContext context, FluidTransferComponent component) {
 		FlowFluidBuffer myOutputBuffer = new FlowFluidBuffer();
 
-		// Carry over any incoming fluids passed from upstream input nodes
+		// Carry over any incoming fluids passed from upstream input nodes [3]
 		FlowFluidBuffer myInputBuffer = context.getFluidComponentBuffer(component.getId());
 		if (!myInputBuffer.isEmpty()) {
 			for (FlowFluidBuffer.BufferedFluid fluid : myInputBuffer.getFluids()) {
@@ -108,11 +113,10 @@ public final class FluidTransferPlanner {
 			}
 		}
 
-		// Extract our own configured fluid tanks into the combined buffer
+		// Extract our own configured fluid tanks into the combined buffer [3]
 		extractFluidsIntoBuffer(context, component, myOutputBuffer);
 
-		// Copy extracted buffer contents onto connected target input buffers
-		// sequentially
+		// Copy extracted buffer contents onto connected target input buffers sequentially [3]
 		if (!myOutputBuffer.isEmpty()) {
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
@@ -135,8 +139,7 @@ public final class FluidTransferPlanner {
 			FlowFluidBuffer myOutputBuffer = new FlowFluidBuffer();
 			depositFluidsFromBuffer(context, component, myInputBuffer, myOutputBuffer);
 
-			// Propagate remaining un-deposited leftovers downstream along the connection
-			// lines
+			// Propagate remaining un-deposited leftovers downstream along the connection lines [3]
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
 					UUID targetId = conn.getTargetComponentId();
@@ -201,12 +204,12 @@ public final class FluidTransferPlanner {
 					continue;
 				}
 
-				if (!matchesFilter(component, fluidInTank)) {
+				if (!matchesFilter(context, component, fluidInTank)) {
 					continue;
 				}
 
 				int totalInSource = fluidInTank.getAmount();
-				int srcLimit = getFilterLimit(component, fluidInTank);
+				int srcLimit = getFilterLimit(context, component, fluidInTank);
 				int srcRemaining = totalInSource;
 
 				if (component.isWhitelist()) {
@@ -273,14 +276,14 @@ public final class FluidTransferPlanner {
 			if (incoming.isEmpty())
 				continue;
 
-			if (!matchesFilter(component, incoming)) {
+			if (!matchesFilter(context, component, incoming)) {
 				outputBuffer.add(incomingFluid.srcPos(), incomingFluid.srcSlot(), incomingFluid.srcSide(),
 						incoming.copy());
 				continue;
 			}
 
 			int remainingToDeposit = incoming.getAmount();
-			int tgtLimit = getFilterLimit(component, incoming);
+			int tgtLimit = getFilterLimit(context, component, incoming);
 
 			for (Direction tgtSide : activeTgtSides) {
 				if (remainingToDeposit <= 0)
@@ -346,44 +349,99 @@ public final class FluidTransferPlanner {
 		}
 	}
 
-	private static boolean matchesFilter(FluidTransferComponent component, FluidStack stack) {
+	private static boolean matchesFilter(FlowchartPlanningContext context, FluidTransferComponent component, FluidStack stack) {
 		if (stack.isEmpty()) {
 			return false;
 		}
 
+		int limit = -1;
 		boolean found = false;
-		for (ItemStack filter : component.getFilterItems()) {
-			if (filter == null || filter.isEmpty()) {
-				continue;
-			}
 
-			FluidStack filterFluid = getFluidFromItem(filter);
-			if (!filterFluid.isEmpty() && FluidStack.isSameFluid(stack, filterFluid)) {
-				found = true;
-				break;
+		// 1. Resolve bound fluid variable components placed directly on the flowchart canvas [3]
+		if (component.getBoundFilterVariableId() != null) {
+			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
+			if (boundComp instanceof AdvancedFluidFilterVariableComponent varComp) {
+				if (AdvancedFluidFilterVariableComponent.matchesVariableFilter(varComp, stack)) {
+					found = true;
+					limit = varComp.isUseQuantity() ? varComp.getQuantity() : -1;
+				}
+			}
+		} else {
+			// 2. Scan each of the 12 ghost slots, checking for virtual variable cards [3]
+			for (int i = 0; i < component.getFilterItems().size(); i++) {
+				ItemStack filter = component.getFilterItems().get(i);
+				if (filter == null || filter.isEmpty()) {
+					continue;
+				}
+
+				if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) {
+					CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+					if (tag.contains("VariableId")) {
+						UUID varId = tag.getUUID("VariableId");
+						AbstractFlowComponent varComp = context.getComponents().get(varId);
+						if (varComp instanceof AdvancedFluidFilterVariableComponent advancedVar) {
+							if (AdvancedFluidFilterVariableComponent.matchesVariableFilter(advancedVar, stack)) {
+								found = true;
+								limit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
+								break;
+							}
+						}
+					}
+				} else {
+					FluidStack filterFluid = getFluidFromItem(filter);
+					if (!filterFluid.isEmpty() && FluidStack.isSameFluid(stack, filterFluid)) {
+						found = true;
+						limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
+						break;
+					}
+				}
 			}
 		}
 
 		if (component.isWhitelist()) {
 			return found;
 		} else {
-			return !found;
+			return !found || limit > 0;
 		}
 	}
 
-	private static int getFilterLimit(FluidTransferComponent component, FluidStack stack) {
-		for (int i = 0; i < component.getFilterItems().size(); i++) {
-			ItemStack filter = component.getFilterItems().get(i);
-			if (filter == null || filter.isEmpty()) {
-				continue;
+	private static int getFilterLimit(FlowchartPlanningContext context, FluidTransferComponent component, FluidStack stack) {
+		if (component.getBoundFilterVariableId() != null) {
+			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
+			if (boundComp instanceof AdvancedFluidFilterVariableComponent varComp) {
+				if (AdvancedFluidFilterVariableComponent.matchesVariableFilter(varComp, stack)) {
+					return varComp.isUseQuantity() ? varComp.getQuantity() : -1;
+				}
 			}
+			return -1;
+		}
 
-			FluidStack filterFluid = getFluidFromItem(filter);
-			if (!filterFluid.isEmpty() && FluidStack.isSameFluid(stack, filterFluid)) {
-				int limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
-				return limit;
+		for (ItemStack filter : component.getFilterItems()) {
+			if (filter == null || filter.isEmpty())
+				continue;
+
+			if (filter.getItem() == ModItems.VARIABLE_CARD.get() || filter.is(ModItems.VARIABLE_CARD.get())) {
+				CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+				if (tag.contains("VariableId")) {
+					UUID varId = tag.getUUID("VariableId");
+					AbstractFlowComponent varComp = context.getComponents().get(varId);
+					if (varComp instanceof AdvancedFluidFilterVariableComponent advancedVar) {
+						if (AdvancedFluidFilterVariableComponent.matchesVariableFilter(advancedVar, stack)) {
+							int resolvedLimit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
+							FlowLogger.execution("getFilterLimit Resolved Variable Card: ID=%s, Fluid=%s, UseQty=%b, Limit=%d",
+									varId, stack.getHoverName().getString(), advancedVar.isUseQuantity(), resolvedLimit);
+							return resolvedLimit;
+						}
+					}
+				}
+			} else {
+				FluidStack filterFluid = getFluidFromItem(filter);
+				if (!filterFluid.isEmpty() && FluidStack.isSameFluid(stack, filterFluid)) {
+					return component.getFilterLimit(filter);
+				}
 			}
 		}
+
 		return -1;
 	}
 

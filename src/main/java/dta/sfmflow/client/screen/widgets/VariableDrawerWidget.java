@@ -3,8 +3,8 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
+import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.math.Axis;
@@ -33,7 +33,7 @@ import java.util.Locale;
 
 /**
  * Side-sliding drawer widget displaying a searchable, vertically scrollable 3x3
- * grid of active variables [3].
+ * grid of active variables (supporting items, fluids, and addon variables dynamically) [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class VariableDrawerWidget extends AbstractFlowWidget {
@@ -76,19 +76,19 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		this.children.add(new ApiWidgetAdapter<>(this.searchEdit));
 	}
 
-	private List<AdvancedItemFilterVariableComponent> getFilteredVariables() {
-		List<AdvancedItemFilterVariableComponent> filtered = new ArrayList<>();
+	private List<IFlowchartVariable> getFilteredVariables() {
+		List<IFlowchartVariable> filtered = new ArrayList<>();
 		String query = searchEdit.getValue().toLowerCase(Locale.ROOT).trim();
 
 		var components = parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().values();
 		for (var comp : components) {
-			if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-				if (advancedVar.getFilterStack().isEmpty()) {
+			if (comp instanceof IFlowchartVariable advancedVar) {
+				if (advancedVar.isFilterEmpty()) {
 					continue;
 				}
 
-				String componentName = advancedVar.getName().getString().toLowerCase(Locale.ROOT);
-				String itemName = advancedVar.getFilterStack().getHoverName().getString().toLowerCase(Locale.ROOT);
+				String componentName = comp.getName().getString().toLowerCase(Locale.ROOT);
+				String itemName = advancedVar.getFilteredContentName().toLowerCase(Locale.ROOT);
 				String colorName = advancedVar.getFilterColor().getSerializedName().toLowerCase(Locale.ROOT);
 
 				if (query.isEmpty() || componentName.contains(query) || itemName.contains(query)
@@ -125,7 +125,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		int gridY = getY() + 20;
 
 		if (button == 0 && mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
-			List<AdvancedItemFilterVariableComponent> vars = getFilteredVariables();
+			List<IFlowchartVariable> vars = getFilteredVariables();
 
 			for (int i = 0; i < vars.size(); i++) {
 				int col = i % 3;
@@ -135,7 +135,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 				int cellY = getCellY(row);
 
 				if (mouseX >= cellX && mouseX < cellX + 18 && mouseY >= cellY && mouseY < cellY + 18) {
-					AdvancedItemFilterVariableComponent clickedVar = vars.get(i);
+					IFlowchartVariable clickedVar = vars.get(i);
 					ItemStack stack = clickedVar.toItemStack();
 
 					parentScreen.getMenu().setCarried(stack);
@@ -162,7 +162,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		int gridY = getY() + 20;
 
 		if (mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
-			List<AdvancedItemFilterVariableComponent> vars = getFilteredVariables();
+			List<IFlowchartVariable> vars = getFilteredVariables();
 			int rows = (vars.size() + 2) / 3;
 			int maxScrollY = Math.max(0, rows * 18 - 54);
 
@@ -223,7 +223,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 		guiGraphics.pose().translate(textX, textY, 0.0F);
 		guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(90.0F));
-		guiGraphics.drawString(parentScreen.getFont(), "Item Vars", 0, 0, 0xFF404040, false);
+		guiGraphics.drawString(parentScreen.getFont(), "Item/Fluid Vars", 0, 0, 0xFF404040, false);
 		guiGraphics.pose().popPose();
 
 		this.searchEdit.setX(getX() + 4);
@@ -236,7 +236,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		// Enable second scissor layer to bound items to grid viewport bounds [3]
 		guiGraphics.enableScissor(gridX, gridY, gridX + 54, gridY + 54);
 
-		List<AdvancedItemFilterVariableComponent> vars = getFilteredVariables();
+		List<IFlowchartVariable> vars = getFilteredVariables();
 
 		for (int i = 0; i < vars.size(); i++) {
 			int col = i % 3;

@@ -11,7 +11,6 @@ import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.api.component.IGhostSlotAware;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
-import dta.sfmflow.registry.ModDataComponents;
 import dta.sfmflow.util.Color;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
@@ -25,60 +24,59 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.level.material.Fluid;
+import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Variable component that stores a single item filter along with an optional
- * quantity limit [3]. Configured with 0 inputs and 0 outputs [3].
+ * Variable component that stores a single fluid filter along with an optional
+ * quantity limit in mB [3]. Configured with 0 inputs and 0 outputs [3].
  */
-public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
+public class AdvancedFluidFilterVariableComponent extends AbstractFlowComponent
 		implements IGhostSlotAware, IFlowchartVariable {
 
-	public static final MapCodec<AdvancedItemFilterVariableComponent> CODEC = RecordCodecBuilder
+	public static final MapCodec<AdvancedFluidFilterVariableComponent> CODEC = RecordCodecBuilder
 			.mapCodec(instance -> instance
 					.group(BaseProperties.CODEC.fieldOf("base")
-							.forGetter(AdvancedItemFilterVariableComponent::getBaseProperties),
-							ItemStack.OPTIONAL_CODEC.optionalFieldOf("filterStack", ItemStack.EMPTY)
-									.forGetter(AdvancedItemFilterVariableComponent::getFilterStack),
+							.forGetter(AdvancedFluidFilterVariableComponent::getBaseProperties),
+							FluidStack.CODEC.optionalFieldOf("filterFluid", FluidStack.EMPTY)
+									.forGetter(AdvancedFluidFilterVariableComponent::getFilterFluid),
 							Codec.BOOL.optionalFieldOf("useQuantity", false)
-									.forGetter(AdvancedItemFilterVariableComponent::isUseQuantity),
-							Codec.INT.optionalFieldOf("quantity", 1)
-									.forGetter(AdvancedItemFilterVariableComponent::getQuantity),
+									.forGetter(AdvancedFluidFilterVariableComponent::isUseQuantity),
+							Codec.INT.optionalFieldOf("quantity", 1000)
+									.forGetter(AdvancedFluidFilterVariableComponent::getQuantity),
 							Color.CODEC.optionalFieldOf("filterColor", Color.WHITE)
-									.forGetter(AdvancedItemFilterVariableComponent::getFilterColor),
+									.forGetter(AdvancedFluidFilterVariableComponent::getFilterColor),
 							Codec.BOOL.optionalFieldOf("useModId", false)
-									.forGetter(AdvancedItemFilterVariableComponent::isUseModId),
+									.forGetter(AdvancedFluidFilterVariableComponent::isUseModId),
 							Codec.BOOL.optionalFieldOf("useTag", false)
-									.forGetter(AdvancedItemFilterVariableComponent::isUseTag),
+									.forGetter(AdvancedFluidFilterVariableComponent::isUseTag),
 							Codec.STRING.optionalFieldOf("selectedTag", "")
-									.forGetter(AdvancedItemFilterVariableComponent::getSelectedTag),
+									.forGetter(AdvancedFluidFilterVariableComponent::getSelectedTag),
 							Codec.BOOL.optionalFieldOf("useComponentFilter", false)
-									.forGetter(AdvancedItemFilterVariableComponent::isUseComponentFilter),
+									.forGetter(AdvancedFluidFilterVariableComponent::isUseComponentFilter),
 							Codec.STRING.listOf().optionalFieldOf("enabledComponentTypes", List.of())
-									.forGetter(AdvancedItemFilterVariableComponent::getEnabledComponentTypes),
+									.forGetter(AdvancedFluidFilterVariableComponent::getEnabledComponentTypes),
 							CompoundTag.CODEC.optionalFieldOf("customComponentSettings", new CompoundTag())
-									.forGetter(AdvancedItemFilterVariableComponent::getCustomComponentSettings))
-					.apply(instance, (baseProps, filterStack, useQuantity, quantity, filterColor, useModId, useTag,
+									.forGetter(AdvancedFluidFilterVariableComponent::getCustomComponentSettings))
+					.apply(instance, (baseProps, filterFluid, useQuantity, quantity, filterColor, useModId, useTag,
 							selectedTag, useComponentFilter, enabledComponentTypes, customComponentSettings) -> {
-						AdvancedItemFilterVariableComponent comp = new AdvancedItemFilterVariableComponent(
+						AdvancedFluidFilterVariableComponent comp = new AdvancedFluidFilterVariableComponent(
 								baseProps.id());
 						comp.setBaseProperties(baseProps);
-						comp.filterStack = filterStack;
+						comp.filterFluid = filterFluid;
 						comp.useQuantity = useQuantity;
 						comp.quantity = quantity;
 						comp.filterColor = filterColor;
@@ -92,9 +90,9 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 						return comp;
 					}));
 
-	private ItemStack filterStack = ItemStack.EMPTY;
+	private FluidStack filterFluid = FluidStack.EMPTY;
 	private boolean useQuantity = false;
-	private int quantity = 1;
+	private int quantity = 1000;
 	private Color filterColor = Color.WHITE;
 	private boolean useModId = false;
 	private boolean useTag = false;
@@ -104,7 +102,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 
 	private CompoundTag customComponentSettings = new CompoundTag();
 
-	public AdvancedItemFilterVariableComponent(UUID uuid) {
+	public AdvancedFluidFilterVariableComponent(UUID uuid) {
 		super(uuid);
 		this.hasInputNodes = false;
 		this.hasOutputNodes = false;
@@ -112,15 +110,15 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 
 	@Override
 	public FlowComponentType getType() {
-		return VanillaSFMFlowPlugin.ADVANCED_ITEM_FILTER_VARIABLE.get();
+		return VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get();
 	}
 
-	public ItemStack getFilterStack() {
-		return filterStack;
+	public FluidStack getFilterFluid() {
+		return filterFluid;
 	}
 
-	public void setFilterStack(ItemStack stack) {
-		this.filterStack = stack == null ? ItemStack.EMPTY : stack;
+	public void setFilterFluid(FluidStack stack) {
+		this.filterFluid = stack == null ? FluidStack.EMPTY : stack;
 	}
 
 	public boolean isUseQuantity() {
@@ -188,19 +186,20 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 	}
 
 	/**
-	 * Matches an item stack based on the dynamic card configurations [3]. Performs
-	 * deep value-based equality checking on enabled data components [3].
+	 * Matches an in-transit fluid stack based on the dynamic card configurations
+	 * [3]. Performs deep value-based equality checking on enabled data components
+	 * [3].
 	 */
-	public static boolean matchesVariableFilter(AdvancedItemFilterVariableComponent varComp, ItemStack candidate) {
-		ItemStack filterItem = varComp.getFilterStack();
-		if (filterItem.isEmpty() || candidate.isEmpty()) {
+	public static boolean matchesVariableFilter(AdvancedFluidFilterVariableComponent varComp, FluidStack candidate) {
+		FluidStack filterFluid = varComp.getFilterFluid();
+		if (filterFluid.isEmpty() || candidate.isEmpty()) {
 			return false;
 		}
 
 		boolean matchModId = true;
 		if (varComp.isUseModId()) {
-			String filterMod = BuiltInRegistries.ITEM.getKey(filterItem.getItem()).getNamespace();
-			String candidateMod = BuiltInRegistries.ITEM.getKey(candidate.getItem()).getNamespace();
+			String filterMod = BuiltInRegistries.FLUID.getKey(filterFluid.getFluid()).getNamespace();
+			String candidateMod = BuiltInRegistries.FLUID.getKey(candidate.getFluid()).getNamespace();
 			matchModId = filterMod.equals(candidateMod);
 		}
 
@@ -209,11 +208,11 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 			matchTag = false;
 			ResourceLocation tagLoc = ResourceLocation.tryParse(varComp.getSelectedTag());
 			if (tagLoc != null) {
-				TagKey<Item> tagKey = TagKey.create(Registries.ITEM, tagLoc);
+				TagKey<Fluid> tagKey = TagKey.create(Registries.FLUID, tagLoc);
 				matchTag = candidate.is(tagKey);
 			}
 		} else if (!varComp.isUseModId() && !varComp.isUseComponentFilter()) {
-			return ItemStack.isSameItem(candidate, filterItem);
+			return FluidStack.isSameFluid(candidate, filterFluid);
 		}
 
 		if (varComp.isUseComponentFilter()) {
@@ -223,114 +222,13 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 					var typeOpt = BuiltInRegistries.DATA_COMPONENT_TYPE.getOptional(loc);
 					if (typeOpt.isPresent()) {
 						var type = typeOpt.get();
-						boolean filterHas = filterItem.has(type);
+						boolean filterHas = filterFluid.has(type);
 						boolean candidateHas = candidate.has(type);
 						if (filterHas != candidateHas) {
 							return false; // Type mismatch [3]
 						}
 						if (filterHas) {
-							if (type == DataComponents.DAMAGE) {
-								int candidateDmg = candidate.getDamageValue();
-								int maxDmgVal = candidate.getMaxDamage();
-								if (maxDmgVal > 0) {
-									CompoundTag dmgSettings = varComp.getCustomComponentSettings()
-											.getCompound("minecraft:damage");
-									if (!dmgSettings.isEmpty()) {
-										boolean usePct = dmgSettings.getBoolean("usePercentage");
-										if (usePct) {
-											int minPct = dmgSettings.contains("minPct") ? dmgSettings.getInt("minPct")
-													: 0;
-											int maxPct = dmgSettings.contains("maxPct") ? dmgSettings.getInt("maxPct")
-													: 100;
-											double candidatePct = ((double) candidate.getDamageValue()
-													/ (double) candidate.getMaxDamage()) * 100.0;
-											if (candidate.isDamageableItem()) {
-												candidatePct = ((double) candidateDamageValue(candidate)
-														/ (double) maxDmgVal) * 100.0;
-											}
-											if (candidatePct < minPct || candidatePct > maxPct) {
-												return false;
-											}
-										} else {
-											int minDmg = dmgSettings.contains("minDmg") ? dmgSettings.getInt("minDmg")
-													: 0;
-											int maxDmg = dmgSettings.contains("maxDmg") ? dmgSettings.getInt("maxDmg")
-													: maxDmgVal;
-											int actualDmg = candidateDamageValue(candidate);
-											if (actualDmg < minDmg || actualDmg > maxDmg) {
-												return false;
-											}
-										}
-										continue; // Match succeeded, bypass standard Objects.equals check [3]
-									}
-								}
-							}
-
-							// Custom evaluation pass for tool enchantment values [3]
-							if (type == DataComponents.ENCHANTMENTS) {
-								CompoundTag enchSettings = varComp.getCustomComponentSettings()
-										.getCompound("minecraft:enchantments");
-								if (!enchSettings.isEmpty()) {
-									ItemEnchantments candidateEnchs = candidate.getEnchantments();
-									String mode = Objects.requireNonNullElse(enchSettings.getString("mode"), "HAS_ANY");
-
-									if ("HAS_ANY".equals(mode)) {
-										if (candidateEnchs.isEmpty()) {
-											return false;
-										}
-									} else if ("HAS_NONE".equals(mode)) {
-										if (!candidateEnchs.isEmpty()) {
-											return false;
-										}
-									} else if ("CONTAINS".equals(mode) || "EXACT".equals(mode)) {
-										ListTag list = enchSettings.getList("enchantments", Tag.TAG_COMPOUND);
-										Map<String, int[]> filterMap = new HashMap<>();
-										for (int k = 0; k < list.size(); k++) {
-											CompoundTag entry = list.getCompound(k);
-											String id = entry.getString("id");
-											int minL = entry.contains("minL") ? entry.getInt("minL") : 1;
-											int maxL = entry.contains("maxL") ? entry.getInt("maxL") : 10;
-											filterMap.put(id, new int[] { minL, maxL });
-										}
-
-										// 1. Verify candidate has at least all the specified ones
-										for (var filterEntry : filterMap.entrySet()) {
-											String reqId = filterEntry.getKey();
-											int[] reqRange = filterEntry.getValue();
-
-											boolean candidateHasEnch = false;
-											for (var holder : candidateEnchs.keySet()) {
-												ResourceLocation locKey = holder.unwrapKey().map(ResourceKey::location)
-														.orElse(null);
-												if (locKey != null && locKey.toString().equals(reqId)) {
-													int lvl = candidateEnchs.getLevel(holder);
-													if (lvl >= reqRange[0] && lvl <= reqRange[1]) {
-														candidateHasEnch = true;
-														break;
-													}
-												}
-											}
-											if (!candidateHasEnch) {
-												return false;
-											}
-										}
-
-										// 2. For EXACT match, make sure candidate has NO other enchantments [3]
-										if ("EXACT".equals(mode)) {
-											for (var holder : candidateEnchs.keySet()) {
-												ResourceLocation locKey = holder.unwrapKey().map(ResourceKey::location)
-														.orElse(null);
-												if (locKey == null || !filterMap.containsKey(locKey.toString())) {
-													return false;
-												}
-											}
-										}
-									}
-									continue; // Match succeeded, bypass standard Objects.equals check [3]
-								}
-							}
-
-							Object filterVal = filterItem.get(type);
+							Object filterVal = filterFluid.get(type);
 							Object candidateVal = candidate.get(type);
 							if (!Objects.equals(filterVal, candidateVal)) {
 								return false; // Values differ [3]
@@ -344,22 +242,11 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		return matchModId && matchTag;
 	}
 
-	private static int candidateDamageValue(ItemStack candidate) {
-		return candidate.isDamageableItem() ? candidate.getDamageValue() : 0;
-	}
-
 	public ItemStack toItemStack() {
 		ItemStack stack = new ItemStack(ModItems.VARIABLE_CARD.get());
 
-		if (!this.filterStack.isEmpty()) {
-			stack.set(ModDataComponents.FILTERED_ITEM.get(),
-					new ModDataComponents.FilteredItemComponent(this.filterStack.copyWithCount(1)));
-		}
-
 		stack.set(DataComponents.DYED_COLOR, new DyedItemColor(this.getFilterColor().getHexColor(), true));
 
-		// Symmetrically apply the standard vanilla enchantment glint override to the
-		// card item stack if component filtering is enabled [3]
 		if (this.useComponentFilter) {
 			stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
 		}
@@ -375,6 +262,12 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		tag.putBoolean("UseComponentFilter", this.useComponentFilter);
 		tag.put("CustomComponentSettings", this.customComponentSettings);
 
+		// Serialize the active fluid so the custom BEWLR item renderer can find it [3]
+		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
+		if (!this.filterFluid.isEmpty()) {
+			tag.put("FilterFluid", this.filterFluid.save(registries));
+		}
+
 		ListTag typesList = new ListTag();
 		for (String type : this.enabledComponentTypes) {
 			typesList.add(StringTag.valueOf(type));
@@ -388,13 +281,19 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 
 	@Override
 	public ItemStack getGhostStack(int index) {
-		return index == 0 ? this.filterStack : ItemStack.EMPTY;
+		if (index == 0 && !filterFluid.isEmpty()) {
+			Item bucket = filterFluid.getFluid().getBucket();
+			if (bucket != null && bucket != Items.AIR) {
+				return new ItemStack(bucket);
+			}
+		}
+		return ItemStack.EMPTY;
 	}
 
 	@Override
 	public void setGhostStack(int index, ItemStack stack) {
 		if (index == 0) {
-			this.setFilterStack(stack);
+			this.setFilterFluid(FluidTransferPlanner.getFluidFromItem(stack));
 		}
 	}
 
@@ -406,11 +305,10 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 
-		if (!this.filterStack.isEmpty()) {
-			compoundTag.put("filterStack", this.filterStack.save(registries));
+		if (!this.filterFluid.isEmpty()) {
+			compoundTag.put("filterFluid", this.filterFluid.save(registries));
 		}
 		compoundTag.putBoolean("useQuantity", this.useQuantity);
 		compoundTag.putInt("quantity", this.quantity);
@@ -434,11 +332,11 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 
-		AdvancedItemFilterVariableComponent.CODEC.codec().parse(ops, compoundTag)
-				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse advanced item variable: {}", err))
+		AdvancedFluidFilterVariableComponent.CODEC.codec().parse(ops, compoundTag)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse advanced fluid variable: {}", err))
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
-					this.setFilterStack(decoded.getFilterStack());
+					this.setFilterFluid(decoded.getFilterFluid());
 					this.setUseQuantity(decoded.isUseQuantity());
 					this.setQuantity(decoded.getQuantity());
 					this.setFilterColor(decoded.getFilterColor());
@@ -448,13 +346,12 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 					this.setUseComponentFilter(decoded.isUseComponentFilter());
 					this.enabledComponentTypes.clear();
 					this.enabledComponentTypes.addAll(decoded.getEnabledComponentTypes());
-					this.customComponentSettings = decoded.getCustomComponentSettings(); // Safely load from parsed
-																							// codec [3]
+					this.customComponentSettings = decoded.getCustomComponentSettings();
 				});
 
-		if (compoundTag.contains("filterStack")) {
-			this.filterStack = ItemStack.parse(registries, compoundTag.getCompound("filterStack"))
-					.orElse(ItemStack.EMPTY);
+		if (compoundTag.contains("filterFluid")) {
+			this.filterFluid = FluidStack.parse(registries, compoundTag.getCompound("filterFluid"))
+					.orElse(FluidStack.EMPTY);
 		}
 		if (compoundTag.contains("useQuantity")) {
 			this.useQuantity = compoundTag.getBoolean("useQuantity");
@@ -472,33 +369,21 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		}
 		if (compoundTag.contains("useModId")) {
 			this.useModId = compoundTag.getBoolean("useModId");
-		} else if (compoundTag.contains("UseModId")) {
-			this.useModId = compoundTag.getBoolean("UseModId");
 		}
 		if (compoundTag.contains("useTag")) {
 			this.useTag = compoundTag.getBoolean("useTag");
-		} else if (compoundTag.contains("UseTag")) {
-			this.useTag = compoundTag.getBoolean("UseTag");
 		}
 		if (compoundTag.contains("selectedTag")) {
 			this.selectedTag = compoundTag.getString("selectedTag");
-		} else if (compoundTag.contains("SelectedTag")) {
-			this.selectedTag = compoundTag.getString("SelectedTag");
 		}
 		if (compoundTag.contains("useComponentFilter")) {
 			this.useComponentFilter = compoundTag.getBoolean("useComponentFilter");
-		} else if (compoundTag.contains("UseComponentFilter")) {
-			this.useComponentFilter = compoundTag.getBoolean("UseComponentFilter");
 		}
 		if (compoundTag.contains("customComponentSettings")) {
 			this.customComponentSettings = compoundTag.getCompound("customComponentSettings");
-		} else if (compoundTag.contains("CustomComponentSettings")) {
-			this.customComponentSettings = compoundTag.getCompound("CustomComponentSettings");
 		}
-		if (compoundTag.contains("enabledComponentTypes") || compoundTag.contains("EnabledComponentTypes")) {
-			ListTag list = compoundTag.contains("enabledComponentTypes")
-					? compoundTag.getList("enabledComponentTypes", Tag.TAG_STRING)
-					: compoundTag.getList("EnabledComponentTypes", Tag.TAG_STRING);
+		if (compoundTag.contains("enabledComponentTypes")) {
+			ListTag list = compoundTag.getList("enabledComponentTypes", Tag.TAG_STRING);
 			this.enabledComponentTypes.clear();
 			for (int i = 0; i < list.size(); i++) {
 				this.enabledComponentTypes.add(list.getString(i));
@@ -511,17 +396,17 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		if (getCustomName() != null && !getCustomName().isEmpty()) {
 			return Component.literal(getCustomName());
 		}
-		return Component.translatable("gui.sfmflow.advanced_item_filter_variable");
+		return Component.translatable("gui.sfmflow.advanced_fluid_filter_variable");
 	}
 
 	@Override
 	public boolean isFilterEmpty() {
-		return this.filterStack.isEmpty();
+		return this.filterFluid.isEmpty();
 	}
 
 	@Override
 	public String getFilteredContentName() {
-		return this.filterStack.getHoverName().getString();
+		return this.filterFluid.getHoverName().getString();
 	}
 
 }

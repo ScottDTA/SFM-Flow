@@ -9,6 +9,7 @@ import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.VariableCardRenderer;
 import dta.sfmflow.client.screen.CableClusterScreen;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
+import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.item.VariableCardItem;
@@ -115,10 +116,14 @@ public class SFMFlowClient {
 						return new Object[] { advancedVar.getFilterStack(), advancedVar.isUseQuantity(),
 								advancedVar.getQuantity(), advancedVar.getFilterColor() };
 					}
+					// Added tooltip support for fluid variables [3]
+					if (comp instanceof AdvancedFluidFilterVariableComponent advancedVar) {
+						return new Object[] { advancedVar.getFilterFluid(), advancedVar.isUseQuantity(),
+								advancedVar.getQuantity(), advancedVar.getFilterColor() };
+					}
 				}
 				return null;
 			});
-
 			Color.setResolver((color, isText) -> {
 				if (isText) {
 					var specValue = ClientConfig.TEXT_CONFIGS.get(color);

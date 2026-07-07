@@ -9,6 +9,7 @@ import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.FluidTransferParams;
 import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
@@ -36,6 +37,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ADVANCED_ITEM_FILTER_VARIABLE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_INPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_OUTPUT;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ADVANCED_FLUID_FILTER_VARIABLE;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively [3]
@@ -71,6 +73,13 @@ public class VanillaSFMFlowPlugin {
 		FLUID_OUTPUT = FlowComponentBuilder.create("fluid_output", uuid -> new FluidTransferComponent(uuid, false))
 				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("gui.sfmflow.fluid_output").codec(FluidTransferComponent.OUTPUT_CODEC).build(registry);
+		
+		ADVANCED_FLUID_FILTER_VARIABLE = FlowComponentBuilder
+				.create("advanced_fluid_filter_variable", AdvancedFluidFilterVariableComponent::new)
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
+				.displayName("gui.sfmflow.advanced_fluid_filter_variable")
+				.codec(AdvancedFluidFilterVariableComponent.CODEC).build(registry);
+		
 	}
 
 	private void registerFluidCapability() {

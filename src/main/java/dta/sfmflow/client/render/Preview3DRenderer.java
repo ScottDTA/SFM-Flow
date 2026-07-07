@@ -16,25 +16,39 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.Sheets;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.material.FluidState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.model.data.ModelData;
 import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
+
+import javax.annotation.Nullable;
+
+import org.joml.Matrix4f;
 
 /**
  * Client-only 3D rendering assistant isolating mathematical calculations,
@@ -170,6 +184,60 @@ public final class Preview3DRenderer {
 		Lighting.setupFor3DItems();
 		RenderSystem.enableDepthTest();
 
+		// Build a lightweight, compile-safe proxy to force maximum light levels [3]
+		BlockAndTintGetter brightLevel = new BlockAndTintGetter() {
+			@Override
+			public float getShade(Direction direction, boolean shade) {
+				return 1.0F; // Return 1.0F to completely disable face shadow shading [3]
+			}
+
+			@Override
+			public LevelLightEngine getLightEngine() {
+				return level.getLightEngine();
+			}
+
+			@Override
+			public int getBlockTint(BlockPos pos, ColorResolver resolver) {
+				return level.getBlockTint(pos, resolver);
+			}
+
+			@Override
+			public BlockState getBlockState(BlockPos pos) {
+				return level.getBlockState(pos);
+			}
+
+			@Override
+			public FluidState getFluidState(BlockPos pos) {
+				return level.getFluidState(pos);
+			}
+
+			@Override
+			@Nullable
+			public BlockEntity getBlockEntity(BlockPos pos) {
+				return level.getBlockEntity(pos);
+			}
+
+			@Override
+			public int getHeight() {
+				return level.getHeight();
+			}
+
+			@Override
+			public int getMinBuildHeight() {
+				return level.getMinBuildHeight();
+			}
+
+			@Override
+			public int getBrightness(LightLayer lightLayer, BlockPos pos) {
+				return 15; // Force maximum brightness [3]
+			}
+
+			@Override
+			public int getRawBrightness(BlockPos pos, int amount) {
+				return 15; // Force maximum brightness [3]
+			}
+		};
+
 		BlockState centerState = level.getBlockState(centerPos);
 		if (!centerState.isAir()) {
 			poseStack.pushPose();
@@ -189,8 +257,24 @@ public final class Preview3DRenderer {
 							15728880, OverlayTexture.NO_OVERLAY, poseStack, bufferSource, level, 0);
 				}
 			} else {
-				blockRenderer.renderSingleBlock(centerState, poseStack, bufferSource, 15728880,
-						OverlayTexture.NO_OVERLAY);
+				// Use brightLevel proxy to enforce full bright rendering on the center block [3]
+				BakedModel model = blockRenderer.getBlockModel(centerState);
+				RenderType renderType = ItemBlockRenderTypes.getChunkRenderType(centerState);
+				VertexConsumer consumer = bufferSource.getBuffer(renderType);
+				blockRenderer.getModelRenderer().tesselateBlock(
+						brightLevel,
+						model,
+						centerState,
+						centerPos,
+						poseStack,
+						consumer,
+						false,
+						RandomSource.create(),
+						centerState.getSeed(centerPos),
+						15728880,						
+						ModelData.EMPTY,
+						renderType
+				);
 			}
 			poseStack.popPose();
 
@@ -260,8 +344,24 @@ public final class Preview3DRenderer {
 							RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 						}
 					} else {
-						blockRenderer.renderSingleBlock(state, poseStack, ghostSource, 15728880,
-								OverlayTexture.NO_OVERLAY);
+						// Use brightLevel proxy to enforce full bright rendering on the adjacent blocks [3]
+						BakedModel model = blockRenderer.getBlockModel(state);
+						RenderType renderType = ItemBlockRenderTypes.getChunkRenderType(state);
+						VertexConsumer consumer = ghostSource.getBuffer(renderType);
+						blockRenderer.getModelRenderer().tesselateBlock(
+								brightLevel,
+								model,
+								state,
+								currentPos,
+								poseStack,
+								consumer,
+								false,
+								RandomSource.create(),
+								state.getSeed(currentPos),
+								15728880,
+								ModelData.EMPTY,
+								renderType
+						);
 					}
 					poseStack.popPose();
 				}
@@ -276,7 +376,7 @@ public final class Preview3DRenderer {
 		poseStack.popPose();
 	}
 
-	private static void draw3DQuad(VertexConsumer builder, org.joml.Matrix4f matrix, float x1, float y1, float z1,
+	private static void draw3DQuad(VertexConsumer builder, Matrix4f matrix, float x1, float y1, float z1,
 			float x2, float y2, float z2, float x3, float y3, float z3, float x4, float y4, float z4, int r, int g,
 			int b) {
 		// Set to 128 (50% alpha) to increase text and orientation visibility underneath
@@ -287,7 +387,7 @@ public final class Preview3DRenderer {
 		builder.addVertex(matrix, x4, y4, z4).setColor(r, g, b, 128);
 	}
 
-	private static void draw3DLine(VertexConsumer builder, org.joml.Matrix4f matrix, Direction face, float x1, float y1,
+	private static void draw3DLine(VertexConsumer builder, Matrix4f matrix, Direction face, float x1, float y1,
 			float z1, float x2, float y2, float z2, int r, int g, int b) {
 		float nx = face.getStepX();
 		float ny = face.getStepY();
