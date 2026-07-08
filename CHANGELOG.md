@@ -1,3 +1,15 @@
+7-8-2026
+
+### [Added]
+* **Extensible Snapshot API:** Introduced a developer-facing snapshotting registry (`ICapabilitySnapshotter`). Addon developers can now register custom snapshot handlers, enabling the system to deep-copy and simulate third-party capabilities (like gases, chemicals, or custom power grids) safely on background threads.
+
+### [Changed]
+* **Unified State Snapshotting:** Re-engineered the underlying world state capture mechanics to dynamically snapshot all registered network capabilities, removing hardcoded logic from the snapshot container.
+
+### [Fixed]
+* **Type-Inference Compilation Issues:** Resolved edge-case Java compiler and memory model breakdowns during type-inference resolution by standardizing capability transfer signatures.
+
+
 7-7-2026
 
 ### [Added]

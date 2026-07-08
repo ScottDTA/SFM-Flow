@@ -8,6 +8,7 @@ import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
@@ -172,7 +173,7 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 		}
 
 		@Override
-		public void playDownSound(net.minecraft.client.sounds.SoundManager soundManager) {
+		public void playDownSound(SoundManager soundManager) {
 			// Silent scrolling
 		}
 	}

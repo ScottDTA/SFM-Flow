@@ -12,6 +12,7 @@ import org.jetbrains.annotations.Nullable;
 public final class FlowCapabilityRegistry {
 	private static final Map<ResourceLocation, FlowCapability<?>> CAPABILITIES = new HashMap<>();
 	private static final Map<ResourceLocation, FlowCapabilityTransfer> TRANSFERS = new HashMap<>();
+	private static final Map<ResourceLocation, ICapabilitySnapshotter<?>> SNAPSHOTTERS = new HashMap<>();
 
 	private FlowCapabilityRegistry() {
 	}
@@ -40,5 +41,19 @@ public final class FlowCapabilityRegistry {
 
 	public static Map<ResourceLocation, FlowCapability<?>> getRegisteredCapabilities() {
 		return CAPABILITIES;
+	}
+	
+	/**
+	 * Registers a dynamic snapshot constructor for a specific capability ID [3].
+	 */
+	public static <T> void registerSnapshotter(ResourceLocation id, ICapabilitySnapshotter<T> snapshotter) {
+		if (id != null && snapshotter != null) {
+			SNAPSHOTTERS.put(id, snapshotter);
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public static @Nullable <T> ICapabilitySnapshotter<T> getSnapshotter(ResourceLocation id) {
+		return (ICapabilitySnapshotter<T>) SNAPSHOTTERS.get(id);
 	}
 }
