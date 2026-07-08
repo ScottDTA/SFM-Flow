@@ -121,19 +121,28 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		if (this.activeModalPopup != null) {
 			int pWidth = this.activeModalPopup.getWidth();
 			int pHeight = this.activeModalPopup.getHeight();
-			this.activeModalPopup.setX((this.width - pWidth) / 2);
-			this.activeModalPopup.setY((this.height - pHeight) / 2);
+			int targetX = (this.width - pWidth) / 2;
+			int targetY = (this.height - pHeight) / 2;
+			if (this.activeModalPopup.getX() != targetX) {
+				this.activeModalPopup.setX(targetX);
+			}
+			if (this.activeModalPopup.getY() != targetY) {
+				this.activeModalPopup.setY(targetY);
+			}
 		}
 
+		// Centers the active settings overlay only if the screen coordinates have changed [3]
 		if (this.activeSettingsOverlay != null) {
 			int pWidth = this.activeSettingsOverlay.getWidth();
 			int pHeight = this.activeSettingsOverlay.getHeight();
-			this.activeSettingsOverlay.setX((this.width - pWidth) / 2);
-
-			if (pHeight >= 360) {
-				this.activeSettingsOverlay.setY(25);
-			} else {
-				this.activeSettingsOverlay.setY(this.topPos + (256 - pHeight) / 2);
+			int targetX = (this.width - pWidth) / 2;
+			int targetY = this.getOverlayTargetY(pHeight); // Purely dynamic calculations [3]
+			
+			if (this.activeSettingsOverlay.getX() != targetX) {
+				this.activeSettingsOverlay.setX(targetX);
+			}
+			if (this.activeSettingsOverlay.getY() != targetY) {
+				this.activeSettingsOverlay.setY(targetY);
 			}
 		}
 	}
@@ -611,4 +620,17 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	public ManagerMouseHandler getMouseHandler() {
 		return this.mouseHandler;
 	}
+	
+	/**
+	 * Computes the correct, safe centered Y coordinate for any overlay panel based on its height [3].
+	 * Centers the panel vertically relative to the active canvas and enforces safety boundaries [3].
+	 *
+	 * @param pHeight the physical height of the overlay panel [3]
+	 * @return the safe centered Y coordinate [3]
+	 */
+	public int getOverlayTargetY(int pHeight) {
+		int targetY = this.topPos + (256 - pHeight) / 2;
+		return Math.max(25, targetY); // Prevent clipping under standard screen top title bounds [3]
+	}
+	
 }

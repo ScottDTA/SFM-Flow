@@ -62,8 +62,8 @@ public class AdvancedFluidFilterVariableSettingsOverlay extends NodeSettingsOver
 		this.width = 240;
 		this.height = 195;
 		this.setX((parentScreen.width - this.width) / 2);
-		this.setY(parentScreen.getTopPos() + (256 - this.height) / 2);
-
+		this.setY(parentScreen.getOverlayTargetY(this.height));
+		
 		parentScreen.getMenu().setActiveComponent(component);
 		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
 				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null

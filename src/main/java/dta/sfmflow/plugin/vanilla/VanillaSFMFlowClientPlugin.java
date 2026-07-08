@@ -1,11 +1,13 @@
 package dta.sfmflow.plugin.vanilla;
 
 import dta.sfmflow.api.client.FlowOverlayRegistry;
+import dta.sfmflow.api.client.SideConfigPopupRegistry;
 import dta.sfmflow.api.client.DataComponentOverlayRegistry;
 import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
+import dta.sfmflow.client.screen.widgets.EnergySideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
@@ -90,6 +92,11 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
+		
+		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
+			return new EnergySideConfigModalPopup(screen, (EnergyTransferComponent) sideModel, face, pos, onChanged);
+		});
+		
 
 		// Register the custom modal popup for standard vanilla damage values [3]
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE,

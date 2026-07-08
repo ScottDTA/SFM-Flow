@@ -35,9 +35,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	 * @param component    the flow component being configured [3]
 	 */
 	public NodeSettingsOverlay(ManagerScreen parentScreen, AbstractFlowComponent component) {
-		// Fix: Added parentScreen.getTopPos() to correctly calculate symmetric Y
-		// coordinate in absolute screen space [3]
-		super((parentScreen.width - 240) / 2, parentScreen.getTopPos() + (256 - 180) / 2, 240, 180,
+		super((parentScreen.width - 240) / 2, parentScreen.getOverlayTargetY(180), 240, 180,
 				component.getName());
 		this.parentScreen = parentScreen;
 		this.component = component;

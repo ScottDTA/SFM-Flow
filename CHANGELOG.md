@@ -1,13 +1,14 @@
 7-7-2026
 
-
-
 ### [Added]
+* **Energy Limit Side Configurations:** Shift-clicking an active face on an energy node now opens a compact, 75%-scaled popup slider allowing players to restrict the maximum energy rate (FE/t) handled by that specific side.
 * Task Coalescing System: Added an atomic background-planning state lock. If a planning cycle is running slowly due to heavy server load, subsequent ticks will gracefully skip scheduling redundant sweeps instead of piling up tasks in the background executor pool.
 * **Side Configuration Registry:** Added a developer-facing registry allowing custom settings screens to be opened when shift-clicking specific block faces inside the 3D machine previews.
 * **Custom Slot Sizes and Textures:** Machine slot layout configurations now support rectangular dimensions and custom textures (such as specific machine backgrounds or colored slot borders) rather than being limited to standard 18x18 squares.
 
 ### [Changed]
+* **Auto-Enabling Face Interactions:** Shift-clicking a disabled side in the 3D block preview now automatically enables that block face and opens its slot layout or power configuration immediately, saving an extra click.
+* **Standardized Screen Centering:** Re-aligned all modal overlay configurations to use dynamic layout calculations, preventing configurations from shifting or clipping under screen titles on smaller windows.
 * Thread-Safe Flowchart Planning: Flowchart structure evaluation has been completely isolated from live block entities. By cloning the active flowchart layout on the main thread and parsing it on background worker threads, the mod prevents data corruption and concurrency-related server crashes when editing layouts while they are running.
 * **Thread-Isolated Fluid Simulation:** Enhanced fluid transfer simulations to run entirely within isolated thread-safe snapshots of the world. This isolates the background planner from the active game world, eliminating potential multi-threaded crashes or lag spikes when planning complex liquid movements.
 * **Hardened Energy Snapshots:** Energy snapshots now consult custom capability bridges upon creation, allowing the system to accurately snapshot and simulate energy storage blocks that do not natively expose standard capabilities.
@@ -17,6 +18,7 @@
 * **Underlying Energy Simulation:** Standardized thread-safe snapshots and background execution loops to index, simulate, and plan energy movements off-thread before applying them to the world.
 
 ### [Fixed]
+* **3D Block Preview Shading and Glitches:** Resolved rendering glitches inside the 3D block preview widget (such as dark shadows, ambient occlusion leaks, or flashing textures) by introducing a rendering isolation matrix that shields block previews from external UI draw states.
 * Thread-Pool Bottlenecks: Guaranteed that the planning state lock is always safely released even if the off-thread planning task fails or throws an exception, preventing permanent automation freezes.
 * Concurrency Race Conditions: Resolved potential write collisions and thread conflicts by replacing the live breaker-trip counter with a thread-safe atomic counter.
 

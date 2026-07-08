@@ -30,7 +30,7 @@ public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
 		this.width = 300;
 		this.height = 310;
 		this.setX((parentScreen.width - 300) / 2);
-		this.setY(40);
+		this.setY(parentScreen.getOverlayTargetY(this.height));
 
 		parentScreen.getMenu().setActiveComponent(component);
 
@@ -40,7 +40,8 @@ public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
 						: null,
 				component.getId()));
 
-		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 160,
+		// Height increased from 160 to 210 to prevent projection overflow [3]
+		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 210,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
 				face -> sideSupportsEnergy(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
 						getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, face),
@@ -91,7 +92,10 @@ public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
 		CompoundTag nbt = new CompoundTag();
 		component.saveData(nbt);
 		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
+				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
+						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
+						: null,
+				component.getId(), nbt));
 	}
 
 	@Override

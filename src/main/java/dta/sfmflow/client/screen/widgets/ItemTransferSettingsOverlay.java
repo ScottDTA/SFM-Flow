@@ -34,7 +34,7 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		this.width = 300;
 		this.height = 360;
 		this.setX((parentScreen.width - 300) / 2);
-		this.setY(25);
+		this.setY(parentScreen.getOverlayTargetY(this.height));
 
 		component.setUseAll(false);
 		component.setTargetSlot(-1);

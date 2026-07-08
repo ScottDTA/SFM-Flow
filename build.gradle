@@ -3,6 +3,7 @@ plugins {
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.141'
     id 'idea'
+    id 'eclipse'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -137,7 +138,12 @@ tasks.register('apiJar', Jar) {
 
 dependencies {
     compileOnly "mekanism:Mekanism:${mekanism_version}:api"
+
     // Runtime/Implementation additions would be managed here by the Gatekeeper
+     // Add the full mod for runtime testing in your dev environment
+    localRuntime "mekanism:Mekanism:${mekanism_version}"
+
+    
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

@@ -142,6 +142,11 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 				if (dx * dx + dy * dy <= 36.0) {
 					if (sideSupportChecker.test(face)) {
 						if (Screen.hasShiftDown()) {
+							// ISSUE 1: Enable the side if it is currently disabled [3]
+							if (!sideModel.isSideActive(face)) {
+								sideModel.toggleSide(face);
+								this.onChanged.run();
+							}
 							openSlotLayoutGui(face);
 						} else {
 							sideModel.toggleSide(face);

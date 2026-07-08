@@ -257,11 +257,11 @@ public final class Preview3DRenderer {
 							15728880, OverlayTexture.NO_OVERLAY, poseStack, bufferSource, level, 0);
 				}
 			} else {
-				// Use brightLevel proxy to enforce full bright rendering on the center block [3]
+				// Use brightLevel proxy and invoke tesselateWithoutAO to completely bypass neighboring Ambient Occlusion pollution [3]
 				BakedModel model = blockRenderer.getBlockModel(centerState);
 				RenderType renderType = ItemBlockRenderTypes.getChunkRenderType(centerState);
 				VertexConsumer consumer = bufferSource.getBuffer(renderType);
-				blockRenderer.getModelRenderer().tesselateBlock(
+				blockRenderer.getModelRenderer().tesselateWithoutAO(
 						brightLevel,
 						model,
 						centerState,
@@ -297,6 +297,22 @@ public final class Preview3DRenderer {
 		bufferSource.endBatch();
 
 		RenderSystem.depthMask(false);
+
+		// =========================================================================
+		// PRISTINE OPENGL & SHADER STATE RESTORATION MATRIX [3]
+		// Fully shields standard ghost blocks from external mod render state leaks.
+		// =========================================================================
+		Lighting.setupFor3DItems();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
+		RenderSystem.colorMask(true, true, true, true);
+		RenderSystem.depthFunc(515); // Reset depth function to GL_LEQUAL
+		RenderSystem.enableBlend();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.disablePolygonOffset();
+		RenderSystem.disableColorLogicOp();
+		// =========================================================================
+
 		GhostBufferSource ghostSource = new GhostBufferSource(bufferSource, 0.3F);
 		GhostEntityBufferSource ghostEntitySource = new GhostEntityBufferSource(bufferSource, 0.3F);
 
@@ -341,14 +357,15 @@ public final class Preview3DRenderer {
 							bufferSource.endBatch(actualType);
 
 							RenderSystem.depthMask(false);
+							// Restore standard shader color after drawing each special block [3]
 							RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 						}
 					} else {
-						// Use brightLevel proxy to enforce full bright rendering on the adjacent blocks [3]
+						// Use brightLevel proxy and invoke tesselateWithoutAO to completely bypass neighboring Ambient Occlusion pollution [3]
 						BakedModel model = blockRenderer.getBlockModel(state);
 						RenderType renderType = ItemBlockRenderTypes.getChunkRenderType(state);
 						VertexConsumer consumer = ghostSource.getBuffer(renderType);
-						blockRenderer.getModelRenderer().tesselateBlock(
+						blockRenderer.getModelRenderer().tesselateWithoutAO(
 								brightLevel,
 								model,
 								state,
