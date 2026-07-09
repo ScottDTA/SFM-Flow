@@ -1,6 +1,6 @@
 package dta.sfmflow.client.screen.widgets;
 
-import dta.sfmflow.SFMFlow;
+import dta.sfmflow.api.client.NineSliceUtil;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
@@ -8,7 +8,6 @@ import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -22,8 +21,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	protected final ManagerScreen parentScreen;
 	protected final AbstractFlowComponent component;
-	protected static final ResourceLocation SUBMENU_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
-			"textures/gui/submenu_bg.png");
 
 	private GuiEventListener focusedChild = null;
 
@@ -183,22 +180,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
         guiGraphics.drawCenteredString(parentScreen.getFont(), "Save & Close", btnX + 40, btnY + 3, 0xFFFFFFFF);
     }
 
-	protected void renderOverlayBackground(GuiGraphics guiGraphics) {
-		int c = 6;
-		int m = 10;
-		int x = getX();
-		int y = getY();
-
-		guiGraphics.blit(SUBMENU_BG, x, y, 0, 0, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y, 16, 0, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x, y + height - c, 0, 16, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y + height - c, 16, 16, c, c, 22, 22);
-
-		guiGraphics.blit(SUBMENU_BG, x + c, y, width - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + c, y + height - c, width - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x, y + c, c, height - 2 * c, 0.0F, (float) c, c, m, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y + c, c, height - 2 * c, 16.0F, (float) c, c, m, 22, 22);
-
-		guiGraphics.blit(SUBMENU_BG, x + c, y + c, width - 2 * c, height - 2 * c, (float) c, (float) c, m, m, 22, 22);
+    protected void renderOverlayBackground(GuiGraphics guiGraphics) {
+		NineSliceUtil.drawDefault(guiGraphics, getX(), getY(), width, height);
 	}
 }

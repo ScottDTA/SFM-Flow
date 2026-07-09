@@ -8,6 +8,7 @@ import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.AbstractTriggerComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
+import dta.sfmflow.api.logging.FlowLogger;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
@@ -17,6 +18,8 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 
 /**
  * Specialized event trigger that executes logic repeatedly at set periodic
@@ -158,5 +161,24 @@ public class IntervalTriggerComponent extends AbstractTriggerComponent {
 				context.enqueue(conn.getTargetComponentId());
 			}
 		}
+	}
+	
+	@Override
+	public boolean evaluateTrigger(Level level, BlockPos pos, long gameTime) {
+		long elapsedTrigger = gameTime - this.lastExecutedTick;
+
+		if (elapsedTrigger < 0) {
+			this.lastExecutedTick = gameTime;
+			return false;
+		} else if (elapsedTrigger >= this.getTotalTicks()) {
+			FlowLogger.execution(
+					"Trigger Fired: ID=%s, Hash=%d, GameTime=%d, LastExecuted=%d, Elapsed=%d, Total=%d",
+					this.getId(), System.identityHashCode(this), gameTime,
+					this.lastExecutedTick, elapsedTrigger, this.getTotalTicks());
+
+			this.lastExecutedTick = gameTime;
+			return true;
+		}
+		return false;
 	}
 }

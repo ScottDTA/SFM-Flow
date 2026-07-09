@@ -6,10 +6,10 @@ import java.util.Locale;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
-import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
+import dta.sfmflow.api.client.NineSliceUtil;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.api.component.FlowComponentType;
@@ -31,8 +31,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 @OnlyIn(Dist.CLIENT)
 public class CategoryHoverSubmenu extends AbstractFlowWidget {
-	private static final ResourceLocation SUBMENU_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
-			"textures/gui/submenu_bg.png");
 
 	private final NodeCategory category;
 	private final ManagerScreen parentScreen;
@@ -258,21 +256,6 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 	}
 
 	private void render9SliceBackground(GuiGraphics guiGraphics) {
-		int c = 6;
-		int m = 10;
-		int x = getX();
-		int y = getY();
-
-		guiGraphics.blit(SUBMENU_BG, x, y, 0, 0, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y, 16, 0, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x, y + height - c, 0, 16, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y + height - c, 16, 16, c, c, 22, 22);
-
-		guiGraphics.blit(SUBMENU_BG, x + c, y, width - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + c, y + height - c, width - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x, y + c, c, height - 2 * c, 0.0F, (float) c, c, m, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y + c, c, height - 2 * c, 16.0F, (float) c, c, m, 22, 22);
-
-		guiGraphics.blit(SUBMENU_BG, x + c, y + c, width - 2 * c, height - 2 * c, (float) c, (float) c, m, m, 22, 22);
+		NineSliceUtil.drawDefault(guiGraphics, getX(), getY(), width, height);
 	}
 }

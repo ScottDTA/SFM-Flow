@@ -18,6 +18,7 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.component.AbstractTriggerComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.api.flowchart.Flowchart;
@@ -29,7 +30,6 @@ import dta.sfmflow.common.network.PhysicalNetwork;
 import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
-import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
 import dta.sfmflow.kernel.FlowExecutionKernel;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
@@ -39,8 +39,6 @@ import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -53,6 +51,7 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -65,6 +64,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 /**
  * Backing BlockEntity class for the Manager block [3]. Tracks active logical
@@ -80,7 +80,11 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private UUID managerId;
 	private boolean loadedExternal = false;
 	private boolean isDataDirty = false;
-
+	
+	private transient HolderLookup.Provider savedRegistries = null;
+	private final List<AbstractTriggerComponent> cachedTriggers = new ArrayList<>();
+	private boolean isTriggerCacheDirty = true;
+	
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
 	private final AtomicBoolean planningActive = new AtomicBoolean(false);
@@ -180,10 +184,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 	}
 
-	public void setDataDirty(boolean dirty) {
-		this.isDataDirty = dirty;
-	}
-
 	public boolean isDataDirty() {
 		return this.isDataDirty;
 	}
@@ -224,23 +224,19 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			long elapsed = System.nanoTime() - startTime;
 			updateProfiling(elapsed, tasksRan[0]);
 
+			// Dynamically rebuild the trigger array list only when changes occur [3]
+			if (this.isTriggerCacheDirty) {
+				rebuildTriggerCache();
+			}
+
 			List<UUID> activeTriggers = new ArrayList<>();
 			long currentTime = pLevel.getGameTime();
-			for (var comp : this.getFlowComponents().values()) {
-				if (comp instanceof IntervalTriggerComponent trigger) {
-					long elapsedTrigger = currentTime - trigger.getLastExecutionTick();
 
-					if (elapsedTrigger < 0) {
-						trigger.setLastExecutionTick(currentTime);
-					} else if (elapsedTrigger >= trigger.getTotalTicks()) {
-						FlowLogger.execution(
-								"Trigger Fired: ID=%s, Hash=%d, GameTime=%d, LastExecuted=%d, Elapsed=%d, Total=%d",
-								trigger.getId(), System.identityHashCode(trigger), currentTime,
-								trigger.getLastExecutionTick(), elapsedTrigger, trigger.getTotalTicks());
-
-						trigger.setLastExecutionTick(currentTime);
-						activeTriggers.add(trigger.getId());
-					}
+			// Iterate strictly through cached trigger components, delegating checks polymorphically [3]
+			for (int i = 0; i < this.cachedTriggers.size(); i++) {
+				var comp = this.cachedTriggers.get(i);
+				if (comp.evaluateTrigger(pLevel, pBlockPos, currentTime)) {
+					activeTriggers.add(comp.getId());
 				}
 			}
 
@@ -313,9 +309,35 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			if (!this.loadedExternal) {
 				loadExternalData();
 			}
+			this.isTriggerCacheDirty = true; // Mark dirty on block load [3]
 			updateInventories();
 		}
 	}
+
+	private void loadExternalData() {
+		// Use ServerLifecycleHooks to resolve the MinecraftServer instance safely [3]
+		MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+		if (server == null || this.level == null || this.level.isClientSide() || this.managerId == null) {
+			return;
+		}
+		try {
+			// Supply the composite lookup provider context containing custom static registries [3]
+			HolderLookup.Provider registries = this.savedRegistries != null ? this.savedRegistries : this.level.registryAccess();
+			var loaded = DataStateManager.loadSync(server, this.managerId, registries);
+			this.flowchart = loaded.flowchart();
+			this.groupVariables.clear();
+			this.groupVariables.addAll(loaded.groupVariables());
+			this.filterVariables.clear();
+			this.filterVariables.addAll(loaded.filterVariables());
+			this.isTriggerCacheDirty = true;
+		} catch (Exception e) {
+			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
+			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
+		}
+		this.commandCount = this.flowchart.components().size();
+		this.loadedExternal = true;
+	}
+
 
 	@Override
 	public void onChunkUnloaded() {
@@ -336,9 +358,11 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.putUUID("ManagerId", this.managerId);
 
-		if (this.level != null && !this.level.isClientSide() && this.level.getServer() != null) {
+		// Use ServerLifecycleHooks to resolve the MinecraftServer instance safely [3]
+		MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+		if (server != null) {
 			if (this.isDataDirty) {
-				DataStateManager.saveAsync(this.level.getServer(), this.managerId, this.flowchart, this.groupVariables,
+				DataStateManager.saveSync(server, this.managerId, this.flowchart, this.groupVariables,
 						this.filterVariables, pRegistries);
 				this.isDataDirty = false;
 			}
@@ -448,6 +472,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	@Override
 	protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
 		super.loadAdditional(pTag, pRegistries);
+		this.savedRegistries = pRegistries; // Save the composite provider context for onLoad [3]
 
 		if (pTag.contains("ManagerId")) {
 			this.managerId = pTag.getUUID("ManagerId");
@@ -457,6 +482,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 		var ops = RegistryOps.create(NbtOps.INSTANCE, pRegistries);
 
+		// Handle client update tag synchronization [3]
 		if (pTag.contains("flowchart")) {
 			try {
 				this.flowchart = Flowchart.CODEC.parse(ops, pTag.get("flowchart"))
@@ -479,7 +505,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
 			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
 			map.clear();
-			for (long longVal : dirOrdinals(flatPosOrdinals(flatPosArray))) {
+			for (long longVal : dirOrdinals(flatPosArray)) {
 				map.getOrAddNode(BlockPos.of(longVal));
 			}
 		}
@@ -520,8 +546,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				ListTag typeList = invTag.getList("types", Tag.TAG_STRING);
 				for (int k = 0; k < typeList.size(); k++) {
 					String strVal = typeList.getString(k);
-					// Retroactively translate legacy enum names to correct ResourceLocation
-					// registry keys
 					if ("ITEM".equals(strVal)) {
 						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"));
 					} else if ("FLUID".equals(strVal)) {
@@ -545,27 +569,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 
 		commandCount = flowchart != null ? flowchart.components().size() : 0;
-	}
-
-	private void loadExternalData() {
-		if (this.level == null || this.level.isClientSide() || this.managerId == null
-				|| this.level.getServer() == null) {
-			return;
-		}
-		try {
-			var loaded = DataStateManager.loadSync(this.level.getServer(), this.managerId,
-					RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));
-			this.flowchart = loaded.flowchart();
-			this.groupVariables.clear();
-			this.groupVariables.addAll(loaded.groupVariables());
-			this.filterVariables.clear();
-			this.filterVariables.addAll(loaded.filterVariables());
-		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
-			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
-		}
-		this.commandCount = this.flowchart.components().size();
-		this.loadedExternal = true;
 	}
 
 	@Override
@@ -621,5 +624,28 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			return;
 		}
 		DataStateManager.deleteSync(this.level.getServer(), this.managerId);
+	}
+	
+	/**
+	 * Scans the active flowchart map and compiles a dense cache of trigger components [3].
+	 * Executed only when the flowchart structure is modified or loaded [3].
+	 */
+	private void rebuildTriggerCache() {
+		this.cachedTriggers.clear();
+		if (this.flowchart != null && this.flowchart.components() != null) {
+			for (var comp : this.flowchart.components().values()) {
+				if (comp instanceof dta.sfmflow.api.component.AbstractTriggerComponent trigger) {
+					this.cachedTriggers.add(trigger);
+				}
+			}
+		}
+		this.isTriggerCacheDirty = false;
+	}
+
+	public void setDataDirty(boolean dirty) {
+		this.isDataDirty = dirty;
+		if (dirty) {
+			this.isTriggerCacheDirty = true; // Mark dirty on edits [3]
+		}
 	}
 }

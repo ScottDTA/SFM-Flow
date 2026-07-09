@@ -3,6 +3,8 @@ package dta.sfmflow.networking;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncSideConfigPropertiesPacket;
+import dta.sfmflow.client.network.ClientSideConfigPropertiesPacketHandlerImpl;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -51,5 +53,17 @@ public final class PacketHandlerManager {
 
 	public static void handleSyncInventorySlots(final SyncInventorySlotsPacket payload, final IPayloadContext context) {
 		SLOTS_HANDLER.get().handle(payload, context);
+	}
+	
+	private static final Supplier<IPacketHandler<SyncSideConfigPropertiesPacket>> PROPERTIES_HANDLER = () -> {
+		if (FMLEnvironment.dist == Dist.CLIENT) {
+			return new ClientSideConfigPropertiesPacketHandlerImpl();
+		}
+		return (payload, context) -> {
+		};
+	};
+
+	public static void handleSyncSideConfigProperties(final SyncSideConfigPropertiesPacket payload, final IPayloadContext context) {
+		PROPERTIES_HANDLER.get().handle(payload, context);
 	}
 }

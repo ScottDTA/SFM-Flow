@@ -4,6 +4,7 @@ import dta.sfmflow.api.client.layout.SlotLayout;
 import dta.sfmflow.api.client.layout.SlotEntry;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import dta.sfmflow.api.client.NineSliceUtil;
 import dta.sfmflow.api.client.layout.FlowLayoutRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.component.ISlotConfigurable;
@@ -260,19 +261,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		if (this.layout != null) {
 			guiGraphics.blit(this.layout.background(), 0, 0, 0, 0, w, h, w, h);
 		} else {
-			int c = 6;
-			int m = 10;
-			guiGraphics.blit(SUBMENU_BG, 0, 0, 0, 0, c, c, 22, 22);
-			guiGraphics.blit(SUBMENU_BG, w - c, 0, 16, 0, c, c, 22, 22);
-			guiGraphics.blit(SUBMENU_BG, 0, h - c, 0, 16, c, c, 22, 22);
-			guiGraphics.blit(SUBMENU_BG, w - c, h - c, 16, 16, c, c, 22, 22);
-
-			guiGraphics.blit(SUBMENU_BG, c, 0, w - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
-			guiGraphics.blit(SUBMENU_BG, c, h - c, w - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
-			guiGraphics.blit(SUBMENU_BG, 0, c, c, h - 2 * c, 0.0F, (float) c, c, m, 22, 22);
-			guiGraphics.blit(SUBMENU_BG, w - c, c, c, h - 2 * c, 16.0F, (float) c, c, m, 22, 22);
-
-			guiGraphics.blit(SUBMENU_BG, c, c, w - 2 * c, h - 2 * c, (float) c, (float) c, m, m, 22, 22);
+			NineSliceUtil.drawDefault(guiGraphics, 0, 0, w, h);
 		}
 
 		String sideName = side != null ? side.name() : "GENERAL";

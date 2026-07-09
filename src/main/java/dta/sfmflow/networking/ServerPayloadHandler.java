@@ -13,6 +13,7 @@ import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncSideConfigPropertiesPacket;
 import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
@@ -24,6 +25,7 @@ import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import dta.sfmflow.networking.packets.serverbound.SyncClusterSlotDirectionPacket;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
+import dta.sfmflow.networking.packets.serverbound.RequestSideConfigPropertiesPacket;
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +36,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
@@ -296,6 +299,28 @@ public class ServerPayloadHandler {
 			if (stack.isEmpty() || stack.is(ModItems.VARIABLE_CARD.get())) {
 				player.containerMenu.setCarried(stack);
 				player.containerMenu.broadcastChanges();
+			}
+		});
+	}
+	
+	public static void handleRequestSideConfigProperties(final RequestSideConfigPropertiesPacket data,
+			final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			ServerPlayer player = (ServerPlayer) context.player();
+			Level level = player.level();
+			if (level.hasChunkAt(data.pos())) {
+				CompoundTag properties = new CompoundTag();
+				
+				if (data.capabilityId().getPath().equals("energy")) {
+					IEnergyStorage energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, data.pos(), data.side());
+					if (energy != null) {
+						properties.putInt("MaxEnergy", energy.getMaxEnergyStored());
+						properties.putInt("CurrentEnergy", energy.getEnergyStored());
+					}
+				}
+				
+				// Symmetrically send properties update back to the client [3]
+				PacketDistributor.sendToPlayer(player, new SyncSideConfigPropertiesPacket(data.pos(), data.side(), data.capabilityId(), properties));
 			}
 		});
 	}

@@ -1,25 +1,23 @@
 package dta.sfmflow.client.screen.widgets;
 
-import dta.sfmflow.SFMFlow;
+import dta.sfmflow.api.client.NineSliceUtil;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Base modal window popup that centers itself dynamically and intercepts all
- * workspace inputs [3]. Employs 9-sliced background panels for visual
- * consistency [3].
+ * Base modal window popup that centers itself dynamically, intercepts all
+ * workspace inputs, and delegates drag inputs cleanly to children [3].
  */
 @OnlyIn(Dist.CLIENT)
 public abstract class AbstractModalPopup extends AbstractFlowWidget {
 	protected final ManagerScreen parentScreen;
-	protected static final ResourceLocation SUBMENU_BG = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
-			"textures/gui/submenu_bg.png");
+
+	private GuiEventListener focusedChild = null;
 
 	public AbstractModalPopup(ManagerScreen parentScreen, int width, int height, Component title) {
 		super((parentScreen.width - width) / 2, (parentScreen.height - height) / 2, width, height, title);
@@ -49,14 +47,35 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		// Symmetrically delegate clicks to children and register focus so key inputs can propagate [3]
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
+				this.focusedChild = child;
 				this.setFocused(child); // Align container-focus mapping cleanly [3]
+				this.setDragging(true); // Flag active drag state to process sliders [3]
 				return true;
 			}
 		}
 		return false;
+	}
+
+	@Override
+	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+		boolean handled = false;
+		if (this.focusedChild != null) {
+			handled = this.focusedChild.mouseReleased(mouseX, mouseY, button);
+			this.focusedChild = null; // Clear focused widget reference [3]
+		}
+		this.setDragging(false); // Reset drag state [3]
+		return handled || super.mouseReleased(mouseX, mouseY, button);
+	}
+
+	@Override
+	public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+		if (this.focusedChild != null) {
+			// Direct vector coordinates bypass to active slider elements [3]
+			return this.focusedChild.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+		}
+		return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
 	}
 
 	@Override
@@ -66,29 +85,28 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 			close(); // Cancel and dismiss modal cleanly on ESC [3]
 			return true;
 		}
+		for (GuiEventListener child : children) {
+			if (child.keyPressed(keyCode, scanCode, modifiers)) {
+				return true;
+			}
+		}
 		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 
+	@Override
+	public boolean charTyped(char codePoint, int modifiers) {
+		for (GuiEventListener child : children) {
+			if (child.charTyped(codePoint, modifiers)) {
+				return true;
+			}
+		}
+		return super.charTyped(codePoint, modifiers);
+	}
+
 	/**
-	 * Performs the 9-slice stretching calculations on the submenu background
-	 * textures [3].
+	 * Performs the 9-slice stretching calculations on the submenu background textures [3].
 	 */
 	protected void render9SliceBackground(GuiGraphics guiGraphics) {
-		int c = 6;
-		int m = 10;
-		int x = getX();
-		int y = getY();
-
-		guiGraphics.blit(SUBMENU_BG, x, y, 0, 0, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y, 16, 0, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x, y + height - c, 0, 16, c, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y + height - c, 16, 16, c, c, 22, 22);
-
-		guiGraphics.blit(SUBMENU_BG, x + c, y, width - 2 * c, c, (float) c, 0.0F, m, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + c, y + height - c, width - 2 * c, c, (float) c, 16.0F, m, c, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x, y + c, c, height - 2 * c, 0.0F, (float) c, c, m, 22, 22);
-		guiGraphics.blit(SUBMENU_BG, x + width - c, y + c, c, height - 2 * c, 16.0F, (float) c, c, m, 22, 22);
-
-		guiGraphics.blit(SUBMENU_BG, x + c, y + c, width - 2 * c, height - 2 * c, (float) c, (float) c, m, m, 22, 22);
+		NineSliceUtil.drawDefault(guiGraphics, getX(), getY(), width, height);
 	}
 }

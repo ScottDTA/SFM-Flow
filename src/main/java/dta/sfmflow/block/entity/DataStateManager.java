@@ -12,9 +12,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.storage.LevelResource;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -24,50 +21,26 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
- * High-performance data manager handling asynchronous, thread-safe serialization 
- * and compressed disk saving of flowchart layout configurations and variable states [3]. 
- * Isolates I/O streams onto a single-threaded background daemon pool [3].
+ * High-performance data manager handling synchronous, compressed disk saving
+ * of flowchart layout configurations and variable states [3].
  */
-@EventBusSubscriber(modid = SFMFlow.MODID)
 public final class DataStateManager {
-
-	private static ExecutorService ioExecutor = null;
 
 	private DataStateManager() {}
 
 	/**
-	 * Lazily retrieves or instantiates a fresh background save executor thread pool [3].
-	 * Re-creates the executor automatically if the previous one was terminated on server unload [3].
-	 */
-	private static synchronized ExecutorService getExecutor() {
-		if (ioExecutor == null || ioExecutor.isShutdown() || ioExecutor.isTerminated()) {
-			ioExecutor = Executors.newSingleThreadExecutor(runnable -> {
-				Thread thread = new Thread(runnable, "SFM-Flow I/O Worker");
-				thread.setDaemon(true);
-				return thread;
-			});
-		}
-		return ioExecutor;
-	}
-
-	/**
-	 * Synchronously encodes active flowchart properties to a CompoundTag on the main 
-	 * server thread for concurrency safety, then dispatches the compressed write 
-	 * task asynchronously onto the background I/O thread pool [3].
+	 * Synchronously encodes and saves the active flowchart properties to a compressed file [3].
 	 *
 	 * @param server      the active MinecraftServer context [3]
-	 * @param managerId   the unique ID of the target manager block entity [3]
+	 * @param managerId   the unique ID of the target manager [3]
 	 * @param flowchart   the current flowchart data layout [3]
 	 * @param groupVars   the active inventory group variable list [3]
 	 * @param filterVars  the active item filter variable list [3]
 	 * @param registries  the level registry access provider [3]
 	 */
-	public static void saveAsync(MinecraftServer server, UUID managerId, Flowchart flowchart,
+	public static void saveSync(MinecraftServer server, UUID managerId, Flowchart flowchart,
 			List<InventoryGroupVariable> groupVars, List<ItemFilterVariable> filterVars,
 			HolderLookup.Provider registries) {
 		if (server == null || managerId == null) {
@@ -93,30 +66,17 @@ public final class DataStateManager {
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt));
 
-			// Offload the disk compression write asynchronously using the dynamic pool [3]
-			getExecutor().submit(() -> {
-				try {
-					Files.createDirectories(filePath.getParent());
-					try (OutputStream out = Files.newOutputStream(filePath)) {
-						NbtIo.writeCompressed(dataTag, out);
-					}
-				} catch (Exception e) {
-					SFMFlow.LOGGER.error("Failed to asynchronously compress flowchart data for manager: {}", managerId, e);
-				}
-			});
-
+			Files.createDirectories(filePath.getParent());
+			try (OutputStream out = Files.newOutputStream(filePath)) {
+				NbtIo.writeCompressed(dataTag, out);
+			}
 		} catch (Exception e) {
-			SFMFlow.LOGGER.error("Failed to initiate asynchronous flowchart save for manager: {}", managerId, e);
+			SFMFlow.LOGGER.error("Failed to synchronously compress flowchart data for manager: {}", managerId, e);
 		}
 	}
 
 	/**
 	 * Synchronously loads compressed flowchart and variables data on block initialization [3].
-	 *
-	 * @param server     the active MinecraftServer context [3]
-	 * @param managerId  the unique ID of the target manager block entity [3]
-	 * @param registries the level registry access provider [3]
-	 * @return a LoadedData containing the populated flowchart and variables [3]
 	 */
 	public static LoadedData loadSync(MinecraftServer server, UUID managerId, HolderLookup.Provider registries) {
 		if (server == null || managerId == null) {
@@ -171,12 +131,6 @@ public final class DataStateManager {
 		return LoadedData.empty();
 	}
 
-	/**
-	 * Deletes the on-disk external layout files upon manager block removal [3].
-	 *
-	 * @param server    the active MinecraftServer context [3]
-	 * @param managerId the unique ID of the target manager block entity [3]
-	 */
 	public static void deleteSync(MinecraftServer server, UUID managerId) {
 		if (server == null || managerId == null) {
 			return;
@@ -192,36 +146,6 @@ public final class DataStateManager {
 		}
 	}
 
-	/**
-	 * Gracefully shuts down the background I/O pool, blocking up to 5 seconds to flush pending tasks [3].
-	 */
-	public static synchronized void shutdown() {
-		if (ioExecutor != null) {
-			SFMFlow.LOGGER.info("[SFM-Flow] Shutting down background flowchart saving thread pool...");
-			ioExecutor.shutdown();
-			try {
-				if (!ioExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
-					ioExecutor.shutdownNow();
-				}
-			} catch (InterruptedException e) {
-				ioExecutor.shutdownNow();
-				Thread.currentThread().interrupt();
-			}
-			ioExecutor = null; // Reset reference so a fresh executor can instantiate on re-entry [3]
-		}
-	}
-
-	/**
-	 * Listens to the server stopping event to guarantee pending save operations write completely [3].
-	 */
-	@SubscribeEvent
-	public static void onServerStopping(ServerStoppingEvent event) {
-		shutdown();
-	}
-
-	/**
-	 * Simple data record housing loaded configurations returned by loadSync [3].
-	 */
 	public record LoadedData(Flowchart flowchart, List<InventoryGroupVariable> groupVariables,
 			List<ItemFilterVariable> filterVariables) {
 		public static LoadedData empty() {

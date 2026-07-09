@@ -3,16 +3,14 @@ package dta.sfmflow.client.screen.helper;
 import javax.annotation.Nullable;
 
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.client.WorkspaceValidatorRegistry;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
-import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Validates flowchart component states and rules on the clientbound UI [3].
+ * Delegating validation director querying registered component validators on the clientbound UI [3].
  */
 @OnlyIn(Dist.CLIENT)
 public final class WorkspaceValidator {
@@ -20,126 +18,35 @@ public final class WorkspaceValidator {
 	private WorkspaceValidator() {
 	}
 
-	/**
-	 * Evaluates if a given component has an unbound connected inventory error [3].
-	 * Verifies that the selected inventory ID actually exists on the network [3].
-	 *
-	 * @param screen    active screen manager [3]
-	 * @param component flow component query [3]
-	 * @return true if the component has an unbound inventory error [3]
-	 */
 	public static boolean hasUnboundInventoryError(ManagerScreen screen, AbstractFlowComponent component) {
-		if (component instanceof ItemTransferComponent transfer) {
-			// 1. Check if bound inventory is actively connected to the network [3]
-			boolean foundBoundInventory = false;
-			if (transfer.getInventoryId() != -1) {
-				for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
-					if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
-						foundBoundInventory = true;
-						break;
-					}
-				}
-			}
-
-			// Flag error if unassigned or if the bound chest is disconnected [3]
-			if (transfer.getInventoryId() == -1 || !foundBoundInventory) {
-				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-				for (var conn : connections) {
-					if (conn.getSourceComponentId().equals(transfer.getId())
-							|| conn.getTargetComponentId().equals(transfer.getId())) {
-						return true;
-					}
-				}
-			}
-
-			// 2. Empty Whitelist validation check [3]
-			if (transfer.isWhitelist()) {
-				boolean empty = true;
-				for (ItemStack stack : transfer.getFilterItems()) {
-					if (stack != null && !stack.isEmpty()) {
-						empty = false;
-						break;
-					}
-				}
-				if (empty) {
-					var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-					for (var conn : connections) {
-						if (conn.getSourceComponentId().equals(transfer.getId())
-								|| conn.getTargetComponentId().equals(transfer.getId())) {
-							return true;
-						}
-					}
-				}
-			}
-
-			// 3. No active sides error check [3]
-			if (transfer.getActiveSidesMask() == 0) {
-				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-				for (var conn : connections) {
-					if (conn.getSourceComponentId().equals(transfer.getId())
-							|| conn.getTargetComponentId().equals(transfer.getId())) {
-						return true;
-					}
-				}
-			}
+		var validator = WorkspaceValidatorRegistry.getValidator(component.getClass());
+		if (validator != null) {
+			return validator.hasError(screen, component);
 		}
 		return false;
 	}
 
-	/**
-	 * Retrieves the specific error tooltip component based on the active validation state [3].
-	 * Returns null if the component does not exhibit any active errors [3].
-	 */
 	public static @Nullable Component getErrorTooltip(ManagerScreen screen, AbstractFlowComponent component) {
-		if (component instanceof ItemTransferComponent transfer) {
-			// 1. Check if bound inventory is connected [3]
-			boolean foundBoundInventory = false;
-			if (transfer.getInventoryId() != -1) {
-				for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
-					if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
-						foundBoundInventory = true;
-						break;
-					}
-				}
-			}
-
-			if (transfer.getInventoryId() == -1 || !foundBoundInventory) {
-				return Component.translatable("gui.sfmflow.error.unbound_inventory");
-			}
-
-			// 2. Empty Whitelist validation check [3]
-			if (transfer.isWhitelist()) {
-				boolean empty = true;
-				for (ItemStack stack : transfer.getFilterItems()) {
-					if (stack != null && !stack.isEmpty()) {
-						empty = false;
-						break;
-					}
-				}
-				if (empty) {
-					return Component.translatable("gui.sfmflow.error.empty_whitelist");
-				}
-			}
-
-			// 3. No active sides error check [3]
-			if (transfer.getActiveSidesMask() == 0) {
-				return Component.translatable("gui.sfmflow.error.no_active_sides");
-			}
+		var validator = WorkspaceValidatorRegistry.getValidator(component.getClass());
+		if (validator != null) {
+			return validator.getErrorTooltip(screen, component);
 		}
 		return null;
 	}
 
-	/**
-	 * Evaluates if a given component has an empty filter variable warning [3].
-	 *
-	 * @param screen    active screen manager [3]
-	 * @param component flow component query [3]
-	 * @return true if the component is an empty filter variable warning [3]
-	 */
 	public static boolean hasEmptyFilterVariableWarning(ManagerScreen screen, AbstractFlowComponent component) {
-		if (component instanceof AdvancedItemFilterVariableComponent varComp) {
-			return varComp.getFilterStack().isEmpty();
+		var validator = WorkspaceValidatorRegistry.getValidator(component.getClass());
+		if (validator != null) {
+			return validator.hasWarning(screen, component);
 		}
 		return false;
+	}
+
+	public static @Nullable Component getWarningTooltip(ManagerScreen screen, AbstractFlowComponent component) {
+		var validator = WorkspaceValidatorRegistry.getValidator(component.getClass());
+		if (validator != null) {
+			return validator.getWarningTooltip(screen, component);
+		}
+		return null;
 	}
 }

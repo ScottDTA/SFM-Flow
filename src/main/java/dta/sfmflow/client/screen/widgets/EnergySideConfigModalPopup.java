@@ -3,9 +3,10 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.network.ClientSidePropertyCache;
+import dta.sfmflow.networking.packets.serverbound.RequestSideConfigPropertiesPacket;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.sounds.SoundManager;
@@ -13,15 +14,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Custom popup modal allowing users to configure energy transfer limits
- * statically scaled to 75% (112x60) for a compact look [3].
+ * dynamically bounded by the adjacent block's server-side verified capacity [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class EnergySideConfigModalPopup extends AbstractModalPopup {
@@ -29,36 +30,52 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 	private final Direction side;
 	private final BlockPos pos;
 	private final Runnable onChanged;
-	private final int maxLimit;
+	private int maxLimit;
 	private final EnergySlider slider;
 
 	public EnergySideConfigModalPopup(ManagerScreen parentScreen, EnergyTransferComponent component, Direction side, BlockPos pos, Runnable onChanged) {
-		super(parentScreen, 112, 60, Component.literal("Energy Limit")); // Statically scaled to 75% (112x60) [3]
+		super(parentScreen, 112, 60, Component.literal("Energy Limit"));
 		this.component = component;
 		this.side = side;
 		this.pos = pos;
 		this.onChanged = onChanged;
 
-		// 1. Query adjacent block capability on the client thread to fetch capacity bounds [3]
-		int resolvedMax = 10000; // default fallback [3]
-		var level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
-		if (level != null && pos != null && side != null) {
-			var adjPos = pos.relative(side);
-			var energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, adjPos, side.getOpposite());
-			if (energy != null) {
-				resolvedMax = energy.getEnergyStored(); // Standard limit is 0 to max storage capacity on the side [3]
-			}
+		// 1. Resolve starting bounds from cache if already synchronized [3]
+		int resolvedMax = 10000; // Standard fallback [3]
+		var adjPos = pos.relative(side);
+		CompoundTag props = ClientSidePropertyCache.get(adjPos, side.getOpposite(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
+		if (props.contains("MaxEnergy")) {
+			resolvedMax = props.getInt("MaxEnergy");
 		}
 		this.maxLimit = resolvedMax;
 
-		// Clamp current limit inside the resolved bounds [3]
+		// 2. Dispatch dynamic query packet to fetch exact, server-side verified bounds [3]
+		PacketDistributor.sendToServer(new RequestSideConfigPropertiesPacket(adjPos, side.getOpposite(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy")));
+
+		// Clamp current limit inside starting bounds [3]
 		if (component.getMaxTransferAmount() > maxLimit) {
 			component.setMaxTransferAmount(maxLimit);
 		}
 
-		// 2. Initialize the custom slider aligned inside the 112px layout
+		// 3. Initialize the slider
 		this.slider = new EnergySlider(getX() + 10, getY() + 16, 92, 16, component, maxLimit, onChanged);
 		this.children.add(new ApiWidgetAdapter<>(this.slider));
+	}
+
+	/**
+	 * Callback triggered when server property configurations are returned [3].
+	 * Dynamically re-adjusts slider values and bounds [3].
+	 */
+	public void refreshProperties() {
+		if (pos != null && side != null) {
+			var adjPos = pos.relative(side);
+			CompoundTag props = ClientSidePropertyCache.get(adjPos, side.getOpposite(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
+			if (props.contains("MaxEnergy")) {
+				int newMax = props.getInt("MaxEnergy");
+				this.maxLimit = newMax;
+				this.slider.updateMaxLimit(newMax);
+			}
+		}
 	}
 
 	private void saveAndClose() {
@@ -130,7 +147,7 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 	@OnlyIn(Dist.CLIENT)
 	private static class EnergySlider extends AbstractSliderButton {
 		private final EnergyTransferComponent component;
-		private final int maxLimit;
+		private int maxLimit;
 		private final Runnable onChanged;
 
 		public EnergySlider(int x, int y, int width, int height, EnergyTransferComponent component, int maxLimit, Runnable onChanged) {
@@ -138,6 +155,15 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 			this.component = component;
 			this.maxLimit = maxLimit;
 			this.onChanged = onChanged;
+			this.updateMessage();
+		}
+
+		public void updateMaxLimit(int newMax) {
+			this.maxLimit = newMax;
+			if (component.getMaxTransferAmount() > maxLimit) {
+				component.setMaxTransferAmount(maxLimit);
+			}
+			this.value = maxLimit > 0 ? (double) component.getMaxTransferAmount() / maxLimit : 0.0;
 			this.updateMessage();
 		}
 
@@ -158,7 +184,7 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 		public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 			if (this.visible && this.active && this.isMouseOver(mouseX, mouseY) && maxLimit > 0) {
 				int val = this.component.getMaxTransferAmount();
-				int step = Math.max(1, maxLimit / 100); // 1% steps [3]
+				int step = Math.max(1, maxLimit / 100); // 1% steps
 				int newVal = Mth.clamp(val + (scrollY > 0 ? step : -step), 0, maxLimit);
 
 				if (newVal != val) {

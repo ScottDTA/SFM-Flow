@@ -1,9 +1,16 @@
 7-8-2026
 
+
+
 ### [Added]
+* **Validation Registry API:** Introduced a client-side validation registry (`WorkspaceValidatorRegistry`). Addon developers can now programmatically register custom error, warning, and tooltip rules for their nodes side-safely.
+* **Synchronized Property Queries:** Enabled live network synchronization for side limits. Popups like the Energy Limit slider now dynamically fetch and verify exact capacity parameters from the server, adjusting constraints in real time.
+* **9-Slice UI Assistant:** Consolidated all stretching submenu borders and backgrounds into a unified rendering assistant (`NineSliceUtil`) to improve texture memory usage.
 * **Extensible Snapshot API:** Introduced a developer-facing snapshotting registry (`ICapabilitySnapshotter`). Addon developers can now register custom snapshot handlers, enabling the system to deep-copy and simulate third-party capabilities (like gases, chemicals, or custom power grids) safely on background threads.
 
 ### [Changed]
+* **Polymorphic Trigger Sweeps:** Refactored the core execution loop to cache trigger components and evaluate them polymorphically. This isolates tick timing loops and condition queries within the trigger components themselves, removing central overhead.
+* **Synchronous Disk Operations:** Standardized world state disk writes to run synchronously. This prevents timing conflicts, saving issues, and file corruptions when shutting down or restarting singleplayer worlds and servers.
 * **Unified State Snapshotting:** Re-engineered the underlying world state capture mechanics to dynamically snapshot all registered network capabilities, removing hardcoded logic from the snapshot container.
 
 ### [Fixed]
