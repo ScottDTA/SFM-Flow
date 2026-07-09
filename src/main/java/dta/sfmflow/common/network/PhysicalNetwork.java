@@ -181,7 +181,7 @@ public class PhysicalNetwork {
 
 	@SuppressWarnings("unchecked")
 	private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth,
-			java.util.BitSet visited, boolean isCableComponent) {
+			BitSet visited, boolean isCableComponent) {
 		int posId = this.networkMap.getOrAddNode(pos);
 
 		if (!isCableComponent) {
@@ -214,14 +214,23 @@ public class PhysicalNetwork {
 
 			if (level instanceof ServerLevel serverLevel) {
 				// Dynamically allocate and register BlockCapabilityCache for each discovered
-				// capability [3]
+				// capability across all 6 directions plus the non-directional side context [3]
 				for (ResourceLocation capId : discoveredTypes) {
 					var flowCap = FlowCapabilityRegistry.get(capId);
 					if (flowCap != null && flowCap.getCapability() != null) {
-						var cache = BlockCapabilityCache.create(
+						// Register non-directional cache
+						var nullCache = BlockCapabilityCache.create(
 								(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos,
-								Direction.UP);
-						connection.registerCache(capId, cache);
+								null);
+						connection.registerCache(capId, null, nullCache);
+
+						// Register direction-specific caches
+						for (Direction dir : Direction.values()) {
+							var dirCache = BlockCapabilityCache.create(
+									(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos,
+									dir);
+							connection.registerCache(capId, dir, dirCache);
+						}
 					}
 				}
 			}

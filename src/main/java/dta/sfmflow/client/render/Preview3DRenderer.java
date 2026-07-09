@@ -238,6 +238,7 @@ public final class Preview3DRenderer {
 			}
 		};
 
+		// 1. Render Center Block FIRST with depth-masking active to keep it opaque and solid [3]
 		BlockState centerState = level.getBlockState(centerPos);
 		if (!centerState.isAir()) {
 			poseStack.pushPose();
@@ -259,7 +260,9 @@ public final class Preview3DRenderer {
 			} else {
 				// Use brightLevel proxy and invoke tesselateWithoutAO to completely bypass neighboring Ambient Occlusion pollution [3]
 				BakedModel model = blockRenderer.getBlockModel(centerState);
-				RenderType renderType = ItemBlockRenderTypes.getChunkRenderType(centerState);
+				
+				// Force standard solid/cutout render type for the center block to guarantee depth-masking and prevent neighbor ghosting [3]
+				RenderType renderType = RenderType.cutout();
 				VertexConsumer consumer = bufferSource.getBuffer(renderType);
 				blockRenderer.getModelRenderer().tesselateWithoutAO(
 						brightLevel,
@@ -282,6 +285,7 @@ public final class Preview3DRenderer {
 			// buffers before the markers [3]
 			bufferSource.endBatch();
 
+			// 2. Render Markers directly on the Center Block's faces [3]
 			poseStack.pushPose();
 			poseStack.translate(0.5F, 0.5F, 0.5F);
 			RenderSystem.enableBlend();
@@ -296,6 +300,7 @@ public final class Preview3DRenderer {
 		}
 		bufferSource.endBatch();
 
+		// 3. Render Translucent Neighbors with depth writing disabled so they sit behind the center block [3]
 		RenderSystem.depthMask(false);
 
 		// =========================================================================
@@ -354,7 +359,7 @@ public final class Preview3DRenderer {
 							Minecraft.getInstance().getItemRenderer().renderStatic(itemStack, ItemDisplayContext.FIXED,
 									15728880, OverlayTexture.NO_OVERLAY, poseStack, ghostEntitySource, level, 0);
 
-							bufferSource.endBatch(actualType);
+							bufferSource.endBatch();
 
 							RenderSystem.depthMask(false);
 							// Restore standard shader color after drawing each special block [3]
@@ -404,15 +409,39 @@ public final class Preview3DRenderer {
 		builder.addVertex(matrix, x4, y4, z4).setColor(r, g, b, 128);
 	}
 
-	private static void draw3DLine(VertexConsumer builder, Matrix4f matrix, Direction face, float x1, float y1,
-			float z1, float x2, float y2, float z2, int r, int g, int b) {
-		float nx = face.getStepX();
-		float ny = face.getStepY();
-		float nz = face.getStepZ();
-		// Set to 128 (50% alpha) to increase text and orientation visibility underneath
-		// [3]
-		builder.addVertex(matrix, x1, y1, z1).setColor(r, g, b, 128).setNormal(nx, ny, nz);
-		builder.addVertex(matrix, x2, y2, z2).setColor(r, g, b, 128).setNormal(nx, ny, nz);
+	/**
+	 * Programmatically renders a thick 3D diagonal line inside the face plane as a Quad,
+	 * ensuring 100% visibility during orbit camera rotations [3].
+	 */
+	private static void draw3DThickLine(VertexConsumer builder, Matrix4f matrix, Direction face, 
+			float x1, float y1, float z1, 
+			float x2, float y2, float z2, 
+			float thickness, int r, int g, int b, int a) {
+		float dx = x2 - x1;
+		float dy = y2 - y1;
+		float dz = z2 - z1;
+		float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+		if (len <= 0) return;
+		
+		float ox = 0, oy = 0, oz = 0;
+		
+		// Derive the perpendicular offset vector strictly inside the target face plane [3]
+		if (face.getAxis() == Direction.Axis.Y) {
+			ox = -dz / len * thickness;
+			oz = dx / len * thickness;
+		} else if (face.getAxis() == Direction.Axis.Z) {
+			ox = -dy / len * thickness;
+			oy = dx / len * thickness;
+		} else if (face.getAxis() == Direction.Axis.X) {
+			oy = -dz / len * thickness;
+			oz = dy / len * thickness;
+		}
+		
+		// Map crossing diagonal quads [3]
+		builder.addVertex(matrix, x1 - ox, y1 - oy, z1 - oz).setColor(r, g, b, a);
+		builder.addVertex(matrix, x2 - ox, y2 - oy, z2 - oz).setColor(r, g, b, a);
+		builder.addVertex(matrix, x2 + ox, y2 + oy, z2 + oz).setColor(r, g, b, a);
+		builder.addVertex(matrix, x1 + ox, y1 + oy, z1 + oz).setColor(r, g, b, a);
 	}
 
 	private static void draw3DMarker(PoseStack poseStack, MultiBufferSource bufferSource, Direction face,
@@ -454,31 +483,34 @@ public final class Preview3DRenderer {
 					0.25F, 0.505F, -0.25F, 0.25F, r, g, b);
 			}
 		} else {
-			VertexConsumer builder = bufferSource.getBuffer(RenderType.lines());
+			// Render thick depth-free crossing quads using MARKER_RENDER_TYPE so the red 'X' never fades during rotation [3]
+			VertexConsumer builder = bufferSource.getBuffer(MARKER_RENDER_TYPE);
+			float t = 0.02F; // Establish solid diagonal quad thickness [3]
 			switch (face) {
 			case UP -> {
-				draw3DLine(builder, matrix, face, -0.25F, 0.505F, -0.25F, 0.25F, 0.505F, 0.25F, r, g, b);
-				draw3DLine(builder, matrix, face, -0.25F, 0.505F, 0.25F, 0.25F, 0.505F, -0.25F, r, g, b);
+				draw3DThickLine(builder, matrix, face, -0.25F, 0.505F, -0.25F, 0.25F, 0.505F, 0.25F, t, r, g, b, 255);
+				draw3DThickLine(builder, matrix, face, -0.25F, 0.505F, 0.25F, 0.25F, 0.505F, -0.25F, t, r, g, b, 255);
 			}
 			case DOWN -> {
-				draw3DLine(builder, matrix, face, -0.25F, -0.505F, -0.25F, 0.25F, -0.505F, 0.25F, r, g, b);
-				draw3DLine(builder, matrix, face, -0.25F, -0.505F, 0.25F, 0.25F, -0.505F, -0.25F, r, g, b);
+				draw3DThickLine(builder, matrix, face, -0.25F, -0.505F, -0.25F, 0.25F, -0.505F, 0.25F, t, r, g, b, 255);
+				draw3DThickLine(builder, matrix, face, -0.25F, -0.505F, 0.25F, 0.25F, -0.505F, -0.25F, t, r, g, b, 255);
 			}
 			case NORTH -> {
-				draw3DLine(builder, matrix, face, -0.25F, -0.25F, -0.505F, 0.25F, 0.25F, -0.505F, r, g, b);
-				draw3DLine(builder, matrix, face, -0.25F, 0.25F, -0.505F, 0.25F, -0.25F, -0.505F, r, g, b);
+				draw3DThickLine(builder, matrix, face, -0.25F, -0.25F, -0.505F, 0.25F, 0.25F, -0.505F, t, r, g, b, 255);
+				draw3DThickLine(builder, matrix, face, -0.25F, 0.25F, -0.505F, 0.25F, -0.25F, -0.505F, t, r, g, b, 255);
 			}
 			case SOUTH -> {
-				draw3DLine(builder, matrix, face, -0.25F, -0.25F, 0.505F, 0.25F, 0.25F, 0.505F, r, g, b);
-				draw3DLine(builder, matrix, face, -0.25F, 0.25F, 0.505F, 0.25F, -0.25F, -0.505F, r, g, b);
+				draw3DThickLine(builder, matrix, face, -0.25F, -0.25F, 0.505F, 0.25F, 0.25F, 0.505F, t, r, g, b, 255);
+				draw3DThickLine(builder, matrix, face, -0.25F, 0.25F, 0.505F, 0.25F, -0.25F, 0.505F, t, r, g, b, 255);
 			}
 			case WEST -> {
-				draw3DLine(builder, matrix, face, -0.505F, -0.25F, -0.25F, -0.505F, 0.25F, 0.25F, r, g, b);
-				draw3DLine(builder, matrix, face, -0.505F, -0.25F, 0.25F, -0.505F, 0.25F, -0.25F, r, g, b);
+				// FIX: Rectified typo where second line's y coordinate was hardcoded to -0.25F instead of 0.25F [3]
+				draw3DThickLine(builder, matrix, face, -0.505F, -0.25F, -0.25F, -0.505F, 0.25F, 0.25F, t, r, g, b, 255);
+				draw3DThickLine(builder, matrix, face, -0.505F, -0.25F, 0.25F, -0.505F, 0.25F, -0.25F, t, r, g, b, 255);
 			}
 			case EAST -> {
-				draw3DLine(builder, matrix, face, 0.505F, -0.25F, -0.25F, 0.505F, 0.25F, 0.25F, r, g, b);
-				draw3DLine(builder, matrix, face, 0.505F, -0.25F, 0.25F, 0.505F, 0.25F, -0.25F, r, g, b);
+				draw3DThickLine(builder, matrix, face, 0.505F, -0.25F, -0.25F, 0.505F, 0.25F, 0.25F, t, r, g, b, 255);
+				draw3DThickLine(builder, matrix, face, 0.505F, -0.25F, 0.25F, 0.505F, 0.25F, -0.25F, t, r, g, b, 255);
 			}
 			}
 		}

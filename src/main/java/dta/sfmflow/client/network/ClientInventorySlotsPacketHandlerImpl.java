@@ -45,7 +45,7 @@ public class ClientInventorySlotsPacketHandlerImpl implements IPacketHandler<Syn
 				}
 			}
 
-			ClientInventoryCache.set(payload.pos(), items);
+			ClientInventoryCache.set(payload.pos(), payload.side(), items);
 
 			// Trigger visual update instantly
 			if (mc.screen instanceof dta.sfmflow.client.screen.ManagerScreen screen) {

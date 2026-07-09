@@ -170,7 +170,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		this.setX((parentScreen.width - this.width) / 2);
 		this.setY((parentScreen.height - this.height) / 2);
 
-		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos));
+		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos, this.side));
 	}
 
 	@Override
@@ -269,7 +269,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		Component titleComponent = Component.literal(sideName + suffix);
 		guiGraphics.drawCenteredString(parentScreen.getFont(), titleComponent, w / 2, 6, 0xFFD4AF37);
 
-		ItemStack[] cachedItems = ClientInventoryCache.get(this.blockPos);
+		ItemStack[] cachedItems = ClientInventoryCache.get(this.blockPos, this.side);
 
 		if (this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {

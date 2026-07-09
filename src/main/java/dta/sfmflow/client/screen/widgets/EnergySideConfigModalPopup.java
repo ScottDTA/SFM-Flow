@@ -40,17 +40,26 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 		this.pos = pos;
 		this.onChanged = onChanged;
 
-		// 1. Resolve starting bounds from cache if already synchronized [3]
-		int resolvedMax = 10000; // Standard fallback [3]
-		var adjPos = pos.relative(side);
-		CompoundTag props = ClientSidePropertyCache.get(adjPos, side.getOpposite(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
-		if (props.contains("MaxEnergy")) {
-			resolvedMax = props.getInt("MaxEnergy");
+		// 1. Resolve starting bounds dynamically based on component node context [3]
+		int resolvedMax = 10000; // Fallback [3]
+		CompoundTag props = ClientSidePropertyCache.get(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
+		if (component.isInput()) {
+			if (props.contains("MaxExtract")) {
+				resolvedMax = props.getInt("MaxExtract");
+			} else if (props.contains("MaxEnergy")) {
+				resolvedMax = props.getInt("MaxEnergy");
+			}
+		} else {
+			if (props.contains("MaxReceive")) {
+				resolvedMax = props.getInt("MaxReceive");
+			} else if (props.contains("MaxEnergy")) {
+				resolvedMax = props.getInt("MaxEnergy");
+			}
 		}
 		this.maxLimit = resolvedMax;
 
-		// 2. Dispatch dynamic query packet to fetch exact, server-side verified bounds [3]
-		PacketDistributor.sendToServer(new RequestSideConfigPropertiesPacket(adjPos, side.getOpposite(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy")));
+		// 2. Dispatch dynamic query packet [3]
+		PacketDistributor.sendToServer(new RequestSideConfigPropertiesPacket(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy")));
 
 		// Clamp current limit inside starting bounds [3]
 		if (component.getMaxTransferAmount() > maxLimit) {
@@ -68,13 +77,23 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 	 */
 	public void refreshProperties() {
 		if (pos != null && side != null) {
-			var adjPos = pos.relative(side);
-			CompoundTag props = ClientSidePropertyCache.get(adjPos, side.getOpposite(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
-			if (props.contains("MaxEnergy")) {
-				int newMax = props.getInt("MaxEnergy");
-				this.maxLimit = newMax;
-				this.slider.updateMaxLimit(newMax);
+			CompoundTag props = ClientSidePropertyCache.get(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
+			int resolvedMax = 10000;
+			if (component.isInput()) {
+				if (props.contains("MaxExtract")) {
+					resolvedMax = props.getInt("MaxExtract");
+				} else if (props.contains("MaxEnergy")) {
+					resolvedMax = props.getInt("MaxEnergy");
+				}
+			} else {
+				if (props.contains("MaxReceive")) {
+					resolvedMax = props.getInt("MaxReceive");
+				} else if (props.contains("MaxEnergy")) {
+					resolvedMax = props.getInt("MaxEnergy");
+				}
 			}
+			this.maxLimit = resolvedMax;
+			this.slider.updateMaxLimit(resolvedMax);
 		}
 	}
 

@@ -1,5 +1,8 @@
 package dta.sfmflow.networking;
 
+import java.lang.reflect.Field;
+import java.util.Locale;
+
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
@@ -210,7 +213,11 @@ public class ServerPayloadHandler {
 			ServerPlayer player = (ServerPlayer) context.player();
 			Level level = player.level();
 			if (level.hasChunkAt(data.pos())) {
-				IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
+				// Query item handler directly on the clicked side face [3]
+				IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), data.side());
+				if (itemHandler == null) {
+					itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
+				}
 				if (itemHandler != null) {
 					CompoundTag dataTag = new CompoundTag();
 					ListTag list = new ListTag();
@@ -226,14 +233,16 @@ public class ServerPayloadHandler {
 					dataTag.put("items", list);
 					dataTag.putInt("totalSlots", itemHandler.getSlots());
 
-					PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), dataTag));
+					PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), data.side(), dataTag));
 				} else {
-					// Fallback to fluid handler capability query for fluid layouts (such as
-					// Cauldrons)
-					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), null);
+					// Query fluid handler directly on the clicked side face [3]
+					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), data.side());
+					if (fluidHandler == null) {
+						fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), null);
+					}
 					if (fluidHandler == null) {
 						fluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
-								level, data.pos(), level.getBlockState(data.pos()), null);
+								level, data.pos(), level.getBlockState(data.pos()), data.side());
 					}
 
 					if (fluidHandler != null) {
@@ -255,7 +264,7 @@ public class ServerPayloadHandler {
 						dataTag.put("items", list);
 						dataTag.putInt("totalSlots", fluidHandler.getTanks());
 
-						PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), dataTag));
+						PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), data.side(), dataTag));
 					}
 				}
 			}
@@ -313,8 +322,30 @@ public class ServerPayloadHandler {
 				
 				if (data.capabilityId().getPath().equals("energy")) {
 					IEnergyStorage energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, data.pos(), data.side());
+					if (energy == null) {
+						// Fallback to non-sided query if sided check resolves to null
+						energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, data.pos(), null);
+					}
 					if (energy != null) {
-						properties.putInt("MaxEnergy", energy.getMaxEnergyStored());
+						int capacity = energy.getMaxEnergyStored();
+						int extractLimit = capacity;
+						int receiveLimit = capacity;
+
+						// 1. Mekanism Energy Cube Heuristic: limit is exactly capacity / 1000 [3]
+						net.minecraft.world.level.block.state.BlockState state = level.getBlockState(data.pos());
+						ResourceLocation blockId = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock());
+						if (blockId != null && "mekanism".equals(blockId.getNamespace()) && blockId.getPath().contains("energy_cube")) {
+							extractLimit = capacity / 1000;
+							receiveLimit = capacity / 1000;
+						} else {
+							// 2. Standard Reflection fallback scanning standard energy rate fields [3]
+							extractLimit = reflectField(energy, "maxExtract", capacity);
+							receiveLimit = reflectField(energy, "maxReceive", capacity);
+						}
+
+						properties.putInt("MaxEnergy", capacity);
+						properties.putInt("MaxExtract", extractLimit);
+						properties.putInt("MaxReceive", receiveLimit);
 						properties.putInt("CurrentEnergy", energy.getEnergyStored());
 					}
 				}
@@ -323,5 +354,56 @@ public class ServerPayloadHandler {
 				PacketDistributor.sendToPlayer(player, new SyncSideConfigPropertiesPacket(data.pos(), data.side(), data.capabilityId(), properties));
 			}
 		});
+	}
+
+	private static int reflectField(Object obj, String fieldName, int defaultValue) {
+		return reflectFieldRecursive(obj, fieldName, defaultValue, 0);
+	}
+
+	private static int reflectFieldRecursive(Object obj, String fieldName, int defaultValue, int depth) {
+		if (obj == null || depth > 2) {
+			return defaultValue;
+		}
+		Class<?> clazz = obj.getClass();
+		while (clazz != null) {
+			try {
+				Field field = clazz.getDeclaredField(fieldName);
+				field.setAccessible(true);
+				Object val = field.get(obj);
+				if (val instanceof Number num) {
+					return num.intValue();
+				}
+			} catch (Exception ignored) {
+				// Alternative capitalization mapping support
+				try {
+					String altName = Character.toUpperCase(fieldName.charAt(0)) + fieldName.substring(1);
+					Field field = clazz.getDeclaredField(altName);
+					field.setAccessible(true);
+					Object val = field.get(obj);
+					if (val instanceof Number num) {
+						return num.intValue();
+					}
+				} catch (Exception ignored2) {}
+			}
+			
+			// Recurse through member fields to resolve nested delegate adapters
+			for (Field f : clazz.getDeclaredFields()) {
+				try {
+					f.setAccessible(true);
+					Object member = f.get(obj);
+					if (member != null && member != obj) {
+						String lowerName = f.getName().toLowerCase(Locale.ROOT);
+						if (lowerName.contains("handler") || lowerName.contains("delegate") || lowerName.contains("container") || lowerName.contains("storage") || lowerName.contains("wrapped")) {
+							int result = reflectFieldRecursive(member, fieldName, -1, depth + 1);
+							if (result != -1) {
+								return result;
+							}
+						}
+					}
+				} catch (Exception ignored) {}
+			}
+			clazz = clazz.getSuperclass();
+		}
+		return defaultValue;
 	}
 }

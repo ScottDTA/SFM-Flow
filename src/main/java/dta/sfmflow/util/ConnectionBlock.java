@@ -20,8 +20,7 @@ import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 
 /**
- * Declares scannable target inventory indices mapped to physical coordinates
- * [3].
+ * Declares scannable target inventory indices mapped to physical coordinates [3].
  */
 public class ConnectionBlock implements IContainerSelection {
 	private Level level;
@@ -31,9 +30,10 @@ public class ConnectionBlock implements IContainerSelection {
 	private int id;
 	private boolean sleeping = false;
 
-	// Dynamic capability cache matrix replacing hardcoded item and fluid cache
-	// fields [3]
-	private final Map<ResourceLocation, BlockCapabilityCache<?, Direction>> capabilityCaches = new HashMap<>();
+	public record SidedCacheKey(ResourceLocation capId, @Nullable Direction side) {}
+
+	// Sided capability cache matrix to track and invalidate face settings independently [3]
+	private final Map<SidedCacheKey, BlockCapabilityCache<?, Direction>> capabilityCaches = new HashMap<>();
 
 	public ConnectionBlock(BlockPos blockPos, int cableDistance) {
 		this.blockPos = blockPos;
@@ -76,10 +76,10 @@ public class ConnectionBlock implements IContainerSelection {
 
 	/**
 	 * Registers a dynamically allocated BlockCapabilityCache under its capability
-	 * registry ID [3].
+	 * registry ID and side context [3].
 	 */
-	public void registerCache(ResourceLocation capId, BlockCapabilityCache<?, Direction> cache) {
-		this.capabilityCaches.put(capId, cache);
+	public void registerCache(ResourceLocation capId, @Nullable Direction side, BlockCapabilityCache<?, Direction> cache) {
+		this.capabilityCaches.put(new SidedCacheKey(capId, side), cache);
 	}
 
 	/**
@@ -93,7 +93,7 @@ public class ConnectionBlock implements IContainerSelection {
 			return null;
 		}
 
-		BlockCapabilityCache<?, Direction> cache = this.capabilityCaches.get(capId);
+		BlockCapabilityCache<?, Direction> cache = this.capabilityCaches.get(new SidedCacheKey(capId, side));
 		if (cache != null) {
 			try {
 				Object handler = cache.getCapability();
@@ -134,9 +134,6 @@ public class ConnectionBlock implements IContainerSelection {
 	/**
 	 * Resolves the localized display name of this block coordinate safely and
 	 * appends coordinates [3].
-	 *
-	 * @param level level context [3]
-	 * @return localized display text with block position info [3]
 	 */
 	public Component getDisplayName(Level level) {
 		Component baseName;
