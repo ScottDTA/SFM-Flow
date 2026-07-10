@@ -1,12 +1,18 @@
 7-9-2026
 
 ### [Added]
+* **Redstone Trigger Node:** A new trigger node that fires flowchart logic paths based on incoming redstone signals. It supports evaluating signals on any block face and exposes exactly 4 outputs: *While High*, *While Low*, *On High Pulse*, and *On Low Pulse*.
+* **Sided Redstone Configuration Popup:** Shift-clicking a face on a Redstone Trigger block in the 3D preview now opens a compact custom settings menu to configure individual analog signal thresholds (0 to 15) and mathematical comparison operators (`>`, `<`, `=`, `>=`, `<=`) per side.
+* **Canvas Pin Tooltips:** Flowchart node connection pins now display interactive, localized descriptions when you hover your cursor over them, clarifying what trigger condition or pipeline wire they represent.
 * **Precise Energy Limits:** Overhauled the energy limit panel to support precise numeric typing via an input text box. Players can now input exact rate limits (in FE/t) or toggle the transfer mode to "Unlimited" to bypass constraints.
 
 ### [Changed]
+* **Dynamic Overlay Shifting:** Overlaid settings panels now automatically shift themselves upward on smaller screens to guarantee they never overlap or block access to the player's hotbar and inventory slots.
+* **Functional Cable Placement Rules:** Improved the placement behavior of network cables. Placing or breaking functional nodes (like emitters, receivers, or hatches) now instantly triggers a full network rescan, while plain inert cables continue to utilize the faster O(1) connection path.
 * **Reactive Slot Previews:** Re-engineered the side slot configuration screen to parse and render inventory changes dynamically from cached network tags. This ensures that slot items and locked boundaries update instantly in the preview without needing to close and reopen the menu.
 
 ### [Fixed]
+* **Redstone Device State Desyncs:** Fixed a physical cache issue where placing or removing redstone transmitters or receivers would not instantly notify adjacent cable networks, causing signal desyncs until a manual scan was triggered.
 * **Sided Slot Filtering:** Improved slot detection on the server to recursively scan nested container delegates, ensuring that side-restricted slots are correctly identified and visually greyed out on the client layout preview.
 
 

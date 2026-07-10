@@ -43,6 +43,14 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.energy_input", "Energy Input");
 		add("gui.sfmflow.energy_output", "Energy Output");
 		add("gui.sfmflow.advanced_fluid_filter_variable", "Advanced Fluid Filter");
+		add("gui.sfmflow.redstone_trigger.output.while_high", "While High");
+		add("gui.sfmflow.redstone_trigger.output.while_low", "While Low");
+		add("gui.sfmflow.redstone_trigger.output.on_high_pulse", "On High Pulse");
+		add("gui.sfmflow.redstone_trigger.output.on_low_pulse", "On Low Pulse");
+		
+		add("gui.sfmflow.redstone_trigger", "Redstone Trigger");
+		add("block.sfmflow.redstone_trigger", "Redstone Trigger");		
+		
 		add("gui.sfmflow.loading", "%1$s REQUESTS LOADING...");
 
 		add("gui.sfmflow.menu.camo", "Camouflage");

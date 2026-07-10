@@ -43,7 +43,12 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 			for (int i = 0; i < component.getNumInputs(); i++) {
 				int xOffset = spacing[i];
 				int finalX = getX() + xOffset;
-				this.children.add(new FlowWidgetInputNode(i, this, finalX, baseY));
+				FlowWidgetInputNode pin = new FlowWidgetInputNode(i, this, finalX, baseY);
+				Component pinTooltip = component.getInputNodeTooltip(i);
+				if (pinTooltip != null) {
+					pin.setCustomTooltip(net.minecraft.client.gui.components.Tooltip.create(pinTooltip));
+				}
+				this.children.add(pin);
 			}
 		}
 
@@ -54,7 +59,12 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 			for (int i = 0; i < component.getNumOutputs(); i++) {
 				int xOffset = spacing[i];
 				int finalX = getX() + xOffset;
-				this.children.add(new FlowWidgetOutputNode(i, this, finalX, baseY));
+				FlowWidgetOutputNode pin = new FlowWidgetOutputNode(i, this, finalX, baseY);
+				Component pinTooltip = component.getOutputNodeTooltip(i);
+				if (pinTooltip != null) {
+					pin.setCustomTooltip(net.minecraft.client.gui.components.Tooltip.create(pinTooltip));
+				}
+				this.children.add(pin);
 			}
 		}
 	}

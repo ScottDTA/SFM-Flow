@@ -19,11 +19,6 @@ import org.jetbrains.annotations.Nullable;
 public class RedstoneReceiverBlock extends BaseEntityBlock {
 	public static final MapCodec<RedstoneReceiverBlock> CODEC = simpleCodec(RedstoneReceiverBlock::new);
 
-	/**
-	 * Initializes a new RedstoneReceiverBlock instance [3].
-	 *
-	 * @param properties block behavior properties [3]
-	 */
 	public RedstoneReceiverBlock(Properties properties) {
 		super(properties);
 	}
@@ -31,6 +26,22 @@ public class RedstoneReceiverBlock extends BaseEntityBlock {
 	@Override
 	protected MapCodec<? extends BaseEntityBlock> codec() {
 		return CODEC;
+	}
+
+	@Override
+	protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
+		super.onPlace(state, level, pos, oldState, isMoving);
+		// Cleanly notify nearby network controllers upon placement [3]
+		CableBlock.markNearbyNetworksDirty(level, pos);
+	}
+
+	@Override
+	protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+		if (!state.is(newState.getBlock())) {
+			super.onRemove(state, level, pos, newState, isMoving);
+			// Cleanly notify nearby network controllers upon removal [3]
+			CableBlock.markNearbyNetworksDirty(level, pos);
+		}
 	}
 
 	@Override

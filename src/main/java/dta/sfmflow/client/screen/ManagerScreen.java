@@ -318,18 +318,29 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Fix: Push the container's standard slot tooltips onto a high Z-layer to
-		// prevent overlay overlap [3]
+		// Push the container's standard slot tooltips onto a high Z-layer to prevent overlay overlap [3]
 		guiGraphics.pose().pushPose();
 		guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
 		this.renderTooltip(guiGraphics, mouseX, mouseY);
 		guiGraphics.pose().popPose();
 
+		// Symmetrically render custom widget tooltips on the same high Z-layer [3]
+		if (this.mouseHandler.getTopHoveredElement() instanceof AbstractFlowWidget flowWidget) {
+			net.minecraft.client.gui.components.Tooltip tooltip = flowWidget.getCustomTooltip();
+			if (tooltip != null) {
+				guiGraphics.pose().pushPose();
+				guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
+				guiGraphics.renderTooltip(font, tooltip.toCharSequence(this.minecraft), mouseX, mouseY);
+				guiGraphics.pose().popPose();
+			}
+		}
+
 		for (Renderable renderable : this.renderables) {
 			resetFlagsRecursive(renderable);
 		}
 		if (this.mouseHandler.getTopHoveredElement() instanceof AbstractFlowWidget widget) {
-			widget.setShowCustomTooltip(true);
+			// Disable low-level deferred queue rendering [3]
+			widget.setShowCustomTooltip(false);
 			widget.setIsHovered(true);
 		}
 	}
@@ -623,14 +634,24 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	
 	/**
 	 * Computes the correct, safe centered Y coordinate for any overlay panel based on its height [3].
-	 * Centers the panel vertically relative to the active canvas and enforces safety boundaries [3].
-	 *
-	 * @param pHeight the physical height of the overlay panel [3]
-	 * @return the safe centered Y coordinate [3]
+	 * If the panel is too tall, it dynamically shifts the overlay upward to guarantee clearance
+	 * from the player's inventory slots [3].
 	 */
 	public int getOverlayTargetY(int pHeight) {
+		// Start with standard centered positioning relative to the canvas [3]
 		int targetY = this.topPos + (256 - pHeight) / 2;
-		return Math.max(25, targetY); // Prevent clipping under standard screen top title bounds [3]
+		
+		// Calculate the absolute maximum Y position where the bottom of the overlay can sit [3]
+		// The player's inventory starts at (this.height - 90); we enforce a safe 6px gap [3]
+		int maxBottomY = (this.height - 90) - 6;
+		
+		// If the overlay would cover the player's inventory, dynamically shift it upward [3]
+		if (targetY + pHeight > maxBottomY) {
+			targetY = maxBottomY - pHeight;
+		}
+		
+		// Prevent the panel from clipping past the top of the screen window [3]
+		return Math.max(4, targetY);
 	}
 	
 }

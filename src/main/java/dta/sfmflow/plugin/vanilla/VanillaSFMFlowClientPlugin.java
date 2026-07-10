@@ -14,11 +14,14 @@ import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
+import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent; // Added [3]
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component; // Added [3]
@@ -111,8 +114,22 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});
 
+		// Register the new Redstone Trigger Overlay [3]
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.REDSTONE_TRIGGER.get(), (screen, component) -> {
+			if (component instanceof RedstoneTriggerComponent trigger) {
+				return new RedstoneTriggerSettingsOverlay(screen, trigger);
+			}
+			return null;
+		});
+
+		// 2. Sided Configuration Popups [3]
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new EnergySideConfigModalPopup(screen, (EnergyTransferComponent) sideModel, face, pos, onChanged);
+		});
+
+		// Register the sided Redstone Trigger popup [3]
+		SideConfigPopupRegistry.register(RedstoneTriggerComponent.class, (screen, sideModel, face, pos, onChanged) -> {
+			return new RedstoneSideConfigModalPopup(screen, (RedstoneTriggerComponent) sideModel, face, pos, onChanged);
 		});
 
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
@@ -121,7 +138,6 @@ public class VanillaSFMFlowClientPlugin {
 
 		// =========================================================================
 		// WORKSPACE VALIDATION REGISTRATIONS [3]
-		// Registers error checks and tooltip configurations dynamically on client start.
 		// =========================================================================
 
 		// 1. Items Validation [3]
@@ -333,7 +349,41 @@ public class VanillaSFMFlowClientPlugin {
 			}
 		});
 
-		// 4. Variables Warnings [3]
+		// 4. Redstone Trigger Validation [3]
+		WorkspaceValidatorRegistry.register(RedstoneTriggerComponent.class, new WorkspaceValidatorRegistry.INodeValidator<RedstoneTriggerComponent>() {
+			@Override
+			public boolean hasError(ManagerScreen screen, RedstoneTriggerComponent transfer) {
+				boolean foundBoundInventory = false;
+				if (transfer.getInventoryId() != -1) {
+					for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
+						if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
+							foundBoundInventory = true;
+							break;
+						}
+					}
+				}
+				return transfer.getInventoryId() == -1 || !foundBoundInventory;
+			}
+
+			@Override
+			public @Nullable Component getErrorTooltip(ManagerScreen screen, RedstoneTriggerComponent transfer) {
+				boolean foundBoundInventory = false;
+				if (transfer.getInventoryId() != -1) {
+					for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
+						if (block.getId() == transfer.getInventoryId() && !block.isSleeping()) {
+							foundBoundInventory = true;
+							break;
+						}
+					}
+				}
+				if (transfer.getInventoryId() == -1 || !foundBoundInventory) {
+					return Component.translatable("gui.sfmflow.error.unbound_inventory");
+				}
+				return null;
+			}
+		});
+
+		// 5. Variables Warnings [3]
 		WorkspaceValidatorRegistry.register(AdvancedItemFilterVariableComponent.class, new WorkspaceValidatorRegistry.INodeValidator<AdvancedItemFilterVariableComponent>() {
 			@Override
 			public boolean hasError(ManagerScreen screen, AdvancedItemFilterVariableComponent component) { return false; }

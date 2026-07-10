@@ -1,6 +1,9 @@
 package dta.sfmflow.api.component;
 
 import java.util.UUID;
+
+import javax.annotation.Nullable;
+
 import java.util.Optional;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
@@ -223,4 +226,21 @@ public abstract class AbstractFlowComponent {
 
 	public void plan(FlowchartPlanningContext context) {
 	}
+	
+	/**
+	 * Resolves a customized hovering tooltip for a specific input pin index [3].
+	 */
+	@Nullable
+	public Component getInputNodeTooltip(int index) {
+		return null;
+	}
+
+	/**
+	 * Resolves a customized hovering tooltip for a specific output pin index [3].
+	 */
+	@Nullable
+	public Component getOutputNodeTooltip(int index) {
+		return null;
+	}
+	
 }

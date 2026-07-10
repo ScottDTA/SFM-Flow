@@ -43,7 +43,8 @@ public class CableBlock extends Block {
 					for (Direction dir : Direction.values()) {
 						BlockPos neighbor = pos.relative(dir);
 						BlockState nState = level.getBlockState(neighbor);
-						if (!nState.is(ModTags.CABLES) && !nState.is(ModBlocks.MANAGER_BLOCK.get())) {
+						// Only treat plain cables as inert wiring; functional endpoints must be checked/scanned [3]
+						if ((!nState.is(ModBlocks.CABLE_BLOCK.get()) && !nState.is(ModBlocks.HARDENED_CABLE_BLOCK.get())) && !nState.is(ModBlocks.MANAGER_BLOCK.get())) {
 							BlockEntity be = level.getBlockEntity(neighbor);
 							for (var cap : dta.sfmflow.api.capability.FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
 								if (cap.isPresentAnywhere(level, neighbor, nState, be)) {
@@ -135,7 +136,8 @@ public class CableBlock extends Block {
 					int currentId = map.getNodeId(pos);
 					if (currentId != -1) {
 						BlockState neighborState = level.getBlockState(neighborPos);
-						if (neighborState.is(ModTags.CABLES)) {
+						// Only allow fast O(1) extension without rescanning for plain inert cable blocks [3]
+						if (neighborState.is(ModBlocks.CABLE_BLOCK.get()) || neighborState.is(ModBlocks.HARDENED_CABLE_BLOCK.get())) {
 							int neighborId = map.getOrAddNode(neighborPos);
 							map.addEdge(currentId, neighborId);
 							CableNetworkRegistry.registerCable(level, neighborPos, manager.getBlockPos());

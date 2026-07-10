@@ -16,6 +16,7 @@ import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent; // Added [3]
 
 import net.minecraft.core.BlockPos; // Added [3]
@@ -49,8 +50,9 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_INPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_OUTPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ADVANCED_FLUID_FILTER_VARIABLE;
-	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INPUT; // Added [3]
-	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_OUTPUT; // Added [3]
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INPUT;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_OUTPUT;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_TRIGGER;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively [3]
@@ -100,6 +102,11 @@ public class VanillaSFMFlowPlugin {
 		ENERGY_OUTPUT = FlowComponentBuilder.create("energy_output", uuid -> new EnergyTransferComponent(uuid, false))
 				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("gui.sfmflow.energy_output").codec(EnergyTransferComponent.OUTPUT_CODEC).build(registry);
+		
+		// Inside registerComponents():
+		REDSTONE_TRIGGER = FlowComponentBuilder.create("redstone_trigger", RedstoneTriggerComponent::new)
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.displayName("gui.sfmflow.redstone_trigger").codec(RedstoneTriggerComponent.CODEC).build(registry);
 	}
 
 	private void registerItemCapability() {
