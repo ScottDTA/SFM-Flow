@@ -1,3 +1,15 @@
+7-9-2026
+
+### [Added]
+* **Precise Energy Limits:** Overhauled the energy limit panel to support precise numeric typing via an input text box. Players can now input exact rate limits (in FE/t) or toggle the transfer mode to "Unlimited" to bypass constraints.
+
+### [Changed]
+* **Reactive Slot Previews:** Re-engineered the side slot configuration screen to parse and render inventory changes dynamically from cached network tags. This ensures that slot items and locked boundaries update instantly in the preview without needing to close and reopen the menu.
+
+### [Fixed]
+* **Sided Slot Filtering:** Improved slot detection on the server to recursively scan nested container delegates, ensuring that side-restricted slots are correctly identified and visually greyed out on the client layout preview.
+
+
 7-8-2026
 
 ### [Added]

@@ -8,21 +8,20 @@ import dta.sfmflow.networking.packets.serverbound.RequestSideConfigPropertiesPac
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractSliderButton;
-import net.minecraft.client.sounds.SoundManager;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Custom popup modal allowing users to configure energy transfer limits
- * dynamically bounded by the adjacent block's server-side verified capacity [3].
+ * Custom popup modal allowing users to toggle unlimited energy transfer or
+ * input a precise numeric value [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class EnergySideConfigModalPopup extends AbstractModalPopup {
@@ -30,70 +29,100 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 	private final Direction side;
 	private final BlockPos pos;
 	private final Runnable onChanged;
-	private int maxLimit;
-	private final EnergySlider slider;
+
+	private final Button modeButton;
+	private final EditBox limitEdit;
+	private boolean isUnlimited;
+	private int lastCustomValue = 10000;
 
 	public EnergySideConfigModalPopup(ManagerScreen parentScreen, EnergyTransferComponent component, Direction side, BlockPos pos, Runnable onChanged) {
-		super(parentScreen, 112, 60, Component.literal("Energy Limit"));
+		super(parentScreen, 140, 100, Component.literal("Energy Limit"));
 		this.component = component;
 		this.side = side;
 		this.pos = pos;
 		this.onChanged = onChanged;
 
-		// 1. Resolve starting bounds dynamically based on component node context [3]
-		int resolvedMax = 10000; // Fallback [3]
-		CompoundTag props = ClientSidePropertyCache.get(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
-		if (component.isInput()) {
-			if (props.contains("MaxExtract")) {
-				resolvedMax = props.getInt("MaxExtract");
-			} else if (props.contains("MaxEnergy")) {
-				resolvedMax = props.getInt("MaxEnergy");
-			}
+		// 1. Resolve initial unlimited state and custom values [3]
+		this.isUnlimited = (component.getMaxTransferAmount() == Integer.MAX_VALUE);
+		if (!isUnlimited) {
+			this.lastCustomValue = component.getMaxTransferAmount();
 		} else {
-			if (props.contains("MaxReceive")) {
+			// Resolve fallback custom default from server-verified properties cache if available [3]
+			int resolvedMax = 10000;
+			CompoundTag props = ClientSidePropertyCache.get(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
+			if (props.contains("MaxExtract") && component.isInput()) {
+				resolvedMax = props.getInt("MaxExtract");
+			} else if (props.contains("MaxReceive") && !component.isInput()) {
 				resolvedMax = props.getInt("MaxReceive");
 			} else if (props.contains("MaxEnergy")) {
 				resolvedMax = props.getInt("MaxEnergy");
 			}
+			this.lastCustomValue = resolvedMax;
 		}
-		this.maxLimit = resolvedMax;
 
-		// 2. Dispatch dynamic query packet [3]
+		// 2. Instantiate the edit box first to satisfy Java's blank final assignment rules [3]
+		this.limitEdit = new EditBox(parentScreen.getFont(), getX() + 15, getY() + 44, 110, 16, Component.literal("Limit Amount"));
+		this.limitEdit.setFilter(text -> text.matches("\\d*") || (isUnlimited && "Unlimited".equals(text)));
+		
+		if (isUnlimited) {
+			this.limitEdit.setValue("Unlimited");
+			this.limitEdit.setEditable(false);
+		} else {
+			this.limitEdit.setValue(String.valueOf(lastCustomValue));
+			this.limitEdit.setEditable(true);
+		}
+
+		this.limitEdit.setResponder(text -> {
+			if (isUnlimited) return;
+			try {
+				long val = Long.parseLong(text);
+				int clampedVal = (int) Math.min(Integer.MAX_VALUE - 1, Math.max(1, val));
+				this.lastCustomValue = clampedVal;
+				this.component.setMaxTransferAmount(clampedVal);
+				this.onChanged.run();
+			} catch (NumberFormatException ignored) {}
+		});
+
+		// 3. Create the Toggle button second, referencing the fully instantiated limitEdit [3]
+		this.modeButton = Button.builder(
+			Component.literal(isUnlimited ? "Mode: UNLIMITED" : "Mode: SET AMOUNT"),
+			btn -> {
+				this.isUnlimited = !this.isUnlimited;
+				btn.setMessage(Component.literal(this.isUnlimited ? "Mode: UNLIMITED" : "Mode: SET AMOUNT"));
+				
+				if (this.isUnlimited) {
+					this.component.setMaxTransferAmount(Integer.MAX_VALUE);
+					this.limitEdit.setValue("Unlimited");
+					this.limitEdit.setEditable(false);
+				} else {
+					this.component.setMaxTransferAmount(this.lastCustomValue);
+					this.limitEdit.setValue(String.valueOf(this.lastCustomValue));
+					this.limitEdit.setEditable(true);
+				}
+				this.onChanged.run();
+			}
+		).pos(getX() + 15, getY() + 20).size(110, 18).build();
+
+		this.children.add(new ApiWidgetAdapter<>(this.modeButton));
+		this.children.add(new ApiWidgetAdapter<>(this.limitEdit));
+
+		// Dispatch background query to ensure server capability caches are primed [3]
 		PacketDistributor.sendToServer(new RequestSideConfigPropertiesPacket(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy")));
-
-		// Clamp current limit inside starting bounds [3]
-		if (component.getMaxTransferAmount() > maxLimit) {
-			component.setMaxTransferAmount(maxLimit);
-		}
-
-		// 3. Initialize the slider
-		this.slider = new EnergySlider(getX() + 10, getY() + 16, 92, 16, component, maxLimit, onChanged);
-		this.children.add(new ApiWidgetAdapter<>(this.slider));
 	}
 
-	/**
-	 * Callback triggered when server property configurations are returned [3].
-	 * Dynamically re-adjusts slider values and bounds [3].
-	 */
 	public void refreshProperties() {
-		if (pos != null && side != null) {
+		// Only update custom cache baseline if we are currently unlimited [3]
+		if (pos != null && side != null && isUnlimited) {
 			CompoundTag props = ClientSidePropertyCache.get(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
 			int resolvedMax = 10000;
-			if (component.isInput()) {
-				if (props.contains("MaxExtract")) {
-					resolvedMax = props.getInt("MaxExtract");
-				} else if (props.contains("MaxEnergy")) {
-					resolvedMax = props.getInt("MaxEnergy");
-				}
-			} else {
-				if (props.contains("MaxReceive")) {
-					resolvedMax = props.getInt("MaxReceive");
-				} else if (props.contains("MaxEnergy")) {
-					resolvedMax = props.getInt("MaxEnergy");
-				}
+			if (props.contains("MaxExtract") && component.isInput()) {
+				resolvedMax = props.getInt("MaxExtract");
+			} else if (props.contains("MaxReceive") && !component.isInput()) {
+				resolvedMax = props.getInt("MaxReceive");
+			} else if (props.contains("MaxEnergy")) {
+				resolvedMax = props.getInt("MaxEnergy");
 			}
-			this.maxLimit = resolvedMax;
-			this.slider.updateMaxLimit(resolvedMax);
+			this.lastCustomValue = resolvedMax;
 		}
 	}
 
@@ -127,10 +156,10 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 			return true;
 		}
 
-		int btnX = getX() + (width - 60) / 2;
-		int btnY = getY() + height - 18;
+		int btnX = getX() + (width - 80) / 2;
+		int btnY = getY() + height - 22;
 
-		if (button == 0 && mouseX >= btnX && mouseX < btnX + 60 && mouseY >= btnY && mouseY < btnY + 14) {
+		if (button == 0 && mouseX >= btnX && mouseX < btnX + 80 && mouseY >= btnY && mouseY < btnY + 14) {
 			saveAndClose();
 			return true;
 		}
@@ -143,7 +172,7 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 		render9SliceBackground(guiGraphics);
 
 		String title = side != null ? side.name() + " LIMIT" : "LIMIT";
-		guiGraphics.drawCenteredString(parentScreen.getFont(), title, getX() + width / 2, getY() + 4, 0xFFD4AF37);
+		guiGraphics.drawCenteredString(parentScreen.getFont(), title, getX() + width / 2, getY() + 6, 0xFFD4AF37);
 
 		for (var child : children) {
 			if (child instanceof AbstractFlowWidget widget) {
@@ -154,72 +183,12 @@ public class EnergySideConfigModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		int btnX = getX() + (width - 60) / 2;
-		int btnY = getY() + height - 18;
-		boolean btnHovered = mouseX >= btnX && mouseX < btnX + 60 && mouseY >= btnY && mouseY < btnY + 14;
+		int btnX = getX() + (width - 80) / 2;
+		int btnY = getY() + height - 22;
+		boolean btnHovered = mouseX >= btnX && mouseX < btnX + 80 && mouseY >= btnY && mouseY < btnY + 14;
 
-		guiGraphics.fill(btnX, btnY, btnX + 60, btnY + 14, btnHovered ? 0xFF555555 : 0xFF222222);
-		guiGraphics.renderOutline(btnX, btnY, 60, 14, 0xFFD4AF37);
-		guiGraphics.drawCenteredString(parentScreen.getFont(), "Close", btnX + 30, btnY + 3, 0xFFFFFFFF);
-	}
-
-	@OnlyIn(Dist.CLIENT)
-	private static class EnergySlider extends AbstractSliderButton {
-		private final EnergyTransferComponent component;
-		private int maxLimit;
-		private final Runnable onChanged;
-
-		public EnergySlider(int x, int y, int width, int height, EnergyTransferComponent component, int maxLimit, Runnable onChanged) {
-			super(x, y, width, height, Component.empty(), maxLimit > 0 ? (double) component.getMaxTransferAmount() / maxLimit : 0.0);
-			this.component = component;
-			this.maxLimit = maxLimit;
-			this.onChanged = onChanged;
-			this.updateMessage();
-		}
-
-		public void updateMaxLimit(int newMax) {
-			this.maxLimit = newMax;
-			if (component.getMaxTransferAmount() > maxLimit) {
-				component.setMaxTransferAmount(maxLimit);
-			}
-			this.value = maxLimit > 0 ? (double) component.getMaxTransferAmount() / maxLimit : 0.0;
-			this.updateMessage();
-		}
-
-		@Override
-		protected void updateMessage() {
-			int val = (int) Math.round(this.value * maxLimit);
-			setMessage(Component.literal(val + " FE"));
-		}
-
-		@Override
-		protected void applyValue() {
-			int val = (int) Math.round(this.value * maxLimit);
-			this.component.setMaxTransferAmount(val);
-			this.onChanged.run();
-		}
-
-		@Override
-		public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-			if (this.visible && this.active && this.isMouseOver(mouseX, mouseY) && maxLimit > 0) {
-				int val = this.component.getMaxTransferAmount();
-				int step = Math.max(1, maxLimit / 100); // 1% steps
-				int newVal = Mth.clamp(val + (scrollY > 0 ? step : -step), 0, maxLimit);
-
-				if (newVal != val) {
-					this.component.setMaxTransferAmount(newVal);
-					this.value = (double) newVal / maxLimit;
-					this.updateMessage();
-					this.onChanged.run();
-				}
-				return true;
-			}
-			return false;
-		}
-
-		@Override
-		public void playDownSound(SoundManager soundManager) {
-			// Silent scrolling
-		}
+		guiGraphics.fill(btnX, btnY, btnX + 80, btnY + 14, btnHovered ? 0xFF555555 : 0xFF222222);
+		guiGraphics.renderOutline(btnX, btnY, 80, 14, 0xFFD4AF37);
+		guiGraphics.drawCenteredString(parentScreen.getFont(), "Close", btnX + 40, btnY + 3, 0xFFFFFFFF);
 	}
 }

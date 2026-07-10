@@ -20,6 +20,9 @@ import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -173,6 +176,48 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos, this.side));
 	}
 
+	private Set<Integer> getLiveAccessibleSlots() {
+		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side);
+		if (cachedData.contains("accessibleSlots")) {
+			Set<Integer> live = new HashSet<>();
+			ListTag list = cachedData.getList("accessibleSlots", Tag.TAG_INT);
+			for (int i = 0; i < list.size(); i++) {
+				live.add(list.getInt(i));
+			}
+			return live;
+		}
+		return this.accessibleSlots; // Fallback [3]
+	}
+
+	private int getLiveTotalSlots() {
+		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side);
+		if (cachedData.contains("totalSlots")) {
+			return cachedData.getInt("totalSlots");
+		}
+		return this.totalSlots; // Fallback [3]
+	}
+
+	private ItemStack[] getLiveCachedItems() {
+		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side);
+		int total = getLiveTotalSlots();
+		ItemStack[] items = new ItemStack[total];
+		for (int i = 0; i < total; i++) {
+			items[i] = ItemStack.EMPTY;
+		}
+		if (cachedData.contains("items")) {
+			ListTag list = cachedData.getList("items", Tag.TAG_COMPOUND);
+			for (int i = 0; i < list.size(); i++) {
+				CompoundTag slotTag = list.getCompound(i);
+				int slot = slotTag.getInt("slot");
+				if (slot >= 0 && slot < total) {
+					items[slot] = ItemStack.parse(Minecraft.getInstance().level.registryAccess(), slotTag.getCompound("item"))
+							.orElse(ItemStack.EMPTY);
+				}
+			}
+		}
+		return items;
+	}
+
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (!this.visible || !this.active) {
@@ -192,6 +237,9 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			return true;
 		}
 
+		Set<Integer> liveAccessible = getLiveAccessibleSlots();
+		int liveTotal = getLiveTotalSlots();
+
 		// Hit checks now respect dynamic width and height properties [3]
 		if (button == 0 && this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {
@@ -202,7 +250,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				int sHeight = entry.height();
 
 				if (localX >= slotX && localX < slotX + sWidth && localY >= slotY && localY < slotY + sHeight) {
-					if (accessibleSlots.contains(i)) {
+					if (liveAccessible.contains(i)) {
 						if (sideModel instanceof ISlotConfigurable transfer) {
 							transfer.toggleSlot(side, i);
 							this.onChanged.run();
@@ -215,14 +263,14 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		if (button == 0 && this.layout == null && this.totalSlots > 0) {
-			int cols = Math.min(9, this.totalSlots);
+		if (button == 0 && this.layout == null && liveTotal > 0) {
+			int cols = Math.min(9, liveTotal);
 			if (cols <= 0)
 				cols = 9;
 			int gridW = cols * 20 - 2;
 			int startGridX = (this.unscaledWidth - gridW) / 2;
 
-			for (int i = 0; i < this.totalSlots; i++) {
+			for (int i = 0; i < liveTotal; i++) {
 				int row = i / cols;
 				int col = i % cols;
 
@@ -230,7 +278,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				int slotY = GRID_START_Y + row * 20;
 
 				if (localX >= slotX && localX < slotX + 18 && localY >= slotY && localY < slotY + 18) {
-					if (accessibleSlots.contains(i)) {
+					if (liveAccessible.contains(i)) {
 						if (sideModel instanceof ISlotConfigurable transfer) {
 							transfer.toggleSlot(side, i);
 							this.onChanged.run();
@@ -269,7 +317,9 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		Component titleComponent = Component.literal(sideName + suffix);
 		guiGraphics.drawCenteredString(parentScreen.getFont(), titleComponent, w / 2, 6, 0xFFD4AF37);
 
-		ItemStack[] cachedItems = ClientInventoryCache.get(this.blockPos, this.side);
+		ItemStack[] cachedItems = getLiveCachedItems();
+		Set<Integer> liveAccessible = getLiveAccessibleSlots();
+		int liveTotal = getLiveTotalSlots();
 
 		if (this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {
@@ -286,7 +336,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					guiGraphics.blit(entry.customTexture().get(), slotX, slotY, 0, 0, sWidth, sHeight, sWidth, sHeight);
 				}
 
-				boolean isAccessible = accessibleSlots.contains(i);
+				boolean isAccessible = liveAccessible.contains(i);
 
 				if (!isAccessible) {
 					guiGraphics.fill(slotX + 1, slotY + 1, slotX + sWidth - 1, slotY + sHeight - 1, 0x80151515);
@@ -352,13 +402,13 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				}
 			}
 		} else {
-			int cols = Math.min(9, this.totalSlots);
+			int cols = Math.min(9, liveTotal);
 			if (cols <= 0)
 				cols = 9;
 			int gridW = cols * 20 - 2;
 			int startGridX = (this.unscaledWidth - gridW) / 2;
 
-			for (int i = 0; i < this.totalSlots; i++) {
+			for (int i = 0; i < liveTotal; i++) {
 				int row = i / cols;
 				int col = i % cols;
 
@@ -367,7 +417,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 				guiGraphics.blit(SLOT_TEXTURE, slotX, slotY, 0, 0, 18, 18, 18, 18);
 
-				boolean isAccessible = accessibleSlots.contains(i);
+				boolean isAccessible = liveAccessible.contains(i);
 				if (!isAccessible) {
 					guiGraphics.fill(slotX + 1, slotY + 1, slotX + 17, slotY + 17, 0x80151515);
 					for (int k = 0; k < 12; k++) {
@@ -439,7 +489,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 		guiGraphics.pose().popPose();
 
-		if (this.totalSlots > 0) {
+		if (liveTotal > 0) {
 			if (this.layout != null) {
 				for (SlotEntry entry : this.layout.slots()) {
 					int i = entry.index();
@@ -450,7 +500,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 
 					// Dynamic scaled hovering tooltip bounds calculation [3]
 					if (mouseX >= slotX && mouseX < slotX + scaledW && mouseY >= slotY && mouseY < slotY + scaledH) {
-						boolean isAccessible = accessibleSlots.contains(i);
+						boolean isAccessible = liveAccessible.contains(i);
 						if (!isAccessible) {
 							guiGraphics.renderTooltip(parentScreen.getFont(),
 									Component.translatable("gui.sfmflow.error.slot_not_accessible"), mouseX, mouseY);
@@ -465,7 +515,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					}
 				}
 			} else {
-				int cols = Math.min(9, this.totalSlots);
+				int cols = Math.min(9, liveTotal);
 				if (cols <= 0)
 					cols = 9;
 				int gridW = cols * 20 - 2;
@@ -473,7 +523,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				int scaledStartX = getX() + (int) (startGridX * 0.5);
 				int unscaledStartY = getY() + (int) (GRID_START_Y * 0.5);
 
-				for (int i = 0; i < this.totalSlots; i++) {
+				for (int i = 0; i < liveTotal; i++) {
 					int row = i / cols;
 					int col = i % cols;
 
@@ -481,7 +531,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					int slotY = unscaledStartY + row * 10;
 
 					if (mouseX >= slotX && mouseX < slotX + 9 && mouseY >= slotY && mouseY < slotY + 9) {
-						boolean isAccessible = accessibleSlots.contains(i);
+						boolean isAccessible = liveAccessible.contains(i);
 						if (!isAccessible) {
 							guiGraphics.renderTooltip(parentScreen.getFont(),
 									Component.translatable("gui.sfmflow.error.slot_not_accessible"), mouseX, mouseY);

@@ -1,7 +1,10 @@
 package dta.sfmflow.networking;
 
 import java.lang.reflect.Field;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
+import java.util.Collection;
 
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
@@ -32,11 +35,13 @@ import dta.sfmflow.networking.packets.serverbound.RequestSideConfigPropertiesPac
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -213,16 +218,21 @@ public class ServerPayloadHandler {
 			ServerPlayer player = (ServerPlayer) context.player();
 			Level level = player.level();
 			if (level.hasChunkAt(data.pos())) {
-				// Query item handler directly on the clicked side face [3]
+				CompoundTag dataTag = new CompoundTag();
+				ListTag list = new ListTag();
+				ListTag accessibleList = new ListTag();
+				int totalSlotsVal = 0;
+
+				// 1. Resolve absolute/maximum slot capacity from non-sided (null) capability handler [3]
+				IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
 				IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), data.side());
-				if (itemHandler == null) {
-					itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
-				}
-				if (itemHandler != null) {
-					CompoundTag dataTag = new CompoundTag();
-					ListTag list = new ListTag();
-					for (int i = 0; i < itemHandler.getSlots(); i++) {
-						ItemStack stack = itemHandler.getStackInSlot(i);
+				
+				if (nullHandler != null) {
+					totalSlotsVal = nullHandler.getSlots();
+					
+					// Populate list of current item stacks based on raw slot indexes [3]
+					for (int i = 0; i < totalSlotsVal; i++) {
+						ItemStack stack = nullHandler.getStackInSlot(i);
 						if (!stack.isEmpty()) {
 							CompoundTag slotTag = new CompoundTag();
 							slotTag.putInt("slot", i);
@@ -230,26 +240,49 @@ public class ServerPayloadHandler {
 							list.add(slotTag);
 						}
 					}
-					dataTag.put("items", list);
-					dataTag.putInt("totalSlots", itemHandler.getSlots());
 
-					PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), data.side(), dataTag));
-				} else {
-					// Query fluid handler directly on the clicked side face [3]
-					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), data.side());
-					if (fluidHandler == null) {
-						fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), null);
+					// Resolve accessible slots from sided capability [3]
+					if (itemHandler != null) {
+						int sideCount = itemHandler.getSlots();
+						if (sideCount == totalSlotsVal) {
+							for (int i = 0; i < totalSlotsVal; i++) {
+								accessibleList.add(IntTag.valueOf(i));
+							}
+						} else {
+							for (int i = 0; i < sideCount; i++) {
+								accessibleList.add(IntTag.valueOf(i));
+							}
+						}
 					}
+					
+					// WorldlyContainer (SidedInventory) mapping logic [3]
+					if (level.getBlockEntity(data.pos()) instanceof WorldlyContainer worldly && data.side() != null) {
+						accessibleList.clear();
+						int[] slots = worldly.getSlotsForFace(data.side());
+						if (slots != null) {
+							for (int s : slots) {
+								accessibleList.add(IntTag.valueOf(s));
+							}
+						}
+					}
+				} else {
+					// 2. Fluid Handler query fallback
+					IFluidHandler nullFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), null);
+					if (nullFluidHandler == null) {
+						nullFluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
+								level, data.pos(), level.getBlockState(data.pos()), null);
+					}
+					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), data.side());
 					if (fluidHandler == null) {
 						fluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
 								level, data.pos(), level.getBlockState(data.pos()), data.side());
 					}
 
-					if (fluidHandler != null) {
-						CompoundTag dataTag = new CompoundTag();
-						ListTag list = new ListTag();
-						for (int i = 0; i < fluidHandler.getTanks(); i++) {
-							FluidStack fluid = fluidHandler.getFluidInTank(i);
+					if (nullFluidHandler != null) {
+						totalSlotsVal = nullFluidHandler.getTanks();
+						
+						for (int i = 0; i < totalSlotsVal; i++) {
+							FluidStack fluid = nullFluidHandler.getFluidInTank(i);
 							if (!fluid.isEmpty()) {
 								Item bucket = fluid.getFluid().getBucket();
 								if (bucket != null && bucket != Items.AIR) {
@@ -261,14 +294,121 @@ public class ServerPayloadHandler {
 								}
 							}
 						}
-						dataTag.put("items", list);
-						dataTag.putInt("totalSlots", fluidHandler.getTanks());
 
-						PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), data.side(), dataTag));
+						if (fluidHandler != null) {
+							int sideCount = fluidHandler.getTanks();
+							if (sideCount == totalSlotsVal) {
+								for (int i = 0; i < totalSlotsVal; i++) {
+									accessibleList.add(IntTag.valueOf(i));
+								}
+							} else {
+								for (int i = 0; i < sideCount; i++) {
+									accessibleList.add(IntTag.valueOf(i));
+								}
+							}
+						}
 					}
 				}
+
+				dataTag.put("items", list);
+				dataTag.putInt("totalSlots", totalSlotsVal);
+				dataTag.put("accessibleSlots", accessibleList);
+
+				PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), data.side(), dataTag));
 			}
 		});
+	}
+
+	private static Set<Integer> getSidedSlotIndices(IItemHandler sidedHandler, IItemHandler nullHandler) {
+		Set<Integer> indices = new HashSet<>();
+		if (sidedHandler == null) {
+			return indices;
+		}
+
+		// Inspect fields recursively to resolve slot arrays within wrapped sided
+		// containers [3]
+		Class<?> clazz = sidedHandler.getClass();
+		while (clazz != null && clazz != Object.class) {
+			for (Field f : clazz.getDeclaredFields()) {
+				try {
+					f.setAccessible(true);
+					Object val = f.get(sidedHandler);
+					if (val instanceof int[] arr) {
+						for (int i : arr) {
+							indices.add(i);
+						}
+						return indices;
+					} else if (val instanceof Collection<?> col) {
+						for (Object item : col) {
+							if (item instanceof Number num) {
+								indices.add(num.intValue());
+							}
+						}
+						if (!indices.isEmpty()) {
+							return indices;
+						}
+					}
+				} catch (Exception ignored) {
+				}
+			}
+			clazz = clazz.getSuperclass();
+		}
+
+		if (nullHandler != null && sidedHandler.getSlots() == nullHandler.getSlots()) {
+			for (int i = 0; i < nullHandler.getSlots(); i++) {
+				indices.add(i);
+			}
+		} else {
+			for (int i = 0; i < sidedHandler.getSlots(); i++) {
+				indices.add(i);
+			}
+		}
+		return indices;
+	}
+
+	private static Set<Integer> getSidedTankIndices(IFluidHandler sidedHandler, IFluidHandler nullHandler) {
+		Set<Integer> indices = new HashSet<>();
+		if (sidedHandler == null) {
+			return indices;
+		}
+
+		Class<?> clazz = sidedHandler.getClass();
+		while (clazz != null && clazz != Object.class) {
+			for (Field f : clazz.getDeclaredFields()) {
+				try {
+					f.setAccessible(true);
+					Object val = f.get(sidedHandler);
+					if (val instanceof int[] arr) {
+						for (int i : arr) {
+							indices.add(i);
+						}
+						return indices;
+					} else if (val instanceof java.util.Collection<?> col) {
+						for (Object item : col) {
+							if (item instanceof Number num) {
+								indices.add(num.intValue());
+							}
+						}
+						if (!indices.isEmpty()) {
+							return indices;
+						}
+					}
+				} catch (Exception ignored) {
+				}
+			}
+			clazz = clazz.getSuperclass();
+		}
+
+		if (nullHandler != null && sidedHandler.getTanks() == nullHandler.getTanks()) {
+			for (int i = 0; i < nullHandler.getTanks(); i++) {
+				indices.add(i);
+			}
+		} else {
+			for (int i = 0; i < sidedHandler.getTanks(); i++) {
+				indices.add(i);
+			}
+		}
+		return indices;
 	}
 
 	/**
@@ -311,7 +451,7 @@ public class ServerPayloadHandler {
 			}
 		});
 	}
-	
+
 	public static void handleRequestSideConfigProperties(final RequestSideConfigPropertiesPacket data,
 			final IPayloadContext context) {
 		context.enqueueWork(() -> {
@@ -319,9 +459,10 @@ public class ServerPayloadHandler {
 			Level level = player.level();
 			if (level.hasChunkAt(data.pos())) {
 				CompoundTag properties = new CompoundTag();
-				
+
 				if (data.capabilityId().getPath().equals("energy")) {
-					IEnergyStorage energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, data.pos(), data.side());
+					IEnergyStorage energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, data.pos(),
+							data.side());
 					if (energy == null) {
 						// Fallback to non-sided query if sided check resolves to null
 						energy = level.getCapability(Capabilities.EnergyStorage.BLOCK, data.pos(), null);
@@ -333,8 +474,10 @@ public class ServerPayloadHandler {
 
 						// 1. Mekanism Energy Cube Heuristic: limit is exactly capacity / 1000 [3]
 						net.minecraft.world.level.block.state.BlockState state = level.getBlockState(data.pos());
-						ResourceLocation blockId = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock());
-						if (blockId != null && "mekanism".equals(blockId.getNamespace()) && blockId.getPath().contains("energy_cube")) {
+						ResourceLocation blockId = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+								.getKey(state.getBlock());
+						if (blockId != null && "mekanism".equals(blockId.getNamespace())
+								&& blockId.getPath().contains("energy_cube")) {
 							extractLimit = capacity / 1000;
 							receiveLimit = capacity / 1000;
 						} else {
@@ -349,9 +492,10 @@ public class ServerPayloadHandler {
 						properties.putInt("CurrentEnergy", energy.getEnergyStored());
 					}
 				}
-				
+
 				// Symmetrically send properties update back to the client [3]
-				PacketDistributor.sendToPlayer(player, new SyncSideConfigPropertiesPacket(data.pos(), data.side(), data.capabilityId(), properties));
+				PacketDistributor.sendToPlayer(player,
+						new SyncSideConfigPropertiesPacket(data.pos(), data.side(), data.capabilityId(), properties));
 			}
 		});
 	}
@@ -383,9 +527,10 @@ public class ServerPayloadHandler {
 					if (val instanceof Number num) {
 						return num.intValue();
 					}
-				} catch (Exception ignored2) {}
+				} catch (Exception ignored2) {
+				}
 			}
-			
+
 			// Recurse through member fields to resolve nested delegate adapters
 			for (Field f : clazz.getDeclaredFields()) {
 				try {
@@ -393,14 +538,17 @@ public class ServerPayloadHandler {
 					Object member = f.get(obj);
 					if (member != null && member != obj) {
 						String lowerName = f.getName().toLowerCase(Locale.ROOT);
-						if (lowerName.contains("handler") || lowerName.contains("delegate") || lowerName.contains("container") || lowerName.contains("storage") || lowerName.contains("wrapped")) {
+						if (lowerName.contains("handler") || lowerName.contains("delegate")
+								|| lowerName.contains("container") || lowerName.contains("storage")
+								|| lowerName.contains("wrapped")) {
 							int result = reflectFieldRecursive(member, fieldName, -1, depth + 1);
 							if (result != -1) {
 								return result;
 							}
 						}
 					}
-				} catch (Exception ignored) {}
+				} catch (Exception ignored) {
+				}
 			}
 			clazz = clazz.getSuperclass();
 		}
