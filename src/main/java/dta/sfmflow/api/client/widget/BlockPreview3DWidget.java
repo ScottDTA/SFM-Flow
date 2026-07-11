@@ -5,9 +5,9 @@ import dta.sfmflow.api.client.SideConfigPopupRegistry;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.Preview3DRenderer;
+import dta.sfmflow.client.render.SceneProjectionHelper; // Import added [3]
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.widgets.AbstractModalPopup;
-import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -131,18 +131,17 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		if (button == 0 && centerPos != null) {
 			int centerX = getX() + width / 2;
 			int centerY = getY() + height / 2;
-			List<Direction> visibleFaces = Preview3DRenderer.getVisibleFaces(yawRotation, pitchRotation, 40.0F, centerX,
-					centerY);
+			List<Direction> visibleFaces = SceneProjectionHelper.getVisibleFaces(yawRotation, pitchRotation, 40.0F, centerX,
+					centerY); // Refactored to SceneProjectionHelper [3]
 
 			for (Direction face : visibleFaces) {
-				Preview3DRenderer.ProjectedVec proj = Preview3DRenderer.getFaceScreenCoords(face, yawRotation,
-						pitchRotation, 40.0F, centerX, centerY);
+				SceneProjectionHelper.ProjectedVec proj = SceneProjectionHelper.getFaceScreenCoords(face, yawRotation,
+						pitchRotation, 40.0F, centerX, centerY); // Refactored to SceneProjectionHelper [3]
 				double dx = mouseX - proj.x();
 				double dy = mouseY - proj.y();
 				if (dx * dx + dy * dy <= 36.0) {
 					if (sideSupportChecker.test(face)) {
 						if (Screen.hasShiftDown()) {
-							// ISSUE 1: Enable the side if it is currently disabled [3]
 							if (!sideModel.isSideActive(face)) {
 								sideModel.toggleSide(face);
 								this.onChanged.run();
@@ -167,7 +166,6 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 	private void openSlotLayoutGui(Direction face) {
 		BlockPos currentPos = this.posSupplier.get();
 		if (currentPos != null) {
-			// Resolve custom configuration popups through the side config registry [3]
 			AbstractModalPopup popup = SideConfigPopupRegistry.createPopup(
 					this.parentScreen, this.sideModel, face, currentPos, this.onChanged);
 			if (popup != null) {
@@ -215,9 +213,15 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 		int centerY = getY() + height / 2;
 
 		if (centerPos != null && level != null && level.hasChunkAt(centerPos)) {
+			// Apply hardware scissor mask to clip 3D block projections neatly inside widget boundaries [3]
+			guiGraphics.enableScissor(getX() + 1, getY() + 1, getX() + width - 1, getY() + height - 1);
+			
 			Preview3DRenderer.render3DScene(guiGraphics, level, centerPos, yawRotation, pitchRotation, centerX, centerY,
 					sideModel, sideSupportChecker);
-			// Restore standard depth mask and depth test states to prevent polygon sorting conflicts on subsequently rendered 3D GUI items [3]
+			
+			guiGraphics.disableScissor();
+			
+			// Restore standard depth mask and depth test states to prevent polygon sorting conflicts [3]
 			RenderSystem.depthMask(true);
 			RenderSystem.enableDepthTest();
 		} else {

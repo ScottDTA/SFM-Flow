@@ -11,14 +11,16 @@ import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.CycleButton;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
@@ -37,11 +39,11 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 	// While High Columns
 	private final CycleButton<IntervalTriggerComponent.TimeUnit> highUnitBtn;
-	private final EditBox highValueEdit;
+	private HighIntervalSlider highIntervalSlider;
 
 	// While Low Columns
 	private final CycleButton<IntervalTriggerComponent.TimeUnit> lowUnitBtn;
-	private final EditBox lowValueEdit;
+	private LowIntervalSlider lowIntervalSlider;
 
 	public RedstoneTriggerSettingsOverlay(ManagerScreen parentScreen, RedstoneTriggerComponent component) {
 		super(parentScreen, component);
@@ -52,7 +54,10 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		parentScreen.getMenu().setActiveComponent(component);
 		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId()));
+				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
+						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
+						: null,
+				component.getId()));
 
 		// Height increased to 190 to allow correct 3D block projections and prevent ghosting leaks [3]
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 190,
@@ -66,7 +71,16 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"),
-				parentScreen, newInv -> {
+				parentScreen, 
+				// Sided Filter: Only show Redstone Receivers in list [3]
+				block -> {
+					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
+					if (level != null) {
+						return level.getBlockState(block.getBlockPos()).is(dta.sfmflow.block.ModBlocks.REDSTONE_RECEIVER_BLOCK.get());
+					}
+					return true;
+				},
+				newInv -> {
 					component.setActiveSidesMask(0); // Reset side selection mask [3]
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
@@ -100,21 +114,12 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 				.displayOnlyValue()
 				.create(getX() + 15, getY() + 286, 120, 18, Component.literal("High Unit"), (btn, value) -> {
 					component.setHighTimeUnit(value);
+					this.highIntervalSlider.refresh();
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
 				});
 
-		this.highValueEdit = new EditBox(parentScreen.getFont(), getX() + 15, getY() + 308, 120, 16, Component.literal("High Value"));
-		this.highValueEdit.setValue(String.valueOf(component.getHighIntervalValue()));
-		this.highValueEdit.setFilter(text -> text.matches("\\d*"));
-		this.highValueEdit.setResponder(text -> {
-			try {
-				int val = Integer.parseInt(text);
-				component.setHighIntervalValue(Math.max(1, val));
-				parentScreen.getMenu().getManagerBlockEntity().setChanged();
-				sendSettingsUpdate();
-			} catch (NumberFormatException ignored) {}
-		});
+		this.highIntervalSlider = new HighIntervalSlider(getX() + 15, getY() + 308, 120, 18, component, this);
 
 		// 3. "While Low" Interval Column [3]
 		this.lowUnitBtn = CycleButton.<IntervalTriggerComponent.TimeUnit>builder(IntervalTriggerComponent.TimeUnit::getDisplayName)
@@ -123,29 +128,20 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 				.displayOnlyValue()
 				.create(getX() + 160, getY() + 286, 120, 18, Component.literal("Low Unit"), (btn, value) -> {
 					component.setLowTimeUnit(value);
+					this.lowIntervalSlider.refresh();
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
 				});
 
-		this.lowValueEdit = new EditBox(parentScreen.getFont(), getX() + 160, getY() + 308, 120, 16, Component.literal("Low Value"));
-		this.lowValueEdit.setValue(String.valueOf(component.getLowIntervalValue()));
-		this.lowValueEdit.setFilter(text -> text.matches("\\d*"));
-		this.lowValueEdit.setResponder(text -> {
-			try {
-				int val = Integer.parseInt(text);
-				component.setLowIntervalValue(Math.max(1, val));
-				parentScreen.getMenu().getManagerBlockEntity().setChanged();
-				sendSettingsUpdate();
-			} catch (NumberFormatException ignored) {}
-		});
+		this.lowIntervalSlider = new LowIntervalSlider(getX() + 160, getY() + 308, 120, 18, component, this);
 
 		this.children.add(this.previewWidget);
 		this.children.add(this.selectorWidget);
 		this.children.add(this.requiresAllAdapter);
 		this.children.add(new ApiWidgetAdapter<>(this.highUnitBtn));
-		this.children.add(new ApiWidgetAdapter<>(this.highValueEdit));
+		this.children.add(new ApiWidgetAdapter<>(this.highIntervalSlider));
 		this.children.add(new ApiWidgetAdapter<>(this.lowUnitBtn));
-		this.children.add(new ApiWidgetAdapter<>(this.lowValueEdit));
+		this.children.add(new ApiWidgetAdapter<>(this.lowIntervalSlider));
 
 		// Symmetrical headers [3]
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 15, getY() + 274, 120, 10,
@@ -177,11 +173,14 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 		return false;
 	}
 
-	private void sendSettingsUpdate() {
+	public void sendSettingsUpdate() {
 		CompoundTag nbt = new CompoundTag();
 		component.saveData(nbt);
 		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
+				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
+						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
+						: null,
+				component.getId(), nbt));
 	}
 
 	@Override
@@ -190,5 +189,153 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 		PacketDistributor.sendToServer(
 				new SetActiveFilterComponentPacket(parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), null));
 		super.closeAndSave();
+	}
+
+	@OnlyIn(Dist.CLIENT)
+	private static class HighIntervalSlider extends AbstractSliderButton {
+		private final RedstoneTriggerComponent component;
+		private final RedstoneTriggerSettingsOverlay overlay;
+
+		public HighIntervalSlider(int x, int y, int width, int height, RedstoneTriggerComponent component, RedstoneTriggerSettingsOverlay overlay) {
+			super(x, y, width, height, Component.literal("Interval"), getInitialValueProgress(component));
+			this.component = component;
+			this.overlay = overlay;
+			this.updateMessage();
+		}
+
+		private static double getInitialValueProgress(RedstoneTriggerComponent comp) {
+			int val = comp.getHighIntervalValue();
+			int min = getMinLimit(comp);
+			int max = getMaxLimit(comp);
+			return (double) (val - min) / (double) (max - min);
+		}
+
+		private static int getMinLimit(RedstoneTriggerComponent comp) {
+			return (comp.getHighTimeUnit() == IntervalTriggerComponent.TimeUnit.TICKS) ? 5 : 1;
+		}
+
+		private static int getMaxLimit(RedstoneTriggerComponent comp) {
+			return (comp.getHighTimeUnit() == IntervalTriggerComponent.TimeUnit.TICKS) ? 100 : 60;
+		}
+
+		public void refresh() {
+			this.value = getInitialValueProgress(this.component);
+			this.updateMessage();
+		}
+
+		@Override
+		protected void updateMessage() {
+			int min = getMinLimit(this.component);
+			int max = getMaxLimit(this.component);
+			int val = min + (int) Math.round(this.value * (max - min));
+			setMessage(Component.literal(val + " " + this.component.getHighTimeUnit().getDisplayName().getString()));
+		}
+
+		@Override
+		protected void applyValue() {
+			int min = getMinLimit(this.component);
+			int max = getMaxLimit(this.component);
+			int val = min + (int) Math.round(this.value * (max - min));
+			this.component.setHighIntervalValue(val);
+			this.overlay.sendSettingsUpdate();
+		}
+
+		@Override
+		public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+			if (this.visible && this.active && this.isMouseOver(mouseX, mouseY)) {
+				int min = getMinLimit(this.component);
+				int max = getMaxLimit(this.component);
+				int val = this.component.getHighIntervalValue();
+				int newVal = Mth.clamp(val + (scrollY > 0 ? 1 : -1), min, max);
+
+				if (newVal != val) {
+					this.component.setHighIntervalValue(newVal);
+					this.value = (double) (newVal - min) / (double) (max - min);
+					this.updateMessage();
+					this.overlay.sendSettingsUpdate();
+				}
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public void playDownSound(SoundManager soundManager) {
+			// Silent
+		}
+	}
+
+	@OnlyIn(Dist.CLIENT)
+	private static class LowIntervalSlider extends AbstractSliderButton {
+		private final RedstoneTriggerComponent component;
+		private final RedstoneTriggerSettingsOverlay overlay;
+
+		public LowIntervalSlider(int x, int y, int width, int height, RedstoneTriggerComponent component, RedstoneTriggerSettingsOverlay overlay) {
+			super(x, y, width, height, Component.literal("Interval"), getInitialValueProgress(component));
+			this.component = component;
+			this.overlay = overlay;
+			this.updateMessage();
+		}
+
+		private static double getInitialValueProgress(RedstoneTriggerComponent comp) {
+			int val = comp.getLowIntervalValue();
+			int min = getMinLimit(comp);
+			int max = getMaxLimit(comp);
+			return (double) (val - min) / (double) (max - min);
+		}
+
+		private static int getMinLimit(RedstoneTriggerComponent comp) {
+			return (comp.getLowTimeUnit() == IntervalTriggerComponent.TimeUnit.TICKS) ? 5 : 1;
+		}
+
+		private static int getMaxLimit(RedstoneTriggerComponent comp) {
+			return (comp.getLowTimeUnit() == IntervalTriggerComponent.TimeUnit.TICKS) ? 100 : 60;
+		}
+
+		public void refresh() {
+			this.value = getInitialValueProgress(this.component);
+			this.updateMessage();
+		}
+
+		@Override
+		protected void updateMessage() {
+			int min = getMinLimit(this.component);
+			int max = getMaxLimit(this.component);
+			int val = min + (int) Math.round(this.value * (max - min));
+			setMessage(Component.literal(val + " " + this.component.getLowTimeUnit().getDisplayName().getString()));
+		}
+
+		@Override
+		protected void applyValue() {
+			int min = getMinLimit(this.component);
+			int max = getMaxLimit(this.component);
+			int val = min + (int) Math.round(this.value * (max - min));
+			this.component.setLowIntervalValue(val);
+			this.overlay.sendSettingsUpdate();
+		}
+
+		@Override
+		public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+			if (this.visible && this.active && this.isMouseOver(mouseX, mouseY)) {
+				int min = getMinLimit(this.component);
+				int max = getMaxLimit(this.component);
+				int val = this.component.getLowIntervalValue();
+				int newVal = Mth.clamp(val + (scrollY > 0 ? 1 : -1), min, max);
+
+				if (newVal != val) {
+					this.component.setLowIntervalValue(newVal);
+					this.value = (double) (newVal - min) / (double) (max - min);
+					this.updateMessage();
+					this.overlay.sendSettingsUpdate();
+				}
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public void playDownSound(SoundManager soundManager) {
+			// Silent
+		}
 	}
 }

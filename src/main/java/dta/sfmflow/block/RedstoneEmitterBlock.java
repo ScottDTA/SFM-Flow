@@ -4,6 +4,8 @@ import com.mojang.serialization.MapCodec;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -18,8 +20,7 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Analog redstone output device supporting independent multi-sided signal
- * control [3].
+ * Analog redstone output device supporting independent multi-sided signal control [3].
  */
 public class RedstoneEmitterBlock extends BaseEntityBlock {
 	public static final MapCodec<RedstoneEmitterBlock> CODEC = simpleCodec(RedstoneEmitterBlock::new);
@@ -86,6 +87,15 @@ public class RedstoneEmitterBlock extends BaseEntityBlock {
 	@Override
 	public int getDirectSignal(BlockState state, BlockGetter level, BlockPos pos, Direction side) {
 		return getSignal(state, level, pos, side);
+	}
+
+	@Override
+	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+		BlockEntity be = level.getBlockEntity(pos);
+		if (be instanceof RedstoneEmitterBlockEntity emitter) {
+			// Clear all active pulse modes on scheduled tick [3]
+			emitter.clearPulses();
+		}
 	}
 
 	public static BooleanProperty getDirectionProperty(Direction direction) {

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * Reusable side-scrolling UI selector list allowing users to find, search, and
@@ -31,16 +32,23 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 	private final ManagerScreen parentScreen;
 	private final EditBox searchEdit;
 	private final Consumer<ConnectionBlock> onSelected;
+	private final Predicate<ConnectionBlock> filter;
 
 	private float scrollX = 0.0F;
 
 	public InventorySelectorWidget(int x, int y, IInventoryTarget model, ResourceLocation capabilityType,
 			ManagerScreen parentScreen, Consumer<ConnectionBlock> onSelected) {
+		this(x, y, model, capabilityType, parentScreen, block -> true, onSelected);
+	}
+
+	public InventorySelectorWidget(int x, int y, IInventoryTarget model, ResourceLocation capabilityType,
+			ManagerScreen parentScreen, Predicate<ConnectionBlock> filter, Consumer<ConnectionBlock> onSelected) {
 		super(x, y, 260, 52, Component.literal("Inventory Selector"));
 		this.model = model;
 		this.capabilityType = capabilityType;
 		this.parentScreen = parentScreen;
 		this.onSelected = onSelected;
+		this.filter = filter;
 
 		// Initialize local search box [3]
 		this.searchEdit = new EditBox(parentScreen.getFont(), getX(), getY() + 12, 260, 14,
@@ -56,8 +64,8 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 		List<ConnectionBlock> filtered = new ArrayList<>();
 		for (ConnectionBlock inv : list) {
-			// Pre-filter by our target capability type ResourceLocation first [3]
-			if (inv.getTypes().contains(capabilityType)) {
+			// Pre-filter by our target capability type and dynamic block state filters [3]
+			if (inv.getTypes().contains(capabilityType) && (this.filter == null || this.filter.test(inv))) {
 				String name = inv.getDisplayName(level).getString().toLowerCase(Locale.ROOT);
 				if (query.isEmpty() || name.contains(query)) {
 					filtered.add(inv);
@@ -73,8 +81,6 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			return false;
 		}
 
-		// Delegate clicks to the search box first and establish the focus delegation
-		// chain [3]
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
 				this.setFocused(child); // Fix: Set focused child on click so key events propagate [3]
@@ -193,14 +199,14 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x; // Fix inversion: absolute child tracking translation [3]
+		int dif = this.getX() - x; 
 		super.setX(x);
 		updateChildrenXPositions(dif);
 	}
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y; // Fix inversion: absolute child tracking translation [3]
+		int dif = this.getY() - y; 
 		super.setY(y);
 		updateChildrenYPositions(dif);
 	}

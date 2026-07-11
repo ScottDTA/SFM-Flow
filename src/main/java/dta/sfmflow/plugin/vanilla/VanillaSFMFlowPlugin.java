@@ -11,11 +11,13 @@ import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.capability.EnergyTransferParams; // Added [3]
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot; // Added [3]
+import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent; // Added [3]
 
@@ -53,7 +55,8 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_OUTPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_TRIGGER;
-
+	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_EMITTER;
+	
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively [3]
 		registerItemCapability();
@@ -107,6 +110,11 @@ public class VanillaSFMFlowPlugin {
 		REDSTONE_TRIGGER = FlowComponentBuilder.create("redstone_trigger", RedstoneTriggerComponent::new)
 				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
 				.displayName("gui.sfmflow.redstone_trigger").codec(RedstoneTriggerComponent.CODEC).build(registry);
+		
+		REDSTONE_EMITTER = FlowComponentBuilder.create("redstone_emitter", RedstoneEmitterComponent::new)
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/redstone_emitter_button.png")
+				.displayName("gui.sfmflow.redstone_emitter").codec(RedstoneEmitterComponent.CODEC).build(registry);
+		
 	}
 
 	private void registerItemCapability() {
@@ -263,6 +271,35 @@ public class VanillaSFMFlowPlugin {
 	private void registerRedstoneCapability() {
 		ResourceLocation redstoneCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone");
 		FlowCapabilityRegistry.register(new FlowCapability<>(redstoneCapId, null, "gui.sfmflow.type_redstone"));
+		
+		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone_emitter"), 
+				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+					if (params instanceof RedstoneEmitterComponent.RedstoneEmitterParams task) {
+						net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(dest);
+						if (be instanceof RedstoneEmitterBlockEntity emitter) {
+							for (Direction dir : Direction.values()) {
+								if ((task.activeSidesMask() & (1 << dir.ordinal())) != 0) {
+									int currentPower = emitter.getPowerForSide(dir);
+									int newPower = task.operator().apply(currentPower, task.modifierValue(), task.rolloverEnabled());
+									
+									if (task.isPulse()) {
+										emitter.setPowerForSide(dir, newPower);
+										emitter.setPulsed(dir, true);
+										// Schedule 1-tick delay to clear the pulse automatically [3]
+										level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
+									} else {
+										emitter.setPowerForSide(dir, newPower);
+										emitter.setPulsed(dir, false); // clear pulse state if set
+									}
+								}
+							}
+							return true;
+						}
+					}
+					return false;
+				});
+		
+		
 	}
 
 	private void registerCauldronBridges() {

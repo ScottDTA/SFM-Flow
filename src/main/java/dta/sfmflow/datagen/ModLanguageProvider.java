@@ -47,6 +47,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.redstone_trigger.output.while_low", "While Low");
 		add("gui.sfmflow.redstone_trigger.output.on_high_pulse", "On High Pulse");
 		add("gui.sfmflow.redstone_trigger.output.on_low_pulse", "On Low Pulse");
+		add("gui.sfmflow.redstone_emitter", "Redstone Emitter");
+		add("block.sfmflow.redstone_emitter", "Redstone Emitter");
 		
 		add("gui.sfmflow.redstone_trigger", "Redstone Trigger");
 		add("block.sfmflow.redstone_trigger", "Redstone Trigger");		
