@@ -1,3 +1,16 @@
+7-10-2026
+
+### [Added]
+* **Redstone Emitter Node:** A new output node allowing flowcharts to programmatically toggle, add, or subtract analog redstone signals (0 to 15) on specific faces of Redstone Emitter blocks.
+* **Pulse Mode Configuration:** Emitter block outputs can now be set to "Pulse Mode," causing the redstone signal to fire for exactly 1 game tick before automatically resetting to 0.
+* **Redstone Emitter Settings Panel:** Introduced a dedicated settings layout for redstone emitters, featuring a targeted block selector that filters specifically for Redstone Emitter Blocks.
+* **Sided Emitter Configuration Popup:** Shift-clicking a face on an Emitter preview opens a custom options dialog to configure specific math operators (Overwrite, Add, or Subtract), output values, Pulse toggles, and Rollover (value wrapping) per side.
+* **Face Culling Proxy:** Implemented a rendering proxy (`CullingBypassBlockGetter`) for the 3D block preview window, preventing block faces from turning invisible when rendering isolated solid blocks.
+
+### [Changed]
+* **Decoupled Shader and Math Helpers:** Refactored the core 3D preview math and rendering layers into dedicated helper utilities, protecting the preview pipeline from environmental glitches.
+* **Streamlined UI Code:** Re-engineered visual validation checkers on the client to use consolidated helper functions, simplifying code maintainability.
+
 7-9-2026
 
 ### [Added]
