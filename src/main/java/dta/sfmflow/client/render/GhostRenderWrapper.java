@@ -10,12 +10,13 @@ import net.neoforged.api.distmarker.OnlyIn;
 import java.util.Locale;
 
 /**
- * Handles color blending and alpha configurations for neighboring ghost blocks [3].
+ * Handles color blending and alpha configurations for neighboring ghost blocks.
  */
 @OnlyIn(Dist.CLIENT)
 public final class GhostRenderWrapper {
 
-	private GhostRenderWrapper() {}
+	private GhostRenderWrapper() {
+	}
 
 	@OnlyIn(Dist.CLIENT)
 	public static class GhostBufferSource implements MultiBufferSource {
@@ -29,8 +30,10 @@ public final class GhostRenderWrapper {
 
 		@Override
 		public VertexConsumer getBuffer(RenderType renderType) {
-			// Symmetrically delegate to the entity-based translucent shader to remain completely immune to world light levels [3]
-			return new GhostVertexConsumer(delegate.getBuffer(RenderType.entityTranslucentCull(InventoryMenu.BLOCK_ATLAS)), alpha);
+			// Symmetrically delegate to the entity-based translucent shader to remain
+			// completely immune to world light levels
+			return new GhostVertexConsumer(
+					delegate.getBuffer(RenderType.entityTranslucentCull(InventoryMenu.BLOCK_ATLAS)), alpha);
 		}
 	}
 
@@ -55,9 +58,14 @@ public final class GhostRenderWrapper {
 				if (endIdx != -1) {
 					String sub = str.substring(startIdx + 8, endIdx);
 					if (sub.startsWith("Optional[")) {
-						sub = sub.substring(9, sub.length() - 1);
+						// Safe extraction: strip "Optional[" and any trailing bracket we might have
+						// captured
+						sub = sub.substring(9);
+						if (sub.endsWith("]")) {
+							sub = sub.substring(0, sub.length() - 1);
+						}
 					}
-					if (!sub.startsWith("Optional.empty")) {
+					if (!sub.startsWith("Optional.empty") && !sub.isEmpty()) {
 						texture = ResourceLocation.tryParse(sub);
 					}
 				}

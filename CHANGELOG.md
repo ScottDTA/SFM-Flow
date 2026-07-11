@@ -1,3 +1,16 @@
+7-11-2026
+
+### [Added]
+* **Dynamic Energy Rate Detection:** Augmented the energy limits scanner to perform simulated power transfers on the server. This ensures that custom or heavily wrapped energy storages (like Mekanism Energy Cubes) automatically reveal their exact maximum per-tick transfer limits to the player config menu.
+
+### [Changed]
+* **Cleaned Mod Startup Sequence:** Removed obsolete and unused startup event listeners from the main mod registration lifecycle, ensuring a cleaner load sequence.
+* **Contrast Adjustments:** Adjusted the default text color for the Orange mask to solid white to improve contrast and visual readability against colored flowchart nodes.
+
+### [Fixed]
+* **Visual Slot Sync Performance:** Shifted inventory slot packet parsing from the background network threads to the visual rendering pass. This alleviates network thread bottlenecks and ensures slot previews remain responsive even on congested servers.
+
+
 7-10-2026
 
 ### [Added]

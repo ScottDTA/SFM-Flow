@@ -67,8 +67,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 /**
- * Backing BlockEntity class for the Manager block [3]. Tracks active logical
- * elements and delegates external layout saves/loads to DataStateManager [3].
+ * Backing BlockEntity class for the Manager block. Tracks active logical
+ * elements and delegates external layout saves/loads to DataStateManager.
  */
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
@@ -80,11 +80,11 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private UUID managerId;
 	private boolean loadedExternal = false;
 	private boolean isDataDirty = false;
-	
+
 	private transient HolderLookup.Provider savedRegistries = null;
 	private final List<AbstractTriggerComponent> cachedTriggers = new ArrayList<>();
 	private boolean isTriggerCacheDirty = true;
-	
+
 	private final PhysicalNetwork physicalNetwork = new PhysicalNetwork();
 	private final ExecutionRingBuffer executionBuffer = new ExecutionRingBuffer(1024);
 	private final AtomicBoolean planningActive = new AtomicBoolean(false);
@@ -97,8 +97,9 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private transient long rollingExecutionTimeNs = 0;
 	private transient int rollingExecutedTasks = 0;
 	private transient int rollingTicks = 0;
-	
-	// Atomic counter to avoid raw concurrency writes from background callback sweeps [3]
+
+	// Atomic counter to avoid raw concurrency writes from background callback
+	// sweeps
 	private final AtomicInteger planningBreakerTrips = new AtomicInteger(0);
 
 	public List<InventoryGroupVariable> getGroupVariables() {
@@ -224,7 +225,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			long elapsed = System.nanoTime() - startTime;
 			updateProfiling(elapsed, tasksRan[0]);
 
-			// Dynamically rebuild the trigger array list only when changes occur [3]
+			// Dynamically rebuild the trigger array list only when changes occur
 			if (this.isTriggerCacheDirty) {
 				rebuildTriggerCache();
 			}
@@ -232,7 +233,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			List<UUID> activeTriggers = new ArrayList<>();
 			long currentTime = pLevel.getGameTime();
 
-			// Iterate strictly through cached trigger components, delegating checks polymorphically [3]
+			// Iterate strictly through cached trigger components, delegating checks
+			// polymorphically
 			for (int i = 0; i < this.cachedTriggers.size(); i++) {
 				var comp = this.cachedTriggers.get(i);
 				if (comp.evaluateTrigger(pLevel, pBlockPos, currentTime)) {
@@ -241,30 +243,26 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			}
 
 			if (!activeTriggers.isEmpty()) {
-				// Atomically attempt to acquire the lock before submitting a background task [3]
+				// Atomically attempt to acquire the lock before submitting a background task
 				if (this.planningActive.compareAndSet(false, true)) {
 					var snapshot = ThreadSafeInventorySnapshot.create(this);
 
-					// 1. Clone the active flowchart structure on the main thread using Mojang NBT Codecs [3]
+					// 1. Clone the active flowchart structure on the main thread using Mojang NBT
+					// Codecs
 					var registries = pLevel.registryAccess();
 					var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-					Tag flowchartNbt = Flowchart.CODEC.encodeStart(ops, this.flowchart)
-							.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to clone flowchart state for planning: {}", err))
+					Tag flowchartNbt = Flowchart.CODEC.encodeStart(ops, this.flowchart).resultOrPartial(
+							err -> SFMFlow.LOGGER.error("Failed to clone flowchart state for planning: {}", err))
 							.orElse(new CompoundTag());
 
-					// 2. Submit task using decentralized thread-safe parameters and callbacks [3]
-					FlowExecutionKernel.submitTask(
-							this.executionBuffer,
-							this::incrementBreakerTrips,
-							snapshot,
-							flowchartNbt,
-							registries,
-							activeTriggers,
-							() -> this.planningActive.set(false) // Release lock callback on task complete [3]
-					);
+					// 2. Submit task using decentralized thread-safe parameters and callbacks
+					FlowExecutionKernel.submitTask(this.executionBuffer, this::incrementBreakerTrips, snapshot,
+							flowchartNbt, registries, activeTriggers, () -> this.planningActive.set(false));
 				} else {
-					// Task coalescing: Skip scheduling this sweep to prevent memory leaks [3]
-					FlowLogger.execution("Skipping planning sweep for manager at %s as a background task is already active.", this.worldPosition);
+					// Task coalescing: Skip scheduling this sweep to prevent memory leaks
+					FlowLogger.execution(
+							"Skipping planning sweep for manager at %s as a background task is already active.",
+							this.worldPosition);
 				}
 			}
 
@@ -309,20 +307,22 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			if (!this.loadedExternal) {
 				loadExternalData();
 			}
-			this.isTriggerCacheDirty = true; // Mark dirty on block load [3]
+			this.isTriggerCacheDirty = true; // Mark dirty on block load
 			updateInventories();
 		}
 	}
 
 	private void loadExternalData() {
-		// Use ServerLifecycleHooks to resolve the MinecraftServer instance safely [3]
+		// Use ServerLifecycleHooks to resolve the MinecraftServer instance safely
 		MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
 		if (server == null || this.level == null || this.level.isClientSide() || this.managerId == null) {
 			return;
 		}
 		try {
-			// Supply the composite lookup provider context containing custom static registries [3]
-			HolderLookup.Provider registries = this.savedRegistries != null ? this.savedRegistries : this.level.registryAccess();
+			// Supply the composite lookup provider context containing custom static
+			// registries
+			HolderLookup.Provider registries = this.savedRegistries != null ? this.savedRegistries
+					: this.level.registryAccess();
 			var loaded = DataStateManager.loadSync(server, this.managerId, registries);
 			this.flowchart = loaded.flowchart();
 			this.groupVariables.clear();
@@ -337,7 +337,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		this.commandCount = this.flowchart.components().size();
 		this.loadedExternal = true;
 	}
-
 
 	@Override
 	public void onChunkUnloaded() {
@@ -358,7 +357,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.putUUID("ManagerId", this.managerId);
 
-		// Use ServerLifecycleHooks to resolve the MinecraftServer instance safely [3]
+		// Use ServerLifecycleHooks to resolve the MinecraftServer instance safely
 		MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
 		if (server != null) {
 			if (this.isDataDirty) {
@@ -428,12 +427,12 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	}
 
 	public void executeCanvasAction(CanvasAction action, UUID componentId) {
-		// Delegate canvas mutation checks to CanvasActionHandler [3]
+		// Delegate canvas mutation checks to CanvasActionHandler
 		CanvasActionHandler.execute(this, action, componentId);
 	}
 
 	public void componentMoved(ComponentMoved pData, IPayloadContext context) {
-		// Delegate component movements to CanvasActionHandler [3]
+		// Delegate component movements to CanvasActionHandler
 		CanvasActionHandler.move(this, pData, context);
 	}
 
@@ -472,7 +471,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	@Override
 	protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
 		super.loadAdditional(pTag, pRegistries);
-		this.savedRegistries = pRegistries; // Save the composite provider context for onLoad [3]
+		this.savedRegistries = pRegistries; // Save the composite provider context for onLoad
 
 		if (pTag.contains("ManagerId")) {
 			this.managerId = pTag.getUUID("ManagerId");
@@ -482,7 +481,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 		var ops = RegistryOps.create(NbtOps.INSTANCE, pRegistries);
 
-		// Handle client update tag synchronization [3]
+		// Handle client update tag synchronization
 		if (pTag.contains("flowchart")) {
 			try {
 				this.flowchart = Flowchart.CODEC.parse(ops, pTag.get("flowchart"))
@@ -505,7 +504,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
 			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
 			map.clear();
-			for (long longVal : dirOrdinals(flatPosArray)) {
+			for (long longVal : flatPosArray) { // Iterate directly [3]
 				map.getOrAddNode(BlockPos.of(longVal));
 			}
 		}
@@ -610,14 +609,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				.forEach(player -> PacketDistributor.sendToPlayer((ServerPlayer) player, packet));
 	}
 
-	private long[] flatPosOrdinals(long[] arr) {
-		return arr != null ? arr : new long[0];
-	}
-
-	private long[] dirOrdinals(long[] arr) {
-		return arr;
-	}
-
 	public void deleteExternalData() {
 		if (this.level == null || this.level.isClientSide() || this.managerId == null
 				|| this.level.getServer() == null) {
@@ -625,16 +616,16 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		DataStateManager.deleteSync(this.level.getServer(), this.managerId);
 	}
-	
+
 	/**
-	 * Scans the active flowchart map and compiles a dense cache of trigger components [3].
-	 * Executed only when the flowchart structure is modified or loaded [3].
+	 * Scans the active flowchart map and compiles a dense cache of trigger
+	 * components. Executed only when the flowchart structure is modified or loaded.
 	 */
 	private void rebuildTriggerCache() {
 		this.cachedTriggers.clear();
 		if (this.flowchart != null && this.flowchart.components() != null) {
 			for (var comp : this.flowchart.components().values()) {
-				if (comp instanceof dta.sfmflow.api.component.AbstractTriggerComponent trigger) {
+				if (comp instanceof AbstractTriggerComponent trigger) {
 					this.cachedTriggers.add(trigger);
 				}
 			}
@@ -645,7 +636,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void setDataDirty(boolean dirty) {
 		this.isDataDirty = dirty;
 		if (dirty) {
-			this.isTriggerCacheDirty = true; // Mark dirty on edits [3]
+			this.isTriggerCacheDirty = true; // Mark dirty on edits
 		}
 	}
 }

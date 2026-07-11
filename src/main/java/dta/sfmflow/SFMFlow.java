@@ -14,12 +14,11 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 
 /**
  * The main mod entry point for SFM-Flow. Handles system initialization,
- * deferred registers, configuration files, and serverbound payload routing [3].
+ * deferred registers, configuration files, and serverbound payload routing.
  */
 @Mod(SFMFlow.MODID)
 public class SFMFlow {
@@ -27,8 +26,7 @@ public class SFMFlow {
 	public static final Logger LOGGER = LogUtils.getLogger();
 
 	public SFMFlow(IEventBus modEventBus, ModContainer modContainer) {
-		modEventBus.addListener(this::commonSetup);
-		modEventBus.addListener(ModNetworking::register); // Cleaned up listener [3]
+		modEventBus.addListener(ModNetworking::register);
 
 		ModCreativeModeTabs.register(modEventBus);
 		ModItems.register(modEventBus);
@@ -40,12 +38,8 @@ public class SFMFlow {
 		modContainer.registerConfig(ModConfig.Type.SERVER, ServerConfig.SPEC);
 		modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "sfmflow-client.toml");
 
-		// Clean, modern, un-deprecated 1.21.1 setup. Fully shields server classloaders [3]
 		if (FMLEnvironment.dist.isClient()) {
 			dta.sfmflow.SFMFlowClient.initialize(modEventBus, modContainer);
 		}
-	}
-
-	private void commonSetup(final FMLCommonSetupEvent event) {
 	}
 }

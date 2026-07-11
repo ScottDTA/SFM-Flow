@@ -25,8 +25,8 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * Public API base class representing an interactive workspace flowchart
- * component [3]. Houses hardcoded coordinates and locked visual dimensions for
- * standard node rendering [3].
+ * component. Houses hardcoded coordinates and locked visual dimensions for
+ * standard node rendering.
  */
 public abstract class AbstractFlowComponent {
 	public static final int BASE_WIDTH = 64;
@@ -38,7 +38,7 @@ public abstract class AbstractFlowComponent {
 
 	/**
 	 * Helper record containing core flowchart component properties to streamline
-	 * Codec usage [3].
+	 * Codec usage.
 	 */
 	public record BaseProperties(UUID id, int x, int y, int z, String customName, Color colorMask) {
 		public static final MapCodec<BaseProperties> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
@@ -70,7 +70,6 @@ public abstract class AbstractFlowComponent {
 	protected int numOutputs = 0;
 	protected boolean hasInputNodes = false;
 	protected int numInputs = 0;
-	private int activeCategory = 0;
 	protected String customName = "";
 	protected Color colorMask = Color.WHITE;
 
@@ -96,14 +95,14 @@ public abstract class AbstractFlowComponent {
 	}
 
 	/**
-	 * Locked to 64px width standard [3].
+	 * Locked to 64px width standard.
 	 */
 	public int getVisualWidth() {
 		return BASE_WIDTH;
 	}
 
 	/**
-	 * Locked to 20px plus output terminal space [3].
+	 * Locked to 20px plus output terminal space.
 	 */
 	public int getVisualHeight() {
 		int h = BASE_HEIGHT;
@@ -216,19 +215,11 @@ public abstract class AbstractFlowComponent {
 		return numInputs;
 	}
 
-	public int getActiveCategory() {
-		return activeCategory;
-	}
-
-	public void setActiveCategory(int category) {
-		this.activeCategory = category;
-	}
-
 	public void plan(FlowchartPlanningContext context) {
 	}
-	
+
 	/**
-	 * Resolves a customized hovering tooltip for a specific input pin index [3].
+	 * Resolves a customized hovering tooltip for a specific input pin index.
 	 */
 	@Nullable
 	public Component getInputNodeTooltip(int index) {
@@ -236,11 +227,11 @@ public abstract class AbstractFlowComponent {
 	}
 
 	/**
-	 * Resolves a customized hovering tooltip for a specific output pin index [3].
+	 * Resolves a customized hovering tooltip for a specific output pin index.
 	 */
 	@Nullable
 	public Component getOutputNodeTooltip(int index) {
 		return null;
 	}
-	
+
 }

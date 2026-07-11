@@ -1,5 +1,7 @@
 package dta.sfmflow.util;
 
+import java.util.function.BiFunction;
+
 import com.mojang.serialization.Codec;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.ChatFormatting;
@@ -9,21 +11,19 @@ import net.minecraft.util.StringRepresentable;
 
 /**
  * Public API enumeration defining the color palette used for visual workspace
- * component masks [3]. Stores compile-time default values but routes active
- * color queries through an injectable resolver [3].
+ * component masks. Stores compile-time default values but routes active color
+ * queries through an injectable resolver.
  */
 public enum Color implements StringRepresentable {
 	BLACK("black", ChatFormatting.BLACK, 0x1D1D21, 0xFFFFFF), BLUE("blue", ChatFormatting.BLUE, 0x3C44AA, 0xFFFFFF),
 	GREEN("green", ChatFormatting.GREEN, 0x5E7C16, 0xFFFFFF),
 	CYAN("cyan", ChatFormatting.DARK_AQUA, 0x169C9C, 0xFFFFFF), RED("red", ChatFormatting.RED, 0xB02E26, 0xFFFFFF),
 	PURPLE("purple", ChatFormatting.DARK_PURPLE, 0x8932B8, 0xFFFFFF),
-	ORANGE("orange", ChatFormatting.GOLD, 0xF9801D, 0x404040),
+	ORANGE("orange", ChatFormatting.GOLD, 0xF9801D, 0xFFFFFF),
 	LIGHT_GRAY("light_gray", ChatFormatting.GRAY, 0x9D9D97, 0x404040),
 	GRAY("gray", ChatFormatting.DARK_GRAY, 0x474F52, 0xFFFFFF),
 	LIGHT_BLUE("light_blue", ChatFormatting.AQUA, 0x3AB3DA, 0x404040),
-	LIME("lime", ChatFormatting.GREEN, 0x80C71F, 0x404040),
-	// TURQUOISE("turquoise", ChatFormatting.AQUA, 0x169C9C, 0xFFFFFF),
-	BROWN("brown", ChatFormatting.GOLD, 0x835432, 0xFFFFFF),
+	LIME("lime", ChatFormatting.GREEN, 0x80C71F, 0x404040), BROWN("brown", ChatFormatting.GOLD, 0x835432, 0xFFFFFF),
 	PINK("pink", ChatFormatting.LIGHT_PURPLE, 0xF38BAA, 0x404040),
 	MAGENTA("magenta", ChatFormatting.LIGHT_PURPLE, 0xC74EBD, 0xFFFFFF),
 	YELLOW("yellow", ChatFormatting.YELLOW, 0xFED83D, 0x404040),
@@ -39,8 +39,8 @@ public enum Color implements StringRepresentable {
 			Enum::ordinal);
 
 	// Interface supplier to fetch config values without referencing ClientConfig
-	// directly in common code [3]
-	private static java.util.function.BiFunction<Color, Boolean, Integer> colorResolver = (color,
+	// directly in common code
+	private static BiFunction<Color, Boolean, Integer> colorResolver = (color,
 			isText) -> isText ? color.defaultHexTextColor : color.defaultHexColor;
 
 	Color(String name, ChatFormatting chatFormat, int hexColor, int hexTextColor) {
@@ -51,13 +51,13 @@ public enum Color implements StringRepresentable {
 	}
 
 	/**
-	 * Configures the active client resolver delegate [3]. Called exclusively on the
-	 * physical client setup phase [3].
+	 * Configures the active client resolver delegate. Called exclusively on the
+	 * physical client setup phase.
 	 *
 	 * @param resolver the resolver function mapping Color and text-state to integer
-	 *                 [3]
+	 * 
 	 */
-	public static void setResolver(java.util.function.BiFunction<Color, Boolean, Integer> resolver) {
+	public static void setResolver(BiFunction<Color, Boolean, Integer> resolver) {
 		colorResolver = resolver;
 	}
 

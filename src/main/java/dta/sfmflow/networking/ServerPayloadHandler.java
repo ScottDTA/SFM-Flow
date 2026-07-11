@@ -43,6 +43,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -53,7 +54,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Handles serverbound network payloads, registering coordinates updates, click
- * tasks, and workspace state updates safely on the server thread [3].
+ * tasks, and workspace state updates safely on the server thread.
  */
 public class ServerPayloadHandler {
 	private ServerPayloadHandler() {
@@ -142,12 +143,13 @@ public class ServerPayloadHandler {
 
 				connections.removeIf(conn -> (conn.getSourceComponentId().equals(data.sourceId())
 						&& conn.getOutputNodeIndex() == data.outputIdx())
+						// Alignment checks
 						|| (conn.getTargetComponentId().equals(data.targetId())
 								&& conn.getInputNodeIndex() == data.inputIdx()));
 
 				connections.add(new FlowComponentConnections(data.sourceId(), data.outputIdx(), data.targetId(),
 						data.inputIdx()));
-				manager.setDataDirty(true); // Flag dirty to trigger saving [3]
+				manager.setDataDirty(true); // Flag dirty to trigger saving
 				manager.setChanged();
 
 				CompoundTag dataTag = new CompoundTag();
@@ -173,7 +175,7 @@ public class ServerPayloadHandler {
 						&& conn.getOutputNodeIndex() == data.outputIdx()
 						&& conn.getTargetComponentId().equals(data.targetId())
 						&& conn.getInputNodeIndex() == data.inputIdx());
-				manager.setDataDirty(true); // Flag dirty to trigger saving [3]
+				manager.setDataDirty(true); // Flag dirty to trigger saving
 				manager.setChanged();
 
 				CompoundTag dataTag = new CompoundTag();
@@ -200,7 +202,7 @@ public class ServerPayloadHandler {
 					} else {
 						transfer.setBoundFilterVariableId(data.variableId());
 					}
-					manager.setDataDirty(true); // Flag dirty to trigger saving [3]
+					manager.setDataDirty(true); // Flag dirty to trigger saving
 					manager.setChanged();
 
 					CompoundTag settingsTag = new CompoundTag();
@@ -223,14 +225,14 @@ public class ServerPayloadHandler {
 				ListTag accessibleList = new ListTag();
 				int totalSlotsVal = 0;
 
-				// 1. Resolve absolute/maximum slot capacity from non-sided (null) capability handler [3]
+				// 1. Resolve absolute/maximum slot capacity from non-sided (null) capability handler
 				IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
 				IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), data.side());
 				
 				if (nullHandler != null) {
 					totalSlotsVal = nullHandler.getSlots();
 					
-					// Populate list of current item stacks based on raw slot indexes [3]
+					// Populate list of current item stacks based on raw slot indexes
 					for (int i = 0; i < totalSlotsVal; i++) {
 						ItemStack stack = nullHandler.getStackInSlot(i);
 						if (!stack.isEmpty()) {
@@ -241,7 +243,7 @@ public class ServerPayloadHandler {
 						}
 					}
 
-					// Resolve accessible slots from sided capability [3]
+					// Resolve accessible slots from sided capability
 					if (itemHandler != null) {
 						int sideCount = itemHandler.getSlots();
 						if (sideCount == totalSlotsVal) {
@@ -255,7 +257,7 @@ public class ServerPayloadHandler {
 						}
 					}
 					
-					// WorldlyContainer (SidedInventory) mapping logic [3]
+					// WorldlyContainer (SidedInventory) mapping logic
 					if (level.getBlockEntity(data.pos()) instanceof WorldlyContainer worldly && data.side() != null) {
 						accessibleList.clear();
 						int[] slots = worldly.getSlotsForFace(data.side());
@@ -319,101 +321,9 @@ public class ServerPayloadHandler {
 		});
 	}
 
-	private static Set<Integer> getSidedSlotIndices(IItemHandler sidedHandler, IItemHandler nullHandler) {
-		Set<Integer> indices = new HashSet<>();
-		if (sidedHandler == null) {
-			return indices;
-		}
-
-		// Inspect fields recursively to resolve slot arrays within wrapped sided
-		// containers [3]
-		Class<?> clazz = sidedHandler.getClass();
-		while (clazz != null && clazz != Object.class) {
-			for (Field f : clazz.getDeclaredFields()) {
-				try {
-					f.setAccessible(true);
-					Object val = f.get(sidedHandler);
-					if (val instanceof int[] arr) {
-						for (int i : arr) {
-							indices.add(i);
-						}
-						return indices;
-					} else if (val instanceof Collection<?> col) {
-						for (Object item : col) {
-							if (item instanceof Number num) {
-								indices.add(num.intValue());
-							}
-						}
-						if (!indices.isEmpty()) {
-							return indices;
-						}
-					}
-				} catch (Exception ignored) {
-				}
-			}
-			clazz = clazz.getSuperclass();
-		}
-
-		if (nullHandler != null && sidedHandler.getSlots() == nullHandler.getSlots()) {
-			for (int i = 0; i < nullHandler.getSlots(); i++) {
-				indices.add(i);
-			}
-		} else {
-			for (int i = 0; i < sidedHandler.getSlots(); i++) {
-				indices.add(i);
-			}
-		}
-		return indices;
-	}
-
-	private static Set<Integer> getSidedTankIndices(IFluidHandler sidedHandler, IFluidHandler nullHandler) {
-		Set<Integer> indices = new HashSet<>();
-		if (sidedHandler == null) {
-			return indices;
-		}
-
-		Class<?> clazz = sidedHandler.getClass();
-		while (clazz != null && clazz != Object.class) {
-			for (Field f : clazz.getDeclaredFields()) {
-				try {
-					f.setAccessible(true);
-					Object val = f.get(sidedHandler);
-					if (val instanceof int[] arr) {
-						for (int i : arr) {
-							indices.add(i);
-						}
-						return indices;
-					} else if (val instanceof java.util.Collection<?> col) {
-						for (Object item : col) {
-							if (item instanceof Number num) {
-								indices.add(num.intValue());
-							}
-						}
-						if (!indices.isEmpty()) {
-							return indices;
-						}
-					}
-				} catch (Exception ignored) {
-				}
-			}
-			clazz = clazz.getSuperclass();
-		}
-
-		if (nullHandler != null && sidedHandler.getTanks() == nullHandler.getTanks()) {
-			for (int i = 0; i < nullHandler.getTanks(); i++) {
-				indices.add(i);
-			}
-		} else {
-			for (int i = 0; i < sidedHandler.getTanks(); i++) {
-				indices.add(i);
-			}
-		}
-		return indices;
-	}
-
 	/**
 	 * Activates the targeted component safely on both the clientbound and
-	 * serverbound container menus [3].
+	 * serverbound container menus.
 	 */
 	public static void handleSetActiveFilterComponent(final SetActiveFilterComponentPacket data,
 			final IPayloadContext context) {
@@ -426,7 +336,7 @@ public class ServerPayloadHandler {
 					} else {
 						var comp = manager.getFlowComponents().get(data.componentId());
 						if (comp != null) {
-							// Generalization fix: set the generic component on the server-side menu [3]
+							// Generalization fix: set the generic component on the server-side menu
 							menu.setActiveComponent(comp);
 						}
 					}
@@ -436,7 +346,7 @@ public class ServerPayloadHandler {
 	}
 
 	/**
-	 * Synchronizes the visual card stack safely on the server menu container [3].
+	 * Synchronizes the visual card stack safely on the server menu container.
 	 */
 	public static void handleSyncCarriedItem(final SyncCarriedItemPacket payload, final IPayloadContext context) {
 		context.enqueueWork(() -> {
@@ -444,7 +354,7 @@ public class ServerPayloadHandler {
 			ItemStack stack = payload.carried();
 
 			// EXPLOIT FIREWALL: Only allow setting the carried item if it is a
-			// VARIABLE_CARD or empty [3]
+			// VARIABLE_CARD or empty
 			if (stack.isEmpty() || stack.is(ModItems.VARIABLE_CARD.get())) {
 				player.containerMenu.setCarried(stack);
 				player.containerMenu.broadcastChanges();
@@ -469,21 +379,24 @@ public class ServerPayloadHandler {
 					}
 					if (energy != null) {
 						int capacity = energy.getMaxEnergyStored();
-						int extractLimit = capacity;
-						int receiveLimit = capacity;
 
-						// 1. Mekanism Energy Cube Heuristic: limit is exactly capacity / 1000 [3]
-						net.minecraft.world.level.block.state.BlockState state = level.getBlockState(data.pos());
-						ResourceLocation blockId = net.minecraft.core.registries.BuiltInRegistries.BLOCK
-								.getKey(state.getBlock());
-						if (blockId != null && "mekanism".equals(blockId.getNamespace())
-								&& blockId.getPath().contains("energy_cube")) {
-							extractLimit = capacity / 1000;
-							receiveLimit = capacity / 1000;
-						} else {
-							// 2. Standard Reflection fallback scanning standard energy rate fields [3]
-							extractLimit = reflectField(energy, "maxExtract", capacity);
-							receiveLimit = reflectField(energy, "maxReceive", capacity);
+						// 1. Inspect rate fields via reflection fallback
+						int extractLimit = reflectField(energy, "maxExtract", capacity);
+						int receiveLimit = reflectField(energy, "maxReceive", capacity);
+
+						// 2. Query actual max per-tick transfer limits via simulated extraction/receive
+						// if stored
+						if (extractLimit == capacity) {
+							int simExtract = energy.extractEnergy(Integer.MAX_VALUE, true);
+							if (simExtract > 0) {
+								extractLimit = simExtract;
+							}
+						}
+						if (receiveLimit == capacity) {
+							int simReceive = energy.receiveEnergy(Integer.MAX_VALUE, true);
+							if (simReceive > 0) {
+								receiveLimit = simReceive;
+							}
 						}
 
 						properties.putInt("MaxEnergy", capacity);
@@ -493,7 +406,7 @@ public class ServerPayloadHandler {
 					}
 				}
 
-				// Symmetrically send properties update back to the client [3]
+				// Symmetrically send properties update back to the client
 				PacketDistributor.sendToPlayer(player,
 						new SyncSideConfigPropertiesPacket(data.pos(), data.side(), data.capabilityId(), properties));
 			}

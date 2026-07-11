@@ -22,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -29,6 +30,7 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.client.model.data.ModelData;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 
 import java.util.List;
@@ -36,34 +38,36 @@ import java.util.function.Predicate;
 
 import javax.annotation.Nullable;
 
+import org.joml.Matrix4f;
+
 /**
- * Orchestrator class managing 3D block preview scene layers [3].
+ * Orchestrator class managing 3D block preview scene layers.
  */
 @OnlyIn(Dist.CLIENT)
 public final class Preview3DRenderer {
 
-	private static final List<RenderType> STANDARD_LAYERS = List.of(
-			RenderType.solid(), 
-			RenderType.cutoutMipped(), 
-			RenderType.cutout(), 
-			RenderType.translucent()
-	);
+	private static final List<RenderType> STANDARD_LAYERS = List.of(RenderType.solid(), RenderType.cutoutMipped(),
+			RenderType.cutout(), RenderType.translucent());
 
-	private Preview3DRenderer() {}
+	private Preview3DRenderer() {
+	}
 
 	/**
-	 * Symmetrical delegation to projection helpers to preserve backward compatibility with existing widgets [3].
+	 * Symmetrical delegation to projection helpers to preserve backward
+	 * compatibility with existing widgets.
 	 */
 	public static List<Direction> getVisibleFaces(float yaw, float pitch, float scale, int centerX, int centerY) {
 		return SceneProjectionHelper.getVisibleFaces(yaw, pitch, scale, centerX, centerY);
 	}
 
-	public static SceneProjectionHelper.ProjectedVec getFaceScreenCoords(Direction face, float yaw, float pitch, float scale, int centerX, int centerY) {
+	public static SceneProjectionHelper.ProjectedVec getFaceScreenCoords(Direction face, float yaw, float pitch,
+			float scale, int centerX, int centerY) {
 		return SceneProjectionHelper.getFaceScreenCoords(face, yaw, pitch, scale, centerX, centerY);
 	}
 
 	/**
-	 * Renders a full 3D preview of the targeted block and its translucent neighbors [3].
+	 * Renders a full 3D preview of the targeted block and its translucent
+	 * neighbors.
 	 */
 	public static void render3DScene(GuiGraphics guiGraphics, Level level, BlockPos centerPos, float yaw, float pitch,
 			int centerX, int centerY, ISideConfigurable sideModel, Predicate<Direction> sideSupportChecker) {
@@ -85,77 +89,26 @@ public final class Preview3DRenderer {
 
 		Lighting.setupFor3DItems();
 		RenderSystem.enableDepthTest();
-		RenderSystem.depthMask(true); 
+		RenderSystem.depthMask(true);
 
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 
-		// 1. Render Center Block using ItemRenderer to guarantee consistent high-brightness & multipart textures [3]
-		BlockState centerState = level.getBlockState(centerPos);
-		if (!centerState.isAir()) {
-			poseStack.pushPose();
-			ItemStack itemStack = new ItemStack(centerState.getBlock().asItem());
-			if (!itemStack.isEmpty()) {
-				poseStack.translate(0.5F, 0.5F, 0.5F);
-				if (centerState.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-					float yRot = centerState.getValue(BlockStateProperties.HORIZONTAL_FACING).toYRot();
-					poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
-				} else if (centerState.hasProperty(BlockStateProperties.FACING)) {
-					float yRot = centerState.getValue(BlockStateProperties.FACING).toYRot();
-					poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
-				}
-				poseStack.scale(2.0F, 2.0F, 2.0F); // Scale item rendering to match 1x1x1 block size [3]
-				Minecraft.getInstance().getItemRenderer().renderStatic(itemStack, ItemDisplayContext.FIXED,
-						15728880, OverlayTexture.NO_OVERLAY, poseStack, bufferSource, level, 0);
-			}
-			poseStack.popPose();
-
-			bufferSource.endBatch();
-
-			// 2. Render Markers directly on the Center Block's faces
-			poseStack.pushPose();
-			poseStack.translate(0.5F, 0.5F, 0.5F);
-			RenderSystem.enableBlend();
-			RenderSystem.defaultBlendFunc();
-			List<Direction> visibleFaces = getVisibleFaces(yaw, pitch, 40.0F, centerX, centerY);
-			for (Direction face : visibleFaces) {
-				boolean active = sideModel.isSideActive(face);
-				boolean supported = sideSupportChecker.test(face);
-				draw3DMarker(poseStack, bufferSource, face, active, supported);
-			}
-			poseStack.popPose();
-		}
-		bufferSource.endBatch();
-
-		// 3. Render Translucent Neighbors
-		RenderSystem.depthMask(false);
-
-		Lighting.setupFor3DItems();
-		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-		RenderSystem.colorMask(true, true, true, true);
-		RenderSystem.depthFunc(515); 
-		RenderSystem.enableBlend();
-		RenderSystem.defaultBlendFunc();
-		RenderSystem.disablePolygonOffset();
-		RenderSystem.disableColorLogicOp();
-
-		GhostRenderWrapper.GhostBufferSource ghostSource = new GhostRenderWrapper.GhostBufferSource(bufferSource, 0.3F);
-		GhostRenderWrapper.GhostEntityBufferSource ghostEntitySource = new GhostRenderWrapper.GhostEntityBufferSource(bufferSource, 0.3F);
-
-		// Build a lightweight, compile-safe proxy to force maximum light levels on neighbors [3]
-		BlockAndTintGetter neighborBrightLevel = new BlockAndTintGetter() {
+		// Build a lightweight, compile-safe proxy to force maximum light levels on
+		// preview elements
+		BlockAndTintGetter brightLevel = new BlockAndTintGetter() {
 			@Override
 			public float getShade(Direction direction, boolean shade) {
 				return 1.0F; // Disable ambient shading [3]
 			}
 
 			@Override
-			public int getBrightness(net.minecraft.world.level.LightLayer type, BlockPos pos) {
-				return 15; // Force maximum sky and block light level (15) to guarantee full-bright GUI scenes [3]
+			public int getBrightness(LightLayer type, BlockPos pos) {
+				return 15;
 			}
 
 			@Override
 			public int getRawBrightness(BlockPos pos, int amount) {
-				return 15; // Force full brightness [3]
+				return 15;
 			}
 
 			@Override
@@ -195,6 +148,92 @@ public final class Preview3DRenderer {
 			}
 		};
 
+		// 1. Render Center Block
+		BlockState centerState = level.getBlockState(centerPos);
+		if (!centerState.isAir()) {
+			if (centerState.is(ModTags.SPECIAL_3D_RENDERS)) {
+				// Retrieve the actual block entity in the level to render connected multi-block
+				// states (e.g. Double Chests)
+				BlockEntity be = level.getBlockEntity(centerPos);
+				if (be != null) {
+					Minecraft.getInstance().getBlockEntityRenderDispatcher().render(be, 0.0F, poseStack, bufferSource);
+				} else {
+					// Fallback to ItemRenderer if BlockEntity is null (e.g. pre-placement / dummy
+					// scenes)
+					poseStack.pushPose();
+					ItemStack itemStack = new ItemStack(centerState.getBlock().asItem());
+					if (!itemStack.isEmpty()) {
+						poseStack.translate(0.5F, 0.5F, 0.5F);
+						if (centerState.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
+							float yRot = centerState.getValue(BlockStateProperties.HORIZONTAL_FACING).toYRot();
+							poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
+						} else if (centerState.hasProperty(BlockStateProperties.FACING)) {
+							float yRot = centerState.getValue(BlockStateProperties.FACING).toYRot();
+							poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
+						}
+						poseStack.scale(2.0F, 2.0F, 2.0F); // Scale item rendering to match 1x1x1 block size
+						Minecraft.getInstance().getItemRenderer().renderStatic(itemStack, ItemDisplayContext.FIXED,
+								15728880, OverlayTexture.NO_OVERLAY, poseStack, bufferSource, level, 0);
+					}
+					poseStack.popPose();
+				}
+			} else {
+				// Render normal blocks directly with block model dispatcher to preserve perfect
+				// scaling (e.g. Mekanism Energy Cubes)
+				BakedModel model = blockRenderer.getBlockModel(centerState);
+				ModelData modelData = level.getModelData(centerPos);
+				if (modelData == null) {
+					modelData = ModelData.EMPTY;
+				}
+
+				var renderTypes = model.getRenderTypes(centerState, RandomSource.create(), modelData);
+				if (renderTypes.isEmpty()) {
+					RenderType chunkType = ItemBlockRenderTypes.getChunkRenderType(centerState);
+					renderLayer(level, centerPos, centerState, model, modelData, chunkType, brightLevel, poseStack,
+							bufferSource);
+				} else {
+					for (RenderType chunkType : STANDARD_LAYERS) {
+						if (renderTypes.contains(chunkType)) {
+							renderLayer(level, centerPos, centerState, model, modelData, chunkType, brightLevel,
+									poseStack, bufferSource);
+						}
+					}
+				}
+			}
+
+			bufferSource.endBatch();
+
+			// 2. Render Markers directly on the Center Block's faces
+			poseStack.pushPose();
+			poseStack.translate(0.5F, 0.5F, 0.5F);
+			RenderSystem.enableBlend();
+			RenderSystem.defaultBlendFunc();
+			List<Direction> visibleFaces = getVisibleFaces(yaw, pitch, 40.0F, centerX, centerY);
+			for (Direction face : visibleFaces) {
+				boolean active = sideModel.isSideActive(face);
+				boolean supported = sideSupportChecker.test(face);
+				draw3DMarker(poseStack, bufferSource, face, active, supported);
+			}
+			poseStack.popPose();
+		}
+		bufferSource.endBatch();
+
+		// 3. Render Translucent Neighbors
+		RenderSystem.depthMask(false);
+
+		Lighting.setupFor3DItems();
+		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+		RenderSystem.colorMask(true, true, true, true);
+		RenderSystem.depthFunc(515);
+		RenderSystem.enableBlend();
+		RenderSystem.defaultBlendFunc();
+		RenderSystem.disablePolygonOffset();
+		RenderSystem.disableColorLogicOp();
+
+		GhostRenderWrapper.GhostBufferSource ghostSource = new GhostRenderWrapper.GhostBufferSource(bufferSource, 0.3F);
+		GhostRenderWrapper.GhostEntityBufferSource ghostEntitySource = new GhostRenderWrapper.GhostEntityBufferSource(
+				bufferSource, 0.3F);
+
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dy = -1; dy <= 1; dy++) {
 				for (int dz = -1; dz <= 1; dz++) {
@@ -210,48 +249,37 @@ public final class Preview3DRenderer {
 
 					poseStack.pushPose();
 					poseStack.translate(dx, dy, dz);
+
+					// Render neighbor blocks in SPECIAL_3D_RENDERS (Chests, etc.) translucent
+					// via dispatcher to preserve connected multi-block models
 					if (state.is(ModTags.SPECIAL_3D_RENDERS)) {
-						ItemStack itemStack = new ItemStack(state.getBlock().asItem());
-						if (!itemStack.isEmpty()) {
-							poseStack.translate(0.5F, 0.5F, 0.5F);
-							if (state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-								float yRot = state.getValue(BlockStateProperties.HORIZONTAL_FACING).toYRot();
-								poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
-							} else if (state.hasProperty(BlockStateProperties.FACING)) {
-								float yRot = state.getValue(BlockStateProperties.FACING).toYRot();
-								poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
-							}
-							poseStack.scale(2.0F, 2.0F, 2.0F);
-
-							RenderSystem.enableBlend();
-							RenderSystem.depthMask(true);
-							RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 0.3F);
-
-							Minecraft.getInstance().getItemRenderer().renderStatic(itemStack, ItemDisplayContext.FIXED,
-									15728880, OverlayTexture.NO_OVERLAY, poseStack, ghostEntitySource, level, 0);
-
-							bufferSource.endBatch();
-
-							RenderSystem.depthMask(false);
-							RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+						BlockEntity be = level.getBlockEntity(currentPos);
+						if (be != null) {
+							Minecraft.getInstance().getBlockEntityRenderDispatcher().render(be, 0.0F, poseStack,
+									ghostEntitySource // Preserves standard custom textures
+							);
 						}
+						poseStack.popPose();
+						continue;
+					}
+
+					BakedModel model = blockRenderer.getBlockModel(state);
+
+					ModelData neighborModelData = level.getModelData(currentPos);
+					if (neighborModelData == null) {
+						neighborModelData = ModelData.EMPTY;
+					}
+
+					var renderTypes = model.getRenderTypes(state, RandomSource.create(), neighborModelData);
+					if (renderTypes.isEmpty()) {
+						RenderType chunkType = ItemBlockRenderTypes.getChunkRenderType(state);
+						renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType, brightLevel,
+								poseStack, ghostSource);
 					} else {
-						BakedModel model = blockRenderer.getBlockModel(state);
-						
-						net.neoforged.neoforge.client.model.data.ModelData neighborModelData = level.getModelData(currentPos);
-						if (neighborModelData == null) {
-							neighborModelData = net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
-						}
-
-						var renderTypes = model.getRenderTypes(state, RandomSource.create(), neighborModelData);
-						if (renderTypes.isEmpty()) {
-							RenderType chunkType = ItemBlockRenderTypes.getChunkRenderType(state);
-							renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType, neighborBrightLevel, poseStack, ghostSource);
-						} else {
-							for (RenderType chunkType : STANDARD_LAYERS) {
-								if (renderTypes.contains(chunkType)) {
-									renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType, neighborBrightLevel, poseStack, ghostSource);
-								}
+						for (RenderType chunkType : STANDARD_LAYERS) {
+							if (renderTypes.contains(chunkType)) {
+								renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType,
+										brightLevel, poseStack, ghostSource);
 							}
 						}
 					}
@@ -268,71 +296,47 @@ public final class Preview3DRenderer {
 		poseStack.popPose();
 	}
 
-	private static void renderLayer(Level level, BlockPos pos, BlockState state, BakedModel model, 
-			net.neoforged.neoforge.client.model.data.ModelData modelData, RenderType chunkType, 
-			BlockAndTintGetter centerGetter, PoseStack poseStack, MultiBufferSource.BufferSource bufferSource) {
-		
+	private static void renderLayer(Level level, BlockPos pos, BlockState state, BakedModel model, ModelData modelData,
+			RenderType chunkType, BlockAndTintGetter centerGetter, PoseStack poseStack,
+			MultiBufferSource.BufferSource bufferSource) {
+
 		RenderType guiType = SceneRenderTypes.getGuiRenderType(chunkType);
 		VertexConsumer consumer = bufferSource.getBuffer(guiType);
-		
-		Minecraft.getInstance().getBlockRenderer().getModelRenderer().tesselateWithoutAO(
-				centerGetter,
-				model,
-				state,
-				pos,
-				poseStack,
-				consumer,
-				false,
-				RandomSource.create(),
-				state.getSeed(pos),
-				15728880,
-				modelData,
-				chunkType
-		);
+
+		Minecraft.getInstance().getBlockRenderer().getModelRenderer().tesselateWithoutAO(centerGetter, model, state,
+				pos, poseStack, consumer, false, RandomSource.create(), state.getSeed(pos), OverlayTexture.NO_OVERLAY,
+				modelData, chunkType);
 	}
 
-	private static void renderNeighborLayer(Level level, BlockPos pos, BlockState state, BakedModel model, 
-			net.neoforged.neoforge.client.model.data.ModelData modelData, RenderType chunkType, 
-			BlockAndTintGetter brightLevel, PoseStack poseStack, GhostRenderWrapper.GhostBufferSource ghostSource) {
-		
+	private static void renderNeighborLayer(Level level, BlockPos pos, BlockState state, BakedModel model,
+			ModelData modelData, RenderType chunkType, BlockAndTintGetter brightLevel, PoseStack poseStack,
+			GhostRenderWrapper.GhostBufferSource ghostSource) {
+
 		VertexConsumer consumer = ghostSource.getBuffer(chunkType);
-		Minecraft.getInstance().getBlockRenderer().getModelRenderer().tesselateWithoutAO(
-				brightLevel,
-				model,
-				state,
-				pos,
-				poseStack,
-				consumer,
-				false,
-				RandomSource.create(),
-				state.getSeed(pos),
-				15728880,
-				modelData,
-				chunkType
-		);
+		Minecraft.getInstance().getBlockRenderer().getModelRenderer().tesselateWithoutAO(brightLevel, model, state, pos,
+				poseStack, consumer, false, RandomSource.create(), state.getSeed(pos), OverlayTexture.NO_OVERLAY,
+				modelData, chunkType);
 	}
 
-	private static void draw3DQuad(VertexConsumer builder, org.joml.Matrix4f matrix, float x1, float y1, float z1,
-			float x2, float y2, float z2, float x3, float y3, float z3, float x4, float y4, float z4, int r, int g,
-			int b) {
+	private static void draw3DQuad(VertexConsumer builder, Matrix4f matrix, float x1, float y1, float z1, float x2,
+			float y2, float z2, float x3, float y3, float z3, float x4, float y4, float z4, int r, int g, int b) {
 		builder.addVertex(matrix, x1, y1, z1).setColor(r, g, b, 128);
 		builder.addVertex(matrix, x2, y2, z2).setColor(r, g, b, 128);
 		builder.addVertex(matrix, x3, y3, z3).setColor(r, g, b, 128);
 		builder.addVertex(matrix, x4, y4, z4).setColor(r, g, b, 128);
 	}
 
-	private static void draw3DThickLine(VertexConsumer builder, org.joml.Matrix4f matrix, Direction face, 
-			float x1, float y1, float z1, 
-			float x2, float y2, float z2, 
-			float thickness, int r, int g, int b, int a) {
+	private static void draw3DThickLine(VertexConsumer builder, Matrix4f matrix, Direction face, float x1, float y1,
+			float z1, float x2, float y2, float z2, float thickness, int r, int g, int b, int a) {
 		float dx = x2 - x1;
 		float dy = y2 - y1;
 		float dz = z2 - z1;
 		float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-		if (len <= 0) return;
-		
+		if (len <= 0)
+			return;
+
 		float ox = 0, oy = 0, oz = 0;
-		
+
 		if (face.getAxis() == Direction.Axis.Y) {
 			ox = -dz / len * thickness;
 			oz = dx / len * thickness;
@@ -343,7 +347,7 @@ public final class Preview3DRenderer {
 			oy = -dz / len * thickness;
 			oz = dy / len * thickness;
 		}
-		
+
 		builder.addVertex(matrix, x1 - ox, y1 - oy, z1 - oz).setColor(r, g, b, a);
 		builder.addVertex(matrix, x2 - ox, y2 - oy, z2 - oz).setColor(r, g, b, a);
 		builder.addVertex(matrix, x2 + ox, y2 + oy, z2 + oz).setColor(r, g, b, a);
@@ -352,16 +356,22 @@ public final class Preview3DRenderer {
 
 	private static void draw3DMarker(PoseStack poseStack, MultiBufferSource bufferSource, Direction face,
 			boolean active, boolean supported) {
-		org.joml.Matrix4f matrix = poseStack.last().pose();
+		Matrix4f matrix = poseStack.last().pose();
 		int r, g, b;
 		if (supported) {
 			if (active) {
-				r = 57; g = 255; b = 20;
+				r = 57;
+				g = 255;
+				b = 20;
 			} else {
-				r = 255; g = 0; b = 0;
+				r = 255;
+				g = 0;
+				b = 0;
 			}
 		} else {
-			r = 255; g = 0; b = 0;
+			r = 255;
+			g = 0;
+			b = 0;
 		}
 
 		if (supported) {

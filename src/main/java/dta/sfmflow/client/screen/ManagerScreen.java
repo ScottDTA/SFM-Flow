@@ -33,9 +33,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Main visual workspace representing ManagerBlock configurations [3].
- * Incorporates a sliding drawer panel to display dynamic filter cards and
- * warning counters [3].
+ * Main visual workspace representing ManagerBlock configurations. Incorporates
+ * a sliding drawer panel to display dynamic filter cards and warning counters.
  */
 @OnlyIn(Dist.CLIENT)
 public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
@@ -61,7 +60,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	public ManagerScreen(ManagerMenu menu, Inventory playerInventory, Component title) {
 		super(menu, playerInventory, title);
 		this.imageWidth = 512;
-		this.imageHeight = 256; // Centered on the 256px canvas [3]
+		this.imageHeight = 256;
 		this.mc = Minecraft.getInstance();
 		this.originalGuiScale = this.mc.options.guiScale().get();
 		this.mouseHandler = new ManagerMouseHandler(this);
@@ -78,8 +77,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 
 		int x = (width - imageWidth) / 2;
-		// Centers the canvas while guaranteeing at least an 8px margin above the player
-		// inventory [3]
 		int y = Math.min((height - imageHeight) / 2, height - imageHeight - 90 - 8);
 		this.leftPos = x;
 		this.topPos = y;
@@ -115,7 +112,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Add sliding variable drawer widget aligned with the player inventory [3]
 		this.addRenderableWidget(new VariableDrawerWidget(this, x + 344, this.height - 86, 75, 82));
 
 		if (this.activeModalPopup != null) {
@@ -131,13 +127,12 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Centers the active settings overlay only if the screen coordinates have changed [3]
 		if (this.activeSettingsOverlay != null) {
 			int pWidth = this.activeSettingsOverlay.getWidth();
 			int pHeight = this.activeSettingsOverlay.getHeight();
 			int targetX = (this.width - pWidth) / 2;
-			int targetY = this.getOverlayTargetY(pHeight); // Purely dynamic calculations [3]
-			
+			int targetY = this.getOverlayTargetY(pHeight);
+
 			if (this.activeSettingsOverlay.getX() != targetX) {
 				this.activeSettingsOverlay.setX(targetX);
 			}
@@ -203,14 +198,12 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		int x = this.leftPos;
 		int y = this.topPos;
 
-		// Canvas boundary dimming: Drawn BEFORE super.render to keep slots on top [3]
 		if (this.activeSettingsOverlay != null && this.activeSettingsOverlay.visible) {
 			guiGraphics.fill(x, y, x + 512, y + 256, 0xD0000000);
 		}
 
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-		// Render Left Panel variable entries aligned with player inventory [3]
 		guiGraphics.enableScissor(x + 4, this.height - 90, x + 166, this.height);
 		var groupVars = getMenu().getManagerBlockEntity().getGroupVariables();
 		for (int i = 0; i < groupVars.size(); i++) {
@@ -318,13 +311,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Push the container's standard slot tooltips onto a high Z-layer to prevent overlay overlap [3]
 		guiGraphics.pose().pushPose();
 		guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
 		this.renderTooltip(guiGraphics, mouseX, mouseY);
 		guiGraphics.pose().popPose();
 
-		// Symmetrically render custom widget tooltips on the same high Z-layer [3]
 		if (this.mouseHandler.getTopHoveredElement() instanceof AbstractFlowWidget flowWidget) {
 			net.minecraft.client.gui.components.Tooltip tooltip = flowWidget.getCustomTooltip();
 			if (tooltip != null) {
@@ -339,7 +330,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			resetFlagsRecursive(renderable);
 		}
 		if (this.mouseHandler.getTopHoveredElement() instanceof AbstractFlowWidget widget) {
-			// Disable low-level deferred queue rendering [3]
 			widget.setShowCustomTooltip(false);
 			widget.setIsHovered(true);
 		}
@@ -456,9 +446,6 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		this.lastClickedContainer = container;
 	}
 
-	public void setRefreshCooldown(int ticks) {
-	}
-
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		boolean handled = this.mouseHandler.mouseClicked(mouseX, mouseY, button);
@@ -506,14 +493,12 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
-		// Prevent keypresses (like "E") from closing the screen when an edit box is
-		// focused [3]
 		if (this.getFocused() != null) {
 			if (this.getFocused().keyPressed(keyCode, scanCode, modifiers)) {
 				return true;
 			}
 			if (isEditingText(this.getFocused())) {
-				if (keyCode == 256) { // Escape key should still close [3]
+				if (keyCode == 256) {
 					return super.keyPressed(keyCode, scanCode, modifiers);
 				}
 				return true;
@@ -616,7 +601,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 		if (warningCount > 0) {
 			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.warnings", warningCount),
-					currentOffset, 244, 0xFFFED83D, false); // Yellow warning color 0xFED83D [3]
+					currentOffset, 244, 0xFFFED83D, false);
 		}
 	}
 
@@ -631,27 +616,21 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	public ManagerMouseHandler getMouseHandler() {
 		return this.mouseHandler;
 	}
-	
+
 	/**
-	 * Computes the correct, safe centered Y coordinate for any overlay panel based on its height [3].
-	 * If the panel is too tall, it dynamically shifts the overlay upward to guarantee clearance
-	 * from the player's inventory slots [3].
+	 * Computes the correct, safe centered Y coordinate for any overlay panel based
+	 * on its height. If the panel is too tall, it dynamically shifts the overlay
+	 * upward to guarantee clearance from the player's inventory slots.
 	 */
 	public int getOverlayTargetY(int pHeight) {
-		// Start with standard centered positioning relative to the canvas [3]
 		int targetY = this.topPos + (256 - pHeight) / 2;
-		
-		// Calculate the absolute maximum Y position where the bottom of the overlay can sit [3]
-		// The player's inventory starts at (this.height - 90); we enforce a safe 6px gap [3]
 		int maxBottomY = (this.height - 90) - 6;
-		
-		// If the overlay would cover the player's inventory, dynamically shift it upward [3]
+
 		if (targetY + pHeight > maxBottomY) {
 			targetY = maxBottomY - pHeight;
 		}
-		
-		// Prevent the panel from clipping past the top of the screen window [3]
+
 		return Math.max(4, targetY);
 	}
-	
+
 }
