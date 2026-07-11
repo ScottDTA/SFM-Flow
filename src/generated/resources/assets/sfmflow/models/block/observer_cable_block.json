@@ -1,10 +1,9 @@
 {
   "parent": "minecraft:block/observer",
   "textures": {
-    "back": "sfmflow:block/cable_block",
-    "bottom": "sfmflow:block/cable_block",
-    "front": "minecraft:block/observer_front",
-    "side": "sfmflow:block/cable_block",
-    "top": "sfmflow:block/cable_block"
+    "bottom": "sfmflow:block/observer_cable_back",
+    "front": "sfmflow:block/observer_cable_front",
+    "side": "sfmflow:block/observer_cable_side",
+    "top": "sfmflow:block/observer_cable_top"
   }
 }

@@ -1,15 +1,19 @@
 7-11-2026
 
 ### [Added]
+* Added the Observer Trigger, a new flowchart trigger node that executes logical pathways when a connected Observer Cable block registers a state change.
 * **Dynamic Energy Rate Detection:** Augmented the energy limits scanner to perform simulated power transfers on the server. This ensures that custom or heavily wrapped energy storages (like Mekanism Energy Cubes) automatically reveal their exact maximum per-tick transfer limits to the player config menu.
 
 ### [Changed]
+* Configured both Redstone Emitter and Redstone Receiver blocks to behave as non-conductive blocks, preventing accidental redstone wire power bleed to adjacent blocks.
+* Optimized the Redstone Emitter execution path to surgically power specific targeted faces instead of looping through all directions.
 * Updated menu button icons on the flowchart canvas sidebar to use dedicated texture assets for the Interval Trigger, Fluid Input/Output, Fluid Filter, Energy Input/Output, and Redstone Trigger nodes.
 * Adjusted block model generation parameters for the Redstone Emitter to map face indicators to corresponding side textures.
 * **Cleaned Mod Startup Sequence:** Removed obsolete and unused startup event listeners from the main mod registration lifecycle, ensuring a cleaner load sequence.
 * **Contrast Adjustments:** Adjusted the default text color for the Orange mask to solid white to improve contrast and visual readability against colored flowchart nodes.
 
 ### [Fixed]
+* Fixed a momentary redstone power spike issue where Redstone Emitter blocks could briefly output maximum power (signal strength 15) during blockstate updates.
 * **Visual Slot Sync Performance:** Shifted inventory slot packet parsing from the background network threads to the visual rendering pass. This alleviates network thread bottlenecks and ensures slot previews remain responsive even on congested servers.
 
 

@@ -14,6 +14,7 @@ import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.ObserverTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
@@ -23,6 +24,7 @@ import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
@@ -132,6 +134,14 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.OBSERVER_TRIGGER.get(), (screen, component) -> {
+			if (component instanceof ObserverTriggerComponent trigger) {
+				return new ObserverTriggerSettingsOverlay(screen, trigger);
+			}
+			return null;
+		});
+
 
 		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
@@ -330,6 +340,21 @@ public class VanillaSFMFlowClientPlugin {
 						return null;
 					}
 				});
+		
+		WorkspaceValidatorRegistry.register(ObserverTriggerComponent.class, new WorkspaceValidatorRegistry.INodeValidator<ObserverTriggerComponent>() {
+			@Override
+			public boolean hasError(ManagerScreen screen, ObserverTriggerComponent transfer) {
+				return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
+			}
+
+			@Override
+			public @Nullable Component getErrorTooltip(ManagerScreen screen, ObserverTriggerComponent transfer) {
+				if (hasError(screen, transfer)) {
+					return Component.translatable("gui.sfmflow.error.unbound_inventory");
+				}
+				return null;
+			}
+		});
 	}
 
 	/**

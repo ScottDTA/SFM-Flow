@@ -34,11 +34,13 @@ public class ModBlocks {
 
 	public static final DeferredBlock<Block> REDSTONE_EMITTER_BLOCK = registerBlock("redstone_emitter_block",
 			() -> new RedstoneEmitterBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
-					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)
+					.isRedstoneConductor((state, level, pos) -> false))); // Configured as a non-conductor [3]
 
 	public static final DeferredBlock<Block> REDSTONE_RECEIVER_BLOCK = registerBlock("redstone_receiver_block",
 			() -> new RedstoneReceiverBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
-					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)
+					.isRedstoneConductor((state, level, pos) -> false))); // Configured as a non-conductor [3]
 
 	public static final DeferredBlock<Block> OBSERVER_CABLE_BLOCK = registerBlock("observer_cable_block",
 			() -> new ObserverCableBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)

@@ -17,6 +17,7 @@ import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent; 
@@ -57,6 +58,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_OUTPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_TRIGGER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_EMITTER;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> OBSERVER_TRIGGER;
 	
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -115,6 +117,10 @@ public class VanillaSFMFlowPlugin {
 		REDSTONE_EMITTER = FlowComponentBuilder.create("redstone_emitter", RedstoneEmitterComponent::new)
 				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/redstone_emitter_button.png")
 				.displayName("gui.sfmflow.redstone_emitter").codec(RedstoneEmitterComponent.CODEC).build(registry);
+		
+		OBSERVER_TRIGGER = FlowComponentBuilder.create("observer_trigger", ObserverTriggerComponent::new)
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.displayName("gui.sfmflow.observer_trigger").codec(ObserverTriggerComponent.CODEC).build(registry);
 		
 	}
 
@@ -275,24 +281,20 @@ public class VanillaSFMFlowPlugin {
 		
 		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone_emitter"), 
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
-					if (params instanceof RedstoneEmitterComponent.RedstoneEmitterParams task) {
-						BlockEntity be = level.getBlockEntity(dest);
+					if (params instanceof RedstoneEmitterComponent.RedstoneEmitterParams task && destSide != null) {
+						net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(dest);
 						if (be instanceof RedstoneEmitterBlockEntity emitter) {
-							for (Direction dir : Direction.values()) {
-								if ((task.activeSidesMask() & (1 << dir.ordinal())) != 0) {
-									int currentPower = emitter.getPowerForSide(dir);
-									int newPower = task.operator().apply(currentPower, task.modifierValue(), task.rolloverEnabled());
-									
-									if (task.isPulse()) {
-										emitter.setPowerForSide(dir, newPower);
-										emitter.setPulsed(dir, true);
-										// Schedule 1-tick delay to clear the pulse automatically
-										level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
-									} else {
-										emitter.setPowerForSide(dir, newPower);
-										emitter.setPulsed(dir, false);
-									}
-								}
+							int currentPower = emitter.getPowerForSide(destSide);
+							int newPower = task.operator().apply(currentPower, task.modifierValue(), task.rolloverEnabled());
+							
+							if (task.isPulse()) {
+								emitter.setPowerForSide(destSide, newPower);
+								emitter.setPulsed(destSide, true);
+								// Schedule 1-tick delay to clear the pulse automatically [3]
+								level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
+							} else {
+								emitter.setPowerForSide(destSide, newPower);
+								emitter.setPulsed(destSide, false); // clear pulse state if set
 							}
 							return true;
 						}

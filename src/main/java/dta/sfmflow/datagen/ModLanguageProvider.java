@@ -27,8 +27,9 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("block.sfmflow.observer_cable_block", "Observer Cable");
 		add("block.sfmflow.redstone_emitter_block", "Redstone Network Emitter");
 		add("block.sfmflow.redstone_receiver_block", "Redstone Network Receiver");
-		add("container.sfmflow.advanced_cable_cluster", "Advanced Card Cluster");
-		add("container.sfmflow.cable_cluster", "Card Cluster");
+		add("block.sfmflow.redstone_emitter", "Redstone Emitter");
+		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
+		add("container.sfmflow.cable_cluster", "Cable Cluster");
 
 		add("gui.sfmflow.commands", "Commands: %1$s");
 		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");
@@ -48,7 +49,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.redstone_trigger.output.on_high_pulse", "On High Pulse");
 		add("gui.sfmflow.redstone_trigger.output.on_low_pulse", "On Low Pulse");
 		add("gui.sfmflow.redstone_emitter", "Redstone Emitter");
-		add("block.sfmflow.redstone_emitter", "Redstone Emitter");
+
+		add("gui.sfmflow.observer_trigger", "Observer Trigger");
 		
 		add("gui.sfmflow.redstone_trigger", "Redstone Trigger");
 		add("block.sfmflow.redstone_trigger", "Redstone Trigger");		

@@ -113,9 +113,10 @@ public class ModBlockStateProvider extends BlockStateProvider {
 				.condition(BlockStateProperties.EAST, true);
 
 		var observerModel = models().withExistingParent("block/observer_cable_block", mcLoc("block/observer"))
-				.texture("front", mcLoc("block/observer_front")).texture("back", modLoc("block/cable_block"))
-				.texture("side", modLoc("block/cable_block")).texture("top", modLoc("block/cable_block"))
-				.texture("bottom", modLoc("block/cable_block"));
+				.texture("front", modLoc("block/observer_cable_front"))
+				.texture("bottom", modLoc("block/observer_cable_back"))
+				.texture("side", modLoc("block/observer_cable_side"))
+				.texture("top", modLoc("block/observer_cable_top"));
 
 		getVariantBuilder(ModBlocks.OBSERVER_CABLE_BLOCK.get()).forAllStates(state -> {
 			Direction dir = state.getValue(BlockStateProperties.FACING);

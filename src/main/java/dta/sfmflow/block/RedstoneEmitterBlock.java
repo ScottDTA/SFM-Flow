@@ -81,7 +81,7 @@ public class RedstoneEmitterBlock extends BaseEntityBlock {
 			return emitter.getPowerForSide(outputDirection);
 		}
 
-		return 15;
+		return 0; // Safe fallback to unpowered (0) during blockstate updates [3]
 	}
 
 	@Override

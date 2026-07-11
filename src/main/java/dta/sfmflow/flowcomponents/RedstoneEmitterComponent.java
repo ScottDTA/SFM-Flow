@@ -207,7 +207,6 @@ public class RedstoneEmitterComponent extends AbstractFlowComponent implements I
 
 	@Override
 	public void plan(FlowchartPlanningContext context) {
-		// Queue the transfer task to execute on server tick [3]
 		var inventories = context.getConnectedInventories();
 		ConnectionBlock tgtBlock = null;
 
