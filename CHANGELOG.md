@@ -4,6 +4,8 @@
 * **Dynamic Energy Rate Detection:** Augmented the energy limits scanner to perform simulated power transfers on the server. This ensures that custom or heavily wrapped energy storages (like Mekanism Energy Cubes) automatically reveal their exact maximum per-tick transfer limits to the player config menu.
 
 ### [Changed]
+* Updated menu button icons on the flowchart canvas sidebar to use dedicated texture assets for the Interval Trigger, Fluid Input/Output, Fluid Filter, Energy Input/Output, and Redstone Trigger nodes.
+* Adjusted block model generation parameters for the Redstone Emitter to map face indicators to corresponding side textures.
 * **Cleaned Mod Startup Sequence:** Removed obsolete and unused startup event listeners from the main mod registration lifecycle, ensuring a cleaner load sequence.
 * **Contrast Adjustments:** Adjusted the default text color for the Orange mask to solid white to improve contrast and visual readability against colored flowchart nodes.
 

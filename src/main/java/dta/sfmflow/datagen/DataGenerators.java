@@ -17,21 +17,21 @@ import net.neoforged.neoforge.data.event.GatherDataEvent;
 import net.neoforged.neoforge.common.data.BlockTagsProvider;
 
 /**
- * Programmatic asset and data registry coordinator for SFM-Flow [3]. Hooks up
- * the datagen pipeline to generate block state models, recipe schemas, loot
- * tables, tag configurations, item models, and localization asset packages [3].
+ * Programmatic asset and data registry coordinator for SFM-Flow. Hooks up the
+ * datagen pipeline to generate block state models, recipe schemas, loot tables,
+ * tag configurations, item models, and localization asset packages.
  */
-@EventBusSubscriber(modid = SFMFlow.MODID, bus = EventBusSubscriber.Bus.MOD)
+@EventBusSubscriber(modid = SFMFlow.MODID)
 public class DataGenerators {
 	private DataGenerators() {
 	}
 
 	/**
-	 * Listens to the mod event bus to orchestrate and append active data providers
-	 * [3]. Registers both client-side visual assets (block models, items,
-	 * languages) and server-side logic files [3].
+	 * Listens to the mod event bus to orchestrate and append active data providers.
+	 * Registers both client-side visual assets (block models, items, languages) and
+	 * server-side logic files.
 	 *
-	 * @param event the data generation context event [3]
+	 * @param event the data generation context event
 	 */
 	@SubscribeEvent
 	public static void gatherData(GatherDataEvent event) {

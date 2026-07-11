@@ -138,11 +138,12 @@ tasks.register('apiJar', Jar) {
 
 dependencies {
     compileOnly "mekanism:Mekanism:${mekanism_version}:api"
+    compileOnly("mezz.jei:jei-1.21.1-neoforge-api:${jei_version}")    
 
-    // Runtime/Implementation additions would be managed here by the Gatekeeper
-     // Add the full mod for runtime testing in your dev environment
+    // Add the full mod for runtime testing in your dev environment
     localRuntime "mekanism:Mekanism:${mekanism_version}"
-
+    // Inject the JEI runtime into the development environment
+    runtimeOnly("mezz.jei:jei-1.21.1-neoforge:${jei_version}")
     
 }
 

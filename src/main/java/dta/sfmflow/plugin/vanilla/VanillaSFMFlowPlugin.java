@@ -8,9 +8,9 @@ import dta.sfmflow.api.capability.FlowCapability;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.FluidTransferParams;
 import dta.sfmflow.api.capability.ItemTransferParams;
-import dta.sfmflow.api.capability.EnergyTransferParams; // Added [3]
+import dta.sfmflow.api.capability.EnergyTransferParams;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
-import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot; // Added [3]
+import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
@@ -19,14 +19,15 @@ import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
-import dta.sfmflow.flowcomponents.EnergyTransferComponent; // Added [3]
+import dta.sfmflow.flowcomponents.EnergyTransferComponent; 
 
-import net.minecraft.core.BlockPos; // Added [3]
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level; // Added [3]
+import net.minecraft.world.level.Level; 
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -42,7 +43,7 @@ import java.util.Map;
 
 /**
  * Built-in vanilla plugin registering the core interval triggers, transfers,
- * and capability snapshotters [3].
+ * and capability snapshotters.
  */
 public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> INTERVAL_TRIGGER;
@@ -58,7 +59,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_EMITTER;
 	
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
-		// Register capabilities natively [3]
+		// Register capabilities natively
 		registerItemCapability();
 		registerFluidCapability();
 		registerEnergyCapability();
@@ -67,7 +68,7 @@ public class VanillaSFMFlowPlugin {
 		registerCauldronBridges();
 
 		INTERVAL_TRIGGER = FlowComponentBuilder.create("interval_trigger", IntervalTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/interval_trigger_button.png")
 				.displayName("gui.sfmflow.interval_trigger").codec(IntervalTriggerComponent.CODEC).build(registry);
 
 		ITEM_INPUT = FlowComponentBuilder.create("item_input", uuid -> new ItemTransferComponent(uuid, true))
@@ -85,30 +86,30 @@ public class VanillaSFMFlowPlugin {
 				.codec(AdvancedItemFilterVariableComponent.CODEC).build(registry);
 
 		FLUID_INPUT = FlowComponentBuilder.create("fluid_input", uuid -> new FluidTransferComponent(uuid, true))
-				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/fluid_input_button.png")
 				.displayName("gui.sfmflow.fluid_input").codec(FluidTransferComponent.INPUT_CODEC).build(registry);
 
 		FLUID_OUTPUT = FlowComponentBuilder.create("fluid_output", uuid -> new FluidTransferComponent(uuid, false))
-				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/fluid_output_button.png")
 				.displayName("gui.sfmflow.fluid_output").codec(FluidTransferComponent.OUTPUT_CODEC).build(registry);
 		
 		ADVANCED_FLUID_FILTER_VARIABLE = FlowComponentBuilder
 				.create("advanced_fluid_filter_variable", AdvancedFluidFilterVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/fluid_variable_button.png")
 				.displayName("gui.sfmflow.advanced_fluid_filter_variable")
 				.codec(AdvancedFluidFilterVariableComponent.CODEC).build(registry);
 
 		ENERGY_INPUT = FlowComponentBuilder.create("energy_input", uuid -> new EnergyTransferComponent(uuid, true))
-				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/energy_input_button.png")
 				.displayName("gui.sfmflow.energy_input").codec(EnergyTransferComponent.INPUT_CODEC).build(registry);
 
 		ENERGY_OUTPUT = FlowComponentBuilder.create("energy_output", uuid -> new EnergyTransferComponent(uuid, false))
-				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/energy_output_button.png")
 				.displayName("gui.sfmflow.energy_output").codec(EnergyTransferComponent.OUTPUT_CODEC).build(registry);
 		
 		// Inside registerComponents():
 		REDSTONE_TRIGGER = FlowComponentBuilder.create("redstone_trigger", RedstoneTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/redstone_trigger_button.png")
 				.displayName("gui.sfmflow.redstone_trigger").codec(RedstoneTriggerComponent.CODEC).build(registry);
 		
 		REDSTONE_EMITTER = FlowComponentBuilder.create("redstone_emitter", RedstoneEmitterComponent::new)
@@ -122,7 +123,7 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry
 				.register(new FlowCapability<>(itemCapId, Capabilities.ItemHandler.BLOCK, "gui.sfmflow.type_item"));
 
-		// Register standard items snapshotter [3]
+		// Register standard items snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(itemCapId, (IItemHandler handler) -> {
 			Map<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> slots = new HashMap<>();
 			int count = handler.getSlots();
@@ -177,7 +178,7 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry
 				.register(new FlowCapability<>(fluidCapId, Capabilities.FluidHandler.BLOCK, "gui.sfmflow.type_fluid"));
 
-		// Register standard fluids snapshotter [3]
+		// Register standard fluids snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(fluidCapId, (IFluidHandler handler) -> {
 			Map<Integer, ThreadSafeInventorySnapshot.TankSnapshot> tanks = new HashMap<>();
 			int count = handler.getTanks();
@@ -222,12 +223,12 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry
 				.register(new FlowCapability<>(energyCapId, Capabilities.EnergyStorage.BLOCK, "gui.sfmflow.type_energy"));
 
-		// Register standard energy snapshotter [3]
+		// Register standard energy snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(energyCapId, (IEnergyStorage handler) -> {
 			return new ThreadSafeInventorySnapshot.EnergySnapshot(handler.getEnergyStored(), handler.getMaxEnergyStored(), handler.canExtract(), handler.canReceive());
 		});
 
-		// Explicit parameter types prevent JMM-type inference breakdowns [3]
+		// Explicit parameter types prevent JMM-type inference breakdowns
 		FlowCapabilityRegistry.registerTransfer(energyCapId, (Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 			if (params instanceof EnergyTransferParams task) {
 				IEnergyStorage source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, srcSide);
@@ -275,7 +276,7 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone_emitter"), 
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof RedstoneEmitterComponent.RedstoneEmitterParams task) {
-						net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(dest);
+						BlockEntity be = level.getBlockEntity(dest);
 						if (be instanceof RedstoneEmitterBlockEntity emitter) {
 							for (Direction dir : Direction.values()) {
 								if ((task.activeSidesMask() & (1 << dir.ordinal())) != 0) {
@@ -285,11 +286,11 @@ public class VanillaSFMFlowPlugin {
 									if (task.isPulse()) {
 										emitter.setPowerForSide(dir, newPower);
 										emitter.setPulsed(dir, true);
-										// Schedule 1-tick delay to clear the pulse automatically [3]
+										// Schedule 1-tick delay to clear the pulse automatically
 										level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
 									} else {
 										emitter.setPowerForSide(dir, newPower);
-										emitter.setPulsed(dir, false); // clear pulse state if set
+										emitter.setPulsed(dir, false);
 									}
 								}
 							}
@@ -303,7 +304,7 @@ public class VanillaSFMFlowPlugin {
 	}
 
 	private void registerCauldronBridges() {
-		// Bridge stateless vanilla cauldrons to our capability transfer network [3]
+		// Bridge stateless vanilla cauldrons to our capability transfer network
 		SpecialBlockCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, Blocks.CAULDRON,
 				(level, pos, state, side) -> new CauldronFluidHandler(level, pos));
 		SpecialBlockCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, Blocks.WATER_CAULDRON,

@@ -34,13 +34,15 @@ import net.neoforged.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Built-in vanilla client plugin configuring clientbound properties side-safely [3].
+ * Built-in vanilla client plugin configuring clientbound properties
+ * side-safely.
  */
 @OnlyIn(Dist.CLIENT)
 public class VanillaSFMFlowClientPlugin {
 
 	/**
-	 * Scans connections to verify if a targeted component ID participates in active visual execution chains [3].
+	 * Scans connections to verify if a targeted component ID participates in active
+	 * visual execution chains.
 	 */
 	private static boolean hasActiveConnections(ManagerScreen screen, java.util.UUID id) {
 		var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
@@ -123,7 +125,7 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.REDSTONE_EMITTER.get(), (screen, component) -> {
 			if (component instanceof RedstoneEmitterComponent emitter) {
 				return new RedstoneEmitterSettingsOverlay(screen, emitter);
@@ -131,7 +133,7 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});
 
-		// 2. Sided Configuration Popups [3]
+		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new EnergySideConfigModalPopup(screen, (EnergyTransferComponent) sideModel, face, pos, onChanged);
 		});
@@ -139,176 +141,200 @@ public class VanillaSFMFlowClientPlugin {
 		SideConfigPopupRegistry.register(RedstoneTriggerComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new RedstoneSideConfigModalPopup(screen, (RedstoneTriggerComponent) sideModel, face, pos, onChanged);
 		});
-		
+
 		SideConfigPopupRegistry.register(RedstoneEmitterComponent.class, (screen, sideModel, face, pos, onChanged) -> {
-			return new RedstoneEmitterSideConfigModalPopup(screen, (RedstoneEmitterComponent) sideModel, face, pos, onChanged);
+			return new RedstoneEmitterSideConfigModalPopup(screen, (RedstoneEmitterComponent) sideModel, face, pos,
+					onChanged);
 		});
 
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
 		DataComponentOverlayRegistry.register(DataComponents.ENCHANTMENTS, EnchantmentsComponentSettingsModal::new);
 
-
 		// =========================================================================
-		// WORKSPACE VALIDATION REGISTRATIONS [3]
+		// WORKSPACE VALIDATION REGISTRATIONS
 		// =========================================================================
 
-		// 1. Items Validation [3]
-		WorkspaceValidatorRegistry.register(ItemTransferComponent.class, new WorkspaceValidatorRegistry.INodeValidator<ItemTransferComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, ItemTransferComponent transfer) {
-				if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				if (transfer.getActiveSidesMask() == 0) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				return false;
-			}
+		// 1. Items Validation
+		WorkspaceValidatorRegistry.register(ItemTransferComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<ItemTransferComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, ItemTransferComponent transfer) {
+						if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						if (transfer.getActiveSidesMask() == 0) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						return false;
+					}
 
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, ItemTransferComponent transfer) {
-				if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
-					return Component.translatable("gui.sfmflow.error.unbound_inventory");
-				}
-				if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
-					return Component.translatable("gui.sfmflow.error.empty_whitelist");
-				}
-				if (transfer.getActiveSidesMask() == 0) {
-					return Component.translatable("gui.sfmflow.error.no_active_sides");
-				}
-				return null;
-			}
-		});
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, ItemTransferComponent transfer) {
+						if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
+							return Component.translatable("gui.sfmflow.error.empty_whitelist");
+						}
+						if (transfer.getActiveSidesMask() == 0) {
+							return Component.translatable("gui.sfmflow.error.no_active_sides");
+						}
+						return null;
+					}
+				});
 
-		// 2. Fluids Validation [3]
-		WorkspaceValidatorRegistry.register(FluidTransferComponent.class, new WorkspaceValidatorRegistry.INodeValidator<FluidTransferComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, FluidTransferComponent transfer) {
-				if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				if (transfer.getActiveSidesMask() == 0) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				return false;
-			}
+		// 2. Fluids Validation
+		WorkspaceValidatorRegistry.register(FluidTransferComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<FluidTransferComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, FluidTransferComponent transfer) {
+						if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						if (transfer.getActiveSidesMask() == 0) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						return false;
+					}
 
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, FluidTransferComponent transfer) {
-				if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
-					return Component.translatable("gui.sfmflow.error.unbound_inventory");
-				}
-				if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
-					return Component.translatable("gui.sfmflow.error.empty_whitelist");
-				}
-				if (transfer.getActiveSidesMask() == 0) {
-					return Component.translatable("gui.sfmflow.error.no_active_sides");
-				}
-				return null;
-			}
-		});
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, FluidTransferComponent transfer) {
+						if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						if (transfer.isWhitelist() && isWhitelistEmpty(transfer.getFilterItems())) {
+							return Component.translatable("gui.sfmflow.error.empty_whitelist");
+						}
+						if (transfer.getActiveSidesMask() == 0) {
+							return Component.translatable("gui.sfmflow.error.no_active_sides");
+						}
+						return null;
+					}
+				});
 
-		// 3. Energy Validation [3]
-		WorkspaceValidatorRegistry.register(EnergyTransferComponent.class, new WorkspaceValidatorRegistry.INodeValidator<EnergyTransferComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, EnergyTransferComponent transfer) {
-				if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				if (transfer.getActiveSidesMask() == 0) {
-					return hasActiveConnections(screen, transfer.getId());
-				}
-				return false;
-			}
+		// 3. Energy Validation
+		WorkspaceValidatorRegistry.register(EnergyTransferComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<EnergyTransferComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, EnergyTransferComponent transfer) {
+						if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						if (transfer.getActiveSidesMask() == 0) {
+							return hasActiveConnections(screen, transfer.getId());
+						}
+						return false;
+					}
 
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, EnergyTransferComponent transfer) {
-				if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
-					return Component.translatable("gui.sfmflow.error.unbound_inventory");
-				}
-				if (transfer.getActiveSidesMask() == 0) {
-					return Component.translatable("gui.sfmflow.error.no_active_sides");
-				}
-				return null;
-			}
-		});
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, EnergyTransferComponent transfer) {
+						if (isInventoryUnboundOrSleeping(screen, transfer.getInventoryId())) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						if (transfer.getActiveSidesMask() == 0) {
+							return Component.translatable("gui.sfmflow.error.no_active_sides");
+						}
+						return null;
+					}
+				});
 
-		// 4. Redstone Trigger Validation [3]
-		WorkspaceValidatorRegistry.register(RedstoneTriggerComponent.class, new WorkspaceValidatorRegistry.INodeValidator<RedstoneTriggerComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, RedstoneTriggerComponent transfer) {
-				return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
-			}
+		// 4. Redstone Trigger Validation
+		WorkspaceValidatorRegistry.register(RedstoneTriggerComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<RedstoneTriggerComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, RedstoneTriggerComponent transfer) {
+						return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
+					}
 
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, RedstoneTriggerComponent transfer) {
-				if (hasError(screen, transfer)) {
-					return Component.translatable("gui.sfmflow.error.unbound_inventory");
-				}
-				return null;
-			}
-		});
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							RedstoneTriggerComponent transfer) {
+						if (hasError(screen, transfer)) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
 
-		// 5. Variables Warnings [3]
-		WorkspaceValidatorRegistry.register(AdvancedItemFilterVariableComponent.class, new WorkspaceValidatorRegistry.INodeValidator<AdvancedItemFilterVariableComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, AdvancedItemFilterVariableComponent component) { return false; }
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, AdvancedItemFilterVariableComponent component) { return null; }
+		// 5. Variables Warnings
+		WorkspaceValidatorRegistry.register(AdvancedItemFilterVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<AdvancedItemFilterVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, AdvancedItemFilterVariableComponent component) {
+						return false;
+					}
 
-			@Override
-			public boolean hasWarning(ManagerScreen screen, AdvancedItemFilterVariableComponent component) {
-				return component.getFilterStack().isEmpty();
-			}
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							AdvancedItemFilterVariableComponent component) {
+						return null;
+					}
 
-			@Override
-			public @Nullable Component getWarningTooltip(ManagerScreen screen, AdvancedItemFilterVariableComponent component) {
-				return Component.translatable("gui.sfmflow.warning.empty_filter_variable");
-			}
-		});
+					@Override
+					public boolean hasWarning(ManagerScreen screen, AdvancedItemFilterVariableComponent component) {
+						return component.getFilterStack().isEmpty();
+					}
 
-		WorkspaceValidatorRegistry.register(AdvancedFluidFilterVariableComponent.class, new WorkspaceValidatorRegistry.INodeValidator<AdvancedFluidFilterVariableComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, AdvancedFluidFilterVariableComponent component) { return false; }
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, AdvancedFluidFilterVariableComponent component) { return null; }
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen,
+							AdvancedItemFilterVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_filter_variable");
+					}
+				});
 
-			@Override
-			public boolean hasWarning(ManagerScreen screen, AdvancedFluidFilterVariableComponent component) {
-				return component.getFilterFluid().isEmpty();
-			}
+		WorkspaceValidatorRegistry.register(AdvancedFluidFilterVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<AdvancedFluidFilterVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, AdvancedFluidFilterVariableComponent component) {
+						return false;
+					}
 
-			@Override
-			public @Nullable Component getWarningTooltip(ManagerScreen screen, AdvancedFluidFilterVariableComponent component) {
-				return Component.translatable("gui.sfmflow.warning.empty_filter_variable");
-			}
-		});		
-		
-		// 6. Redstone Emitter Validation [3]
-		WorkspaceValidatorRegistry.register(RedstoneEmitterComponent.class, new WorkspaceValidatorRegistry.INodeValidator<RedstoneEmitterComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, RedstoneEmitterComponent transfer) {
-				return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
-			}
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							AdvancedFluidFilterVariableComponent component) {
+						return null;
+					}
 
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, RedstoneEmitterComponent transfer) {
-				if (hasError(screen, transfer)) {
-					return Component.translatable("gui.sfmflow.error.unbound_inventory");
-				}
-				return null;
-			}
-		});		
+					@Override
+					public boolean hasWarning(ManagerScreen screen, AdvancedFluidFilterVariableComponent component) {
+						return component.getFilterFluid().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen,
+							AdvancedFluidFilterVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_filter_variable");
+					}
+				});
+
+		// 6. Redstone Emitter Validation
+		WorkspaceValidatorRegistry.register(RedstoneEmitterComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<RedstoneEmitterComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, RedstoneEmitterComponent transfer) {
+						return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							RedstoneEmitterComponent transfer) {
+						if (hasError(screen, transfer)) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
 	}
 
 	/**
-	 * Shared helper determining if an inventory ID is completely unselected, missing, or in an unloaded chunk [3].
+	 * Shared helper determining if an inventory ID is completely unselected,
+	 * missing, or in an unloaded chunk.
 	 */
 	private static boolean isInventoryUnboundOrSleeping(ManagerScreen screen, int inventoryId) {
 		if (inventoryId == -1) {
@@ -316,19 +342,20 @@ public class VanillaSFMFlowClientPlugin {
 		}
 		for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
 			if (block.getId() == inventoryId && !block.isSleeping()) {
-				return false; // Found a valid, loaded target block [3]
+				return false;
 			}
 		}
 		return true;
 	}
 
 	/**
-	 * Shared helper identifying if a registered whitelist layout contains zero items [3].
+	 * Shared helper identifying if a registered whitelist layout contains zero
+	 * items.
 	 */
 	private static boolean isWhitelistEmpty(java.util.List<ItemStack> filterItems) {
 		for (ItemStack stack : filterItems) {
 			if (stack != null && !stack.isEmpty()) {
-				return false; // Found configured items [3]
+				return false;
 			}
 		}
 		return true;

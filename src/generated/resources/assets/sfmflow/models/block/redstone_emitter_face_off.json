@@ -21,7 +21,7 @@
     }
   ],
   "textures": {
-    "face": "sfmflow:block/redstone_emitter_face_off",
+    "face": "sfmflow:block/redstone_emitter_side_off",
     "particle": "sfmflow:block/redstone_emitter_side_off"
   }
 }

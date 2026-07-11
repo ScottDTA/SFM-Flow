@@ -11,7 +11,7 @@ import net.neoforged.neoforge.client.model.generators.ConfiguredModel;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 /**
- * Automates the creation of blockstate json and block/item model files [3].
+ * Automates the creation of blockstate json and block/item model files.
  */
 public class ModBlockStateProvider extends BlockStateProvider {
 	public ModBlockStateProvider(PackOutput output, ExistingFileHelper exFileHelper) {
@@ -52,13 +52,13 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		simpleBlockItem(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
 				models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
 
-		// Standard Cable Cluster [3]
+		// Standard Cable Cluster
 		simpleBlock(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
 				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
 		simpleBlockItem(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
 				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
 
-		// Advanced Cable Cluster [3]
+		// Advanced Cable Cluster
 		simpleBlock(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(),
 				models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
 		simpleBlockItem(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(),
@@ -67,14 +67,14 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		BlockModelBuilder faceOffModel = models()
 				.withExistingParent("block/redstone_emitter_face_off", mcLoc("block/block"))
 				.texture("particle", modLoc("block/redstone_emitter_side_off"))
-				.texture("face", modLoc("block/redstone_emitter_face_off"));
+				.texture("face", modLoc("block/redstone_emitter_side_off"));
 		faceOffModel.element().from(0, 0, 0).to(16, 16, 16).face(Direction.UP).uvs(0, 0, 16, 16).texture("#face")
 				.cullface(Direction.UP).end();
 
 		BlockModelBuilder faceOnModel = models()
 				.withExistingParent("block/redstone_emitter_face_on", mcLoc("block/block"))
 				.texture("particle", modLoc("block/redstone_emitter_side_on"))
-				.texture("face", modLoc("block/redstone_emitter_face_on"));
+				.texture("face", modLoc("block/redstone_emitter_side_on"));
 		faceOnModel.element().from(0, 0, 0).to(16, 16, 16).face(Direction.UP).uvs(0, 0, 16, 16).texture("#face")
 				.cullface(Direction.UP).end();
 
