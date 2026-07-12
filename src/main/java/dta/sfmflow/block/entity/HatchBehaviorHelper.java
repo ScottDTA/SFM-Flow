@@ -1,11 +1,22 @@
 package dta.sfmflow.block.entity;
 
+import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.flowcomponents.ItemTransferComponent;
+import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.item.ModItems;
+import dta.sfmflow.util.ConnectionBlock;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.FluidState;
@@ -15,7 +26,13 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 
+import java.util.UUID;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Queue;
+import java.util.ArrayDeque;
 
 /**
  * Common, stateless helper consolidating vacuum, ejection, and fluid hatch
@@ -46,6 +63,13 @@ public final class HatchBehaviorHelper {
 		for (ItemEntity itemEntity : entities) {
 			if (itemEntity.isAlive() && !itemEntity.hasPickUpDelay()) {
 				ItemStack stack = itemEntity.getItem();
+
+				// Restrict suctioning to valid, connected flowchart outputs with available
+				// space
+				if (!hasFlowchartSpaceAndMatch(level, pos, stack)) {
+					continue;
+				}
+
 				ItemStack remaining = ItemHandlerHelper.insertItemStacked(itemHandler, stack, false);
 				if (remaining.isEmpty()) {
 					itemEntity.discard();
@@ -159,6 +183,155 @@ public final class HatchBehaviorHelper {
 					onChange.run();
 				}
 			}
+		}
+	}
+
+	/**
+	 * Scans the connected flowchart to verify if the item satisfies both Input and
+	 * Output cards, and checks if the targeted destination chest has room to
+	 * receive the item.
+	 */
+	private static boolean hasFlowchartSpaceAndMatch(Level level, BlockPos valvePos, ItemStack stack) {
+		BlockPos controllerPos = dta.sfmflow.common.network.CableNetworkRegistry.getController(level, valvePos);
+		if (controllerPos == null) {
+			return false; // Not connected to a network [3]
+		}
+		BlockEntity managerBe = level.getBlockEntity(controllerPos);
+		if (managerBe instanceof ManagerBlockEntity manager) {
+			int valveId = valvePos.hashCode();
+
+			for (AbstractFlowComponent comp : manager.getFlowComponents().values()) {
+				if (comp instanceof ItemTransferComponent inputComp && inputComp.isInput()
+						&& inputComp.getInventoryId() == valveId) {
+					// 1. Check if the item matches the Input Card's filter criteria
+					if (!matchesFilterCommon(manager, inputComp, stack)) {
+						continue;
+					}
+
+					// 2. Traverse downstream to locate connected outputs
+					List<ItemTransferComponent> outputs = findDownstreamOutputs(manager, inputComp.getId());
+					for (ItemTransferComponent outputComp : outputs) {
+						// 3. Check if the item matches the Output Card's filter criteria
+						if (!matchesFilterCommon(manager, outputComp, stack)) {
+							continue;
+						}
+
+						// 4. Find the chest bound to the Item Output
+						ConnectionBlock destInv = null;
+						for (ConnectionBlock inv : manager.getInventories()) {
+							if (inv.getId() == outputComp.getInventoryId() && !inv.isSleeping()) {
+								destInv = inv;
+								break;
+							}
+						}
+
+						if (destInv != null) {
+							IItemHandler handler = destInv.getItemHandler(null);
+							if (handler != null) {
+								// 5. Check if there is room in that chest
+								ItemStack remaining = ItemHandlerHelper.insertItemStacked(handler,
+										stack.copyWithCount(1), true);
+								if (remaining.isEmpty()) {
+									return true; // Found a valid target with space
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Performs a fast, non-allocating downstream search to locate all Output cards
+	 * connected to this Input.
+	 */
+	private static List<ItemTransferComponent> findDownstreamOutputs(ManagerBlockEntity manager, UUID startId) {
+		List<ItemTransferComponent> outputs = new ArrayList<>();
+		Queue<UUID> queue = new ArrayDeque<>();
+		Set<UUID> visited = new HashSet<>();
+
+		queue.add(startId);
+		visited.add(startId);
+
+		while (!queue.isEmpty()) {
+			UUID currentId = queue.poll();
+
+			for (FlowComponentConnections conn : manager.getFlowConnections()) {
+				if (conn.getSourceComponentId().equals(currentId)) {
+					UUID targetId = conn.getTargetComponentId();
+					if (!visited.contains(targetId)) {
+						visited.add(targetId);
+						AbstractFlowComponent targetComp = manager.getFlowComponents().get(targetId);
+						if (targetComp != null) {
+							if (targetComp instanceof ItemTransferComponent outputComp && !outputComp.isInput()) {
+								outputs.add(outputComp);
+							} else {
+								// Continue searching down the chain for intermediate nodes (e.g. logic)
+								queue.add(targetId);
+							}
+						}
+					}
+				}
+			}
+		}
+		return outputs;
+	}
+
+	/**
+	 * Simplified matchesFilter method that works on live server thread using the
+	 * manager component map.
+	 */
+	private static boolean matchesFilterCommon(ManagerBlockEntity manager, ItemTransferComponent component,
+			ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+
+		int limit = -1;
+		boolean found = false;
+
+		if (component.getBoundFilterVariableId() != null) {
+			AbstractFlowComponent boundComp = manager.getFlowComponents().get(component.getBoundFilterVariableId());
+			if (boundComp instanceof AdvancedItemFilterVariableComponent varComp) {
+				if (AdvancedItemFilterVariableComponent.matchesVariableFilter(varComp, stack)) {
+					found = true;
+					limit = varComp.isUseQuantity() ? varComp.getQuantity() : -1;
+				}
+			}
+		} else {
+			for (int i = 0; i < component.getFilterItems().size(); i++) {
+				ItemStack filter = component.getFilterItems().get(i);
+				if (filter == null || filter.isEmpty()) {
+					continue;
+				}
+
+				if (filter.is(ModItems.VARIABLE_CARD.get())) {
+					CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+					if (tag.contains("VariableId")) {
+						UUID varId = tag.getUUID("VariableId");
+						AbstractFlowComponent varComp = manager.getFlowComponents().get(varId);
+						if (varComp instanceof AdvancedItemFilterVariableComponent advancedVar) {
+							if (AdvancedItemFilterVariableComponent.matchesVariableFilter(advancedVar, stack)) {
+								found = true;
+								limit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
+								break;
+							}
+						}
+					}
+				} else if (ItemStack.isSameItemSameComponents(stack, filter)) {
+					found = true;
+					limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
+					break;
+				}
+			}
+		}
+
+		if (component.isWhitelist()) {
+			return found;
+		} else {
+			return !found || limit > 0;
 		}
 	}
 }

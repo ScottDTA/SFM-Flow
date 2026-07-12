@@ -1,6 +1,5 @@
 package dta.sfmflow.block.entity;
 
-import dta.sfmflow.block.ItemVacuumValveBlock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -13,8 +12,8 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Backing BlockEntity for the Item Vacuum Hatch block [3]. Vacuums items in a
- * 3x3x3 volume directly in front of it, delegating behavior to HatchBehaviorHelper [3].
+ * Backing BlockEntity for the Item Vacuum Hatch block.
+ * Vacuums items only when the connected flowchart schedules and executes a transfer task.
  */
 public class ItemVacuumValveBlockEntity extends BlockEntity {
 
@@ -35,17 +34,7 @@ public class ItemVacuumValveBlockEntity extends BlockEntity {
 	}
 
 	public static void tick(Level level, BlockPos pos, BlockState state, ItemVacuumValveBlockEntity be) {
-		if (level.isClientSide()) {
-			return;
-		}
-
-		int tickOffset = Math.abs(pos.hashCode()) % 10;
-		if ((level.getGameTime() + tickOffset) % 10 != 0) {
-			return;
-		}
-
-		Direction facing = state.getValue(ItemVacuumValveBlock.FACING);
-		HatchBehaviorHelper.performVacuum(level, pos, facing, be.itemHandler, be::setChanged);
+		// Standalone Vacuum Valve remains completely passive; items are scanned as ground snapshots during flowchart planning
 	}
 
 	@Override

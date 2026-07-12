@@ -2,15 +2,19 @@ package dta.sfmflow.api.execution;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import dta.sfmflow.block.ItemVacuumValveBlock;
+import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.util.ConnectionBlock;
 import org.jetbrains.annotations.Nullable;
@@ -23,13 +27,13 @@ import java.util.Map;
 
 /**
  * Immutable thread-safe snapshot container holding deep copies of target
- * inventories, fluid tanks, and energy configurations dynamically [3].
+ * inventories, fluid tanks, and energy configurations dynamically.
  */
 public final class ThreadSafeInventorySnapshot {
 
 	public record SlotSnapshot(ItemStack stack, int slotLimit, int mainSlotIndex) {
 		public SlotSnapshot {
-			stack = stack.copy(); // Ensure a deep copy of the ItemStack [3]
+			stack = stack.copy();
 		}
 	}
 
@@ -41,7 +45,7 @@ public final class ThreadSafeInventorySnapshot {
 
 	public record TankSnapshot(FluidStack stack, int capacity) {
 		public TankSnapshot {
-			stack = stack.copy(); // Ensure a deep copy of the FluidStack [3]
+			stack = stack.copy();
 		}
 	}
 
@@ -51,9 +55,10 @@ public final class ThreadSafeInventorySnapshot {
 		}
 	}
 
-	public record EnergySnapshot(int energyStored, int maxEnergyStored, boolean canExtract, boolean canReceive) {}
+	public record EnergySnapshot(int energyStored, int maxEnergyStored, boolean canExtract, boolean canReceive) {
+	}
 
-	// Composite key mapping coordinates and active sides [3]
+	// Composite key mapping coordinates and active sides
 	public record SnapshotKey(BlockPos pos, @Nullable Direction side) {
 	}
 
@@ -68,10 +73,10 @@ public final class ThreadSafeInventorySnapshot {
 
 	/**
 	 * Creates a thread-safe deep copy snapshot of all loaded registries connected
-	 * to the manager block entity dynamically [3].
+	 * to the manager block entity dynamically.
 	 *
-	 * @param manager the managing block entity [3]
-	 * @return a complete immutable dynamic snapshot [3]
+	 * @param manager the managing block entity
+	 * @return a complete immutable dynamic snapshot
 	 */
 	@SuppressWarnings("unchecked")
 	public static ThreadSafeInventorySnapshot create(ManagerBlockEntity manager) {
@@ -80,19 +85,20 @@ public final class ThreadSafeInventorySnapshot {
 		Level level = manager.getLevel();
 		if (level != null && !level.isClientSide()) {
 			for (ConnectionBlock block : manager.getInventories()) {
-				capturedList.add(new ConnectionBlock(block)); // Deep copy to prevent data races [3]
+				capturedList.add(new ConnectionBlock(block));
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
 					BlockState state = level.getBlockState(pos);
 
-					// 1. Snapshot dynamic non-directional capabilities [3]
+					// 1. Snapshot dynamic non-directional capabilities
 					Map<ResourceLocation, Object> nullCapsMap = new HashMap<>();
 					for (var flowCap : FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
 						var cap = flowCap.getCapability();
 						if (cap != null) {
 							Object handler = level.getCapability((BlockCapability<Object, Direction>) cap, pos, null);
 							if (handler == null) {
-								handler = SpecialBlockCapabilityRegistry.getCapability((BlockCapability<Object, Direction>) cap, level, pos, state, null);
+								handler = SpecialBlockCapabilityRegistry.getCapability(
+										(BlockCapability<Object, Direction>) cap, level, pos, state, null);
 							}
 							if (handler != null) {
 								var snapshotter = FlowCapabilityRegistry.getSnapshotter(flowCap.getId());
@@ -102,19 +108,29 @@ public final class ThreadSafeInventorySnapshot {
 							}
 						}
 					}
+
+					// Overrides snapshotter for the Item Vacuum Valve to represent ground items as
+					// slot contents
+					if (state.is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get())) {
+						nullCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
+								createVacuumGroundSnapshot(level, pos, state));
+					}
+
 					if (!nullCapsMap.isEmpty()) {
 						map.put(new SnapshotKey(pos, null), nullCapsMap);
 					}
 
-					// 2. Snapshot dynamic directional capabilities [3]
+					// 2. Snapshot dynamic directional capabilities
 					for (Direction dir : Direction.values()) {
 						Map<ResourceLocation, Object> dirCapsMap = new HashMap<>();
 						for (var flowCap : FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
 							var cap = flowCap.getCapability();
 							if (cap != null) {
-								Object handler = level.getCapability((BlockCapability<Object, Direction>) cap, pos, dir);
+								Object handler = level.getCapability((BlockCapability<Object, Direction>) cap, pos,
+										dir);
 								if (handler == null) {
-									handler = SpecialBlockCapabilityRegistry.getCapability((BlockCapability<Object, Direction>) cap, level, pos, state, dir);
+									handler = SpecialBlockCapabilityRegistry.getCapability(
+											(BlockCapability<Object, Direction>) cap, level, pos, state, dir);
 								}
 								if (handler != null) {
 									var snapshotter = FlowCapabilityRegistry.getSnapshotter(flowCap.getId());
@@ -124,6 +140,14 @@ public final class ThreadSafeInventorySnapshot {
 								}
 							}
 						}
+
+						// Overrides snapshotter for the Item Vacuum Valve to represent ground items as
+						// slot contents directionally
+						if (state.is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get())) {
+							dirCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
+									createVacuumGroundSnapshot(level, pos, state));
+						}
+
 						if (!dirCapsMap.isEmpty()) {
 							map.put(new SnapshotKey(pos, dir), dirCapsMap);
 						}
@@ -135,9 +159,38 @@ public final class ThreadSafeInventorySnapshot {
 	}
 
 	/**
-	 * Dynamic snapshot resolver that retrieves custom snapshots safely for any capability [3].
+	 * Scans the ground area in front of the vacuum valve and populates a virtual
+	 * InventorySnapshot. Shifted the AABB center to 2 blocks in front of the block
+	 * to cover the full 3x3x3 scan area.
 	 */
-	public @Nullable <T> T getCustomSnapshot(BlockPos pos, @Nullable Direction side, ResourceLocation capabilityId, Class<T> clazz) {
+	private static ThreadSafeInventorySnapshot.InventorySnapshot createVacuumGroundSnapshot(Level level, BlockPos pos,
+			BlockState state) {
+		Map<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> slots = new HashMap<>();
+		Direction facing = state.getValue(ItemVacuumValveBlock.FACING);
+		BlockPos centerPos = pos.relative(facing, 2);
+		AABB suctionBox = new AABB(centerPos).inflate(1.0);
+
+		List<ItemEntity> entities = level.getEntitiesOfClass(ItemEntity.class, suctionBox);
+		int slotIndex = 0;
+		for (ItemEntity entity : entities) {
+			if (entity.isAlive() && !entity.hasPickUpDelay()) {
+				ItemStack stack = entity.getItem();
+				if (!stack.isEmpty()) {
+					slots.put(slotIndex, new ThreadSafeInventorySnapshot.SlotSnapshot(stack.copy(),
+							stack.getMaxStackSize(), slotIndex));
+					slotIndex++;
+				}
+			}
+		}
+		return new ThreadSafeInventorySnapshot.InventorySnapshot(slots);
+	}
+
+	/**
+	 * Dynamic snapshot resolver that retrieves custom snapshots safely for any
+	 * capability.
+	 */
+	public @Nullable <T> T getCustomSnapshot(BlockPos pos, @Nullable Direction side, ResourceLocation capabilityId,
+			Class<T> clazz) {
 		Map<ResourceLocation, Object> sideMap = snapshotMap.get(new SnapshotKey(pos, side));
 		if (sideMap != null) {
 			Object snap = sideMap.get(capabilityId);
@@ -145,7 +198,8 @@ public final class ThreadSafeInventorySnapshot {
 				return clazz.cast(snap);
 			}
 		}
-		// Fallback to non-directional snapshot if direction-specific capability is missing [3]
+		// Fallback to non-directional snapshot if direction-specific capability is
+		// missing
 		Map<ResourceLocation, Object> nullMap = snapshotMap.get(new SnapshotKey(pos, null));
 		if (nullMap != null) {
 			Object snap = nullMap.get(capabilityId);
@@ -157,15 +211,18 @@ public final class ThreadSafeInventorySnapshot {
 	}
 
 	public @Nullable InventorySnapshot getInventory(BlockPos pos, @Nullable Direction side) {
-		return getCustomSnapshot(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "item"), InventorySnapshot.class);
+		return getCustomSnapshot(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
+				InventorySnapshot.class);
 	}
 
 	public @Nullable FluidInventorySnapshot getFluidInventory(BlockPos pos, @Nullable Direction side) {
-		return getCustomSnapshot(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"), FluidInventorySnapshot.class);
+		return getCustomSnapshot(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"),
+				FluidInventorySnapshot.class);
 	}
 
 	public @Nullable EnergySnapshot getEnergy(BlockPos pos, @Nullable Direction side) {
-		return getCustomSnapshot(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"), EnergySnapshot.class);
+		return getCustomSnapshot(pos, side, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"),
+				EnergySnapshot.class);
 	}
 
 	public List<ConnectionBlock> getCapturedInventories() {

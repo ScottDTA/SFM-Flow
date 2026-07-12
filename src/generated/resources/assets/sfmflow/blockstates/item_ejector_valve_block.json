@@ -2,28 +2,25 @@
   "variants": {
     "facing=down": {
       "model": "sfmflow:block/item_ejector_valve_block",
-      "x": 180
+      "x": 90
     },
     "facing=east": {
       "model": "sfmflow:block/item_ejector_valve_block",
-      "x": 90,
       "y": 90
     },
     "facing=north": {
-      "model": "sfmflow:block/item_ejector_valve_block",
-      "x": 90
+      "model": "sfmflow:block/item_ejector_valve_block"
     },
     "facing=south": {
       "model": "sfmflow:block/item_ejector_valve_block",
-      "x": 90,
       "y": 180
     },
     "facing=up": {
-      "model": "sfmflow:block/item_ejector_valve_block"
+      "model": "sfmflow:block/item_ejector_valve_block",
+      "x": 270
     },
     "facing=west": {
       "model": "sfmflow:block/item_ejector_valve_block",
-      "x": 90,
       "y": 270
     }
   }

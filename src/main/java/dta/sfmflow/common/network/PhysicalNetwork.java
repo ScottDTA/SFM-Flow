@@ -17,16 +17,22 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.BitSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Manages topological scanning and target inventory indices [3]. Extracted to
- * cleanly separate physical networks from logical operations [3]. Upgraded to
- * index capability nodes and cache BlockCapabilityCache handlers safely [3].
+ * Manages topological scanning and target inventory indices. Extracted to
+ * cleanly separate physical networks from logical operations. Upgraded to index
+ * capability nodes and cache BlockCapabilityCache handlers safely.
  */
 public class PhysicalNetwork {
 	private final Set<BlockPos> scannedCables = new HashSet<>();
-	private final List<ConnectionBlock> scannedInventories = new java.util.concurrent.CopyOnWriteArrayList<>();
+	private final List<ConnectionBlock> scannedInventories = new CopyOnWriteArrayList<>();
 	private final PhysicalNetworkMap networkMap = new PhysicalNetworkMap();
 	private long lastScanTime = 0L;
 	private boolean isDirty = true;
@@ -44,9 +50,9 @@ public class PhysicalNetwork {
 
 	/**
 	 * Fast spatial boundary unloader that flags all node IDs inside the unloaded
-	 * chunk as sleeping [3].
+	 * chunk as sleeping.
 	 *
-	 * @param chunkPacked packed long representation [3]
+	 * @param chunkPacked packed long representation
 	 */
 	public void handleChunkUnload(long chunkPacked) {
 		IntArrayList nodesInChunk = this.networkMap.getNodesInChunk(chunkPacked);
@@ -59,12 +65,12 @@ public class PhysicalNetwork {
 	}
 
 	/**
-	 * Throttled ticking loop protecting server performance [3]. Skips evaluations
-	 * on active scan cooldowns [3].
+	 * Throttled ticking loop protecting server performance. Skips evaluations on
+	 * active scan cooldowns.
 	 *
-	 * @param level    physical server level [3]
-	 * @param startPos starting block position [3]
-	 * @return true if a full network rescan was executed [3]
+	 * @param level    physical server level
+	 * @param startPos starting block position
+	 * @return true if a full network rescan was executed
 	 */
 	public boolean tickCheckAndScan(Level level, BlockPos startPos) {
 		if (level.isClientSide()) {
@@ -77,7 +83,7 @@ public class PhysicalNetwork {
 
 		if (isDirty) {
 			performScan(level, startPos);
-			return true; // Return true to notify manager block of completed scans [3]
+			return true;
 		}
 		return false;
 	}
@@ -94,7 +100,7 @@ public class PhysicalNetwork {
 		long startTime = System.nanoTime();
 
 		// Cleanly unregister previously scanned cables to prevent stale dangling
-		// pointer leaks [3]
+		// pointer leaks
 		for (BlockPos oldCable : this.scannedCables) {
 			CableNetworkRegistry.unregisterCable(level, oldCable);
 		}
@@ -120,7 +126,8 @@ public class PhysicalNetwork {
 
 				queue.add(new ScanNode(adjacent, 1));
 
-				if (state.is(ModTags.REDSTONE_CABLES)) {
+				// Evaluate any functional cable that has a block entity or redstone tag
+				if (state.is(ModTags.REDSTONE_CABLES) || level.getBlockEntity(adjacent) != null) {
 					evaluateAndAddInventory(level, adjacent, state, 1, visited, true);
 				}
 			} else if (!state.is(ModBlocks.MANAGER_BLOCK.get())) {
@@ -159,7 +166,8 @@ public class PhysicalNetwork {
 
 					queue.add(new ScanNode(neighbor, current.depth() + 1));
 
-					if (state.is(ModTags.REDSTONE_CABLES)) {
+					// Evaluate any functional cable that has a block entity or redstone tag
+					if (state.is(ModTags.REDSTONE_CABLES) || level.getBlockEntity(neighbor) != null) {
 						evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, true);
 					}
 				} else if (this.scannedInventories.size() < maxInventories
@@ -180,8 +188,8 @@ public class PhysicalNetwork {
 	}
 
 	@SuppressWarnings("unchecked")
-	private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth,
-			BitSet visited, boolean isCableComponent) {
+	private void evaluateAndAddInventory(Level level, BlockPos pos, BlockState state, int depth, BitSet visited,
+			boolean isCableComponent) {
 		int posId = this.networkMap.getOrAddNode(pos);
 
 		if (!isCableComponent) {
@@ -191,7 +199,7 @@ public class PhysicalNetwork {
 		BlockEntity be = level.getBlockEntity(pos);
 		Set<ResourceLocation> discoveredTypes = new HashSet<>();
 
-		// Query dynamically registered capabilities in our FlowCapabilityRegistry [3]
+		// Query dynamically registered capabilities in our FlowCapabilityRegistry
 		for (var entry : FlowCapabilityRegistry.getRegisteredCapabilities().entrySet()) {
 			ResourceLocation capId = entry.getKey();
 			var cap = entry.getValue();
@@ -214,14 +222,13 @@ public class PhysicalNetwork {
 
 			if (level instanceof ServerLevel serverLevel) {
 				// Dynamically allocate and register BlockCapabilityCache for each discovered
-				// capability across all 6 directions plus the non-directional side context [3]
+				// capability across all 6 directions plus the non-directional side context
 				for (ResourceLocation capId : discoveredTypes) {
 					var flowCap = FlowCapabilityRegistry.get(capId);
 					if (flowCap != null && flowCap.getCapability() != null) {
 						// Register non-directional cache
 						var nullCache = BlockCapabilityCache.create(
-								(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos,
-								null);
+								(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, null);
 						connection.registerCache(capId, null, nullCache);
 
 						// Register direction-specific caches
@@ -236,7 +243,7 @@ public class PhysicalNetwork {
 			}
 
 			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent
-			// binding drift [3]
+			// binding drift
 			connection.setId(pos.hashCode());
 
 			this.scannedInventories.add(connection);

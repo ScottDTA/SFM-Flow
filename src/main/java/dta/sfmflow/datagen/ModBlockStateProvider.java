@@ -4,10 +4,12 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.block.ModBlocks;
 import net.minecraft.core.Direction;
 import net.minecraft.data.PackOutput;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.client.model.generators.BlockModelBuilder;
 import net.neoforged.neoforge.client.model.generators.BlockStateProvider;
 import net.neoforged.neoforge.client.model.generators.ConfiguredModel;
+import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 /**
@@ -37,20 +39,27 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		simpleBlockItem(ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
 				models().cubeAll("redstone_receiver_block", modLoc("block/redstone_receiver_block")));
 
-		directionalBlock(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(),
-				models().cubeAll("item_ejector_valve_block", modLoc("block/item_ejector_valve_block")));
-		simpleBlockItem(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(),
-				models().cubeAll("item_ejector_valve_block", modLoc("block/item_ejector_valve_block")));
+		// Configured the Item Ejector Valve to use its dedicated front-face texture
+		// orientably with custom rotations
+		BlockModelBuilder ejectorModel = models().orientable("item_ejector_valve_block",
+				modLoc("block/item_ejector_valve_block"), modLoc("block/item_ejector_valve_block_front"),
+				modLoc("block/item_ejector_valve_block"));
+		directionalBlockFacingNorth(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(), ejectorModel);
+		simpleBlockItem(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(), ejectorModel);
 
-		directionalBlock(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(),
-				models().cubeAll("item_vacuum_valve_block", modLoc("block/item_vacuum_valve_block")));
-		simpleBlockItem(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(),
-				models().cubeAll("item_vacuum_valve_block", modLoc("block/item_vacuum_valve_block")));
+		// Configured Item Vacuum Valve to use its dedicated front-face texture
+		// orientably with custom rotations
+		BlockModelBuilder vacuumModel = models().orientable("item_vacuum_valve_block",
+				modLoc("block/item_vacuum_valve_block"), modLoc("block/item_vacuum_valve_block_front"),
+				modLoc("block/item_vacuum_valve_block"));
+		directionalBlockFacingNorth(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), vacuumModel);
+		simpleBlockItem(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), vacuumModel);
 
-		directionalBlock(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
-				models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
-		simpleBlockItem(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
-				models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
+		// Configured Fluid Hatch Cable Block with correct North-facing rotations
+		BlockModelBuilder fluidHatchModel = models().cubeAll("fluid_hatch_cable_block",
+				modLoc("block/fluid_hatch_cable_block"));
+		directionalBlockFacingNorth(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), fluidHatchModel);
+		simpleBlockItem(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), fluidHatchModel);
 
 		// Standard Cable Cluster
 		simpleBlock(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
@@ -112,8 +121,8 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(90).addModel()
 				.condition(BlockStateProperties.EAST, true);
 
-		var observerModel = models().cube("block/observer_cable_block",
-				modLoc("block/observer_cable_top"), // down (bottom)
+		var observerModel = models().cube("block/observer_cable_block", modLoc("block/observer_cable_top"), // down
+																											// (bottom)
 				modLoc("block/observer_cable_top2"), // up (top)
 				modLoc("block/observer_cable_front"), // north (front face)
 				modLoc("block/observer_cable_back"), // south (back port)
@@ -136,9 +145,34 @@ public class ModBlockStateProvider extends BlockStateProvider {
 			case EAST -> rotY = 90;
 			case WEST -> rotY = 270;
 			}
-			return ConfiguredModel.builder().modelFile(observerModel).rotationX(rotX).rotationY(rotY).uvLock(false).build();
+			return ConfiguredModel.builder().modelFile(observerModel).rotationX(rotX).rotationY(rotY).uvLock(false)
+					.build();
 		});
 
 		simpleBlockItem(ModBlocks.OBSERVER_CABLE_BLOCK.get(), observerModel);
+	}
+
+	/**
+	 * Generates a blockstate with correct rotations for blocks whose default front
+	 * texture faces NORTH.
+	 */
+	public void directionalBlockFacingNorth(Block block, ModelFile model) {
+		getVariantBuilder(block).forAllStates(state -> {
+			Direction dir = state.getValue(BlockStateProperties.FACING);
+			int x = 0;
+			int y = 0;
+			switch (dir) {
+			case DOWN -> x = 90;
+			case UP -> x = 270;
+			case NORTH -> {
+				x = 0;
+				y = 0;
+			}
+			case SOUTH -> y = 180;
+			case EAST -> y = 90;
+			case WEST -> y = 270;
+			}
+			return ConfiguredModel.builder().modelFile(model).rotationX(x).rotationY(y).build();
+		});
 	}
 }

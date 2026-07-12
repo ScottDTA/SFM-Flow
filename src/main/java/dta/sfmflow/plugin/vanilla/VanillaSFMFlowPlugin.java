@@ -11,6 +11,8 @@ import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.capability.EnergyTransferParams;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
+import dta.sfmflow.block.ItemVacuumValveBlock;
+import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
@@ -25,10 +27,14 @@ import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -39,7 +45,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 
+import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -142,6 +150,11 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.registerTransfer(itemCapId,
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof ItemTransferParams task) {
+						// Intercept transfer task if the source block is a Vacuum Valve [3]
+						if (level.getBlockState(src).is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get())) {
+							return executeVacuumTransfer(level, src, dest, destSide, task);
+						}
+
 						IItemHandler source = level.getCapability(Capabilities.ItemHandler.BLOCK, src, srcSide);
 						IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, destSide);
 
@@ -321,7 +334,7 @@ public class VanillaSFMFlowPlugin {
 	}
 
 	/**
-	 * Resolves the underlying main slot index from nested Capability Wrappers [3].
+	 * Resolves the underlying main slot index from nested Capability Wrappers.
 	 */
 	private static int translateSlot(IItemHandler handler, int slotIndex) {
 		if (handler == null) {
@@ -330,12 +343,12 @@ public class VanillaSFMFlowPlugin {
 		String className = handler.getClass().getName();
 		try {
 			if (className.equals("net.neoforged.neoforge.items.wrapper.SidedInvWrapper")) {
-				java.lang.reflect.Field invField = handler.getClass().getDeclaredField("inv");
-				java.lang.reflect.Field sideField = handler.getClass().getDeclaredField("side");
+				Field invField = handler.getClass().getDeclaredField("inv");
+				Field sideField = handler.getClass().getDeclaredField("side");
 				invField.setAccessible(true);
 				sideField.setAccessible(true);
-				net.minecraft.world.WorldlyContainer inv = (net.minecraft.world.WorldlyContainer) invField.get(handler);
-				net.minecraft.core.Direction side = (net.minecraft.core.Direction) sideField.get(handler);
+				WorldlyContainer inv = (WorldlyContainer) invField.get(handler);
+				Direction side = (Direction) sideField.get(handler);
 				if (inv != null && side != null) {
 					int[] slots = inv.getSlotsForFace(side);
 					if (slots != null && slotIndex >= 0 && slotIndex < slots.length) {
@@ -343,11 +356,11 @@ public class VanillaSFMFlowPlugin {
 					}
 				}
 			} else if (className.equals("net.neoforged.neoforge.items.wrapper.RangedWrapper")) {
-				java.lang.reflect.Field minSlotField = handler.getClass().getDeclaredField("minSlot");
+				Field minSlotField = handler.getClass().getDeclaredField("minSlot");
 				minSlotField.setAccessible(true);
 				int minSlot = minSlotField.getInt(handler);
 
-				java.lang.reflect.Field composeField = handler.getClass().getDeclaredField("compose");
+				Field composeField = handler.getClass().getDeclaredField("compose");
 				composeField.setAccessible(true);
 				IItemHandler compose = (IItemHandler) composeField.get(handler);
 
@@ -357,5 +370,64 @@ public class VanillaSFMFlowPlugin {
 			// Fallback on security exceptions or missing fields
 		}
 		return slotIndex;
+	}
+
+	/**
+	 * Extracts matching items directly from ground entities in front of the vacuum
+	 * mouth. Re-centered to evaluate the full 3x3x3 volume correctly.
+	 */
+	private static boolean executeVacuumTransfer(Level level, BlockPos src, BlockPos dest, Direction destSide,
+			ItemTransferParams task) {
+		BlockState state = level.getBlockState(src);
+		if (!state.hasProperty(ItemVacuumValveBlock.FACING)) {
+			return false;
+		}
+		Direction facing = state.getValue(ItemVacuumValveBlock.FACING);
+		BlockPos centerPos = src.relative(facing, 2);
+		AABB suctionBox = new AABB(centerPos).inflate(1.0);
+
+		List<ItemEntity> entities = level.getEntitiesOfClass(ItemEntity.class, suctionBox);
+		for (ItemEntity entity : entities) {
+			if (entity.isAlive() && !entity.hasPickUpDelay()) {
+				ItemStack groundStack = entity.getItem();
+				if (!groundStack.isEmpty() && ItemStack.isSameItemSameComponents(groundStack, task.item())) {
+					IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, destSide);
+					if (target == null) {
+						target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, null);
+					}
+					if (target != null) {
+						int toExtract = Math.min(groundStack.getCount(), task.count());
+						ItemStack simExtracted = groundStack.copyWithCount(toExtract);
+
+						ItemStack targetRemaining;
+						if (task.destSlot() != -1) {
+							targetRemaining = target.insertItem(task.destSlot(), simExtracted, true);
+						} else {
+							targetRemaining = ItemHandlerHelper.insertItemStacked(target, simExtracted, true);
+						}
+
+						int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
+						if (realTransferCount > 0) {
+							ItemStack realInsert = groundStack.copyWithCount(realTransferCount);
+							if (task.destSlot() != -1) {
+								target.insertItem(task.destSlot(), realInsert, false);
+							} else {
+								ItemHandlerHelper.insertItemStacked(target, realInsert, false);
+							}
+
+							// Update or clean up the entity representation on the ground
+							groundStack.shrink(realTransferCount);
+							if (groundStack.isEmpty()) {
+								entity.discard();
+							} else {
+								entity.setItem(groundStack);
+							}
+							return true;
+						}
+					}
+				}
+			}
+		}
+		return false;
 	}
 }

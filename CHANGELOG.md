@@ -1,9 +1,15 @@
 7-12-2026
 
+
 ### [Added]
+* Integrated the Item Vacuum Valve into the logic system; it can now dynamically detect, simulate, and transfer nearby ground items through your network pipelines during flowchart execution.
 * Implemented a multi-threaded copy mechanism for network inventories during background logic planning, resolving potential data conflicts and improving overall server stability.
 
 ### [Changed]
+* Upgraded the Item Vacuum Valve with "intelligent filtering"; it will now scan your active flowchart and only suction ground items if they match your filter rules and have room in destination chests, preventing items from getting stuck inside the valve.
+* Made the Item Vacuum Valve completely passive to optimize server performance, removing its independent ticking loop.
+* Restricted network pipe connections for the Item Vacuum Valve, Item Ejection Valve, and Fluid Extraction Hatch so they can only interact with adjacent blocks on their front-facing side.
+* Reworked the block models for the Item Vacuum Valve and Item Ejection Valve to display unique front textures indicating their facing direction.
 * Renamed the "Item Vacuum Hatch" to the "Item Vacuum Valve" and the "Item Ejection Hatch" to the "Item Ejection Valve".
 * Optimized the manager's background scheduling system to increase processing speed and eliminate frame-skipping delays.
 * Reworked the Observer Cable block's visual model to render distinct front, back, top, bottom, and side texture overlays.
