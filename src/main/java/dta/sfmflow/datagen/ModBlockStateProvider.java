@@ -112,11 +112,14 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(90).addModel()
 				.condition(BlockStateProperties.EAST, true);
 
-		var observerModel = models().withExistingParent("block/observer_cable_block", mcLoc("block/observer"))
-				.texture("front", modLoc("block/observer_cable_front"))
-				.texture("bottom", modLoc("block/observer_cable_back"))
-				.texture("side", modLoc("block/observer_cable_side"))
-				.texture("top", modLoc("block/observer_cable_top"));
+		var observerModel = models().cube("block/observer_cable_block",
+				modLoc("block/observer_cable_top"),           // down (bottom) [3]
+				modLoc("block/observer_cable_top2"),           // up (top) [3]
+				modLoc("block/observer_cable_front"),  // north (front face) [3]
+				modLoc("block/observer_cable_back"),   // south (back port) [3]
+				modLoc("block/observer_cable_side2"),           // west (side) [3]
+				modLoc("block/observer_cable_side")            // east (side) [3]
+		).texture("particle", modLoc("block/cable_block"));
 
 		getVariantBuilder(ModBlocks.OBSERVER_CABLE_BLOCK.get()).forAllStates(state -> {
 			Direction dir = state.getValue(BlockStateProperties.FACING);
@@ -133,7 +136,12 @@ public class ModBlockStateProvider extends BlockStateProvider {
 			case EAST -> rotY = 90;
 			case WEST -> rotY = 270;
 			}
-			return ConfiguredModel.builder().modelFile(observerModel).rotationX(rotX).rotationY(rotY).build();
+			return ConfiguredModel.builder()
+					.modelFile(observerModel)
+					.rotationX(rotX)
+					.rotationY(rotY)
+					.uvLock(false) // Ensures textures rotate dynamically with X/Y block states [3]
+					.build();
 		});
 
 		simpleBlockItem(ModBlocks.OBSERVER_CABLE_BLOCK.get(), observerModel);

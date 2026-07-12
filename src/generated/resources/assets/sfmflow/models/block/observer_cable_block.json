@@ -1,9 +1,12 @@
 {
-  "parent": "minecraft:block/observer",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "bottom": "sfmflow:block/observer_cable_back",
-    "front": "sfmflow:block/observer_cable_front",
-    "side": "sfmflow:block/observer_cable_side",
-    "top": "sfmflow:block/observer_cable_top"
+    "down": "sfmflow:block/observer_cable_top",
+    "east": "sfmflow:block/observer_cable_side2",
+    "north": "sfmflow:block/observer_cable_front",
+    "particle": "sfmflow:block/cable_block",
+    "south": "sfmflow:block/observer_cable_back",
+    "up": "sfmflow:block/observer_cable_top2",
+    "west": "sfmflow:block/observer_cable_side"
   }
 }

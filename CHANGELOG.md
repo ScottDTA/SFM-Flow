@@ -6,6 +6,7 @@
 * **Dynamic Energy Rate Detection:** Augmented the energy limits scanner to perform simulated power transfers on the server. This ensures that custom or heavily wrapped energy storages (like Mekanism Energy Cubes) automatically reveal their exact maximum per-tick transfer limits to the player config menu.
 
 ### [Changed]
+* Updated the Observer Cable Block model and textures.
 * Improved item routing logic during transfers; the manager will now prioritize merging items into existing matching stacks in destination containers before utilizing new, empty slots to keep inventories consolidated.
 * Configured both Redstone Emitter and Redstone Receiver blocks to behave as non-conductive blocks, preventing accidental redstone wire power bleed to adjacent blocks.
 * Optimized the Redstone Emitter execution path to surgically power specific targeted faces instead of looping through all directions.
