@@ -4,7 +4,6 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.AbstractTriggerComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IInventoryTarget;
@@ -34,8 +33,10 @@ public class ObserverTriggerComponent extends AbstractTriggerComponent implement
 	public static final MapCodec<ObserverTriggerComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 			.group(BaseProperties.CODEC.fieldOf("base").forGetter(ObserverTriggerComponent::getBaseProperties),
 					Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ObserverTriggerComponent::getInventoryId),
-					Codec.BOOL.optionalFieldOf("previousPowered", false).forGetter(ObserverTriggerComponent::isPreviousPowered),
-					Direction.CODEC.optionalFieldOf("frontFacing", Direction.NORTH).forGetter(ObserverTriggerComponent::getFrontFacing))
+					Codec.BOOL.optionalFieldOf("previousPowered", false)
+							.forGetter(ObserverTriggerComponent::isPreviousPowered),
+					Direction.CODEC.optionalFieldOf("frontFacing", Direction.NORTH)
+							.forGetter(ObserverTriggerComponent::getFrontFacing))
 			.apply(instance, (baseProps, invId, prevPowered, frontFacing) -> {
 				ObserverTriggerComponent comp = new ObserverTriggerComponent(baseProps.id());
 				comp.setBaseProperties(baseProps);
@@ -82,12 +83,12 @@ public class ObserverTriggerComponent extends AbstractTriggerComponent implement
 
 	@Override
 	public boolean isSideActive(Direction dir) {
-		return dir == this.frontFacing; // The front face is the only active side [3]
+		return dir == this.frontFacing;
 	}
 
 	@Override
 	public void toggleSide(Direction dir) {
-		// No-op for observer trigger [3]
+
 	}
 
 	@Override

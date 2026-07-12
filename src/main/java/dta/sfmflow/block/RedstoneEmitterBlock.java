@@ -20,7 +20,8 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Analog redstone output device supporting independent multi-sided signal control [3].
+ * Analog redstone output device supporting independent multi-sided signal
+ * control.
  */
 public class RedstoneEmitterBlock extends BaseEntityBlock {
 	public static final MapCodec<RedstoneEmitterBlock> CODEC = simpleCodec(RedstoneEmitterBlock::new);
@@ -81,7 +82,7 @@ public class RedstoneEmitterBlock extends BaseEntityBlock {
 			return emitter.getPowerForSide(outputDirection);
 		}
 
-		return 0; // Safe fallback to unpowered (0) during blockstate updates [3]
+		return 0; // Safe fallback to unpowered (0) during blockstate updates
 	}
 
 	@Override
@@ -93,7 +94,7 @@ public class RedstoneEmitterBlock extends BaseEntityBlock {
 	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
 		BlockEntity be = level.getBlockEntity(pos);
 		if (be instanceof RedstoneEmitterBlockEntity emitter) {
-			// Clear all active pulse modes on scheduled tick [3]
+			// Clear all active pulse modes on scheduled tick
 			emitter.clearPulses();
 		}
 	}

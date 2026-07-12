@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 
 /**
- * Backing BlockEntity for the Redstone Network Emitter block [3].
+ * Backing BlockEntity for the Redstone Network Emitter block.
  */
 public class RedstoneEmitterBlockEntity extends BlockEntity {
 	private final int[] powerLevels = new int[6];
@@ -60,7 +60,7 @@ public class RedstoneEmitterBlockEntity extends BlockEntity {
 	protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
 		super.saveAdditional(tag, registries);
 		tag.putIntArray("SidePowerLevels", this.powerLevels);
-		
+
 		byte[] pulsedBytes = new byte[6];
 		for (int i = 0; i < 6; i++) {
 			pulsedBytes[i] = (byte) (pulsedFaces[i] ? 1 : 0);

@@ -2,12 +2,12 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
 import dta.sfmflow.api.client.widget.InventorySelectorWidget;
+import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
-import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
@@ -36,7 +36,8 @@ public class ObserverTriggerSettingsOverlay extends NodeSettingsOverlay {
 						: null,
 				component.getId()));
 
-		// 1. Force-sync frontFacing to the actual block's in-world facing on initial load [3]
+		// 1. Force-sync frontFacing to the actual block's in-world facing on initial
+		// load
 		Level initialLevel = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 		ConnectionBlock initialInv = getSelectedInventory();
 		if (initialLevel != null && initialInv != null) {
@@ -46,28 +47,25 @@ public class ObserverTriggerSettingsOverlay extends NodeSettingsOverlay {
 			}
 		}
 
-		// The sideSupportChecker only returns true for the front facing face [3].
-		// Combined with isSideActive, this renders a static green marker on front, and red Xs on other faces [3].
+		// The sideSupportChecker only returns true for the front facing face.
+		// Combined with isSideActive, this renders a static green marker on front, and
+		// red Xs on other faces.
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 190,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
-				face -> face == component.getFrontFacing(), 
-				parentScreen, () -> {
+				face -> face == component.getFrontFacing(), parentScreen, () -> {
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
 				});
 
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
-				ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"),
-				parentScreen, 
-				block -> {
+				ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"), parentScreen, block -> {
 					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 					if (level != null) {
-						return level.getBlockState(block.getBlockPos()).is(dta.sfmflow.block.ModBlocks.OBSERVER_CABLE_BLOCK.get());
+						return level.getBlockState(block.getBlockPos()).is(ModBlocks.OBSERVER_CABLE_BLOCK.get());
 					}
 					return true;
-				},
-				newInv -> {
-					// Dynamically query blockstate on target selection [3]
+				}, newInv -> {
+					// Dynamically query blockstate on target selection
 					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 					if (level != null) {
 						BlockState state = level.getBlockState(newInv.getBlockPos());

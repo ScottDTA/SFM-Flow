@@ -17,16 +17,16 @@ import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
-import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
-import dta.sfmflow.flowcomponents.EnergyTransferComponent; 
+import dta.sfmflow.flowcomponents.EnergyTransferComponent;
+import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level; 
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.capabilities.BlockCapability;
@@ -59,7 +59,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_TRIGGER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_EMITTER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> OBSERVER_TRIGGER;
-	
+
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
 		registerItemCapability();
@@ -70,7 +70,7 @@ public class VanillaSFMFlowPlugin {
 		registerCauldronBridges();
 
 		INTERVAL_TRIGGER = FlowComponentBuilder.create("interval_trigger", IntervalTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/interval_trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
 				.displayName("gui.sfmflow.interval_trigger").codec(IntervalTriggerComponent.CODEC).build(registry);
 
 		ITEM_INPUT = FlowComponentBuilder.create("item_input", uuid -> new ItemTransferComponent(uuid, true))
@@ -88,40 +88,38 @@ public class VanillaSFMFlowPlugin {
 				.codec(AdvancedItemFilterVariableComponent.CODEC).build(registry);
 
 		FLUID_INPUT = FlowComponentBuilder.create("fluid_input", uuid -> new FluidTransferComponent(uuid, true))
-				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/fluid_input_button.png")
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
 				.displayName("gui.sfmflow.fluid_input").codec(FluidTransferComponent.INPUT_CODEC).build(registry);
 
 		FLUID_OUTPUT = FlowComponentBuilder.create("fluid_output", uuid -> new FluidTransferComponent(uuid, false))
-				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/fluid_output_button.png")
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("gui.sfmflow.fluid_output").codec(FluidTransferComponent.OUTPUT_CODEC).build(registry);
-		
+
 		ADVANCED_FLUID_FILTER_VARIABLE = FlowComponentBuilder
 				.create("advanced_fluid_filter_variable", AdvancedFluidFilterVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/fluid_variable_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
 				.displayName("gui.sfmflow.advanced_fluid_filter_variable")
 				.codec(AdvancedFluidFilterVariableComponent.CODEC).build(registry);
 
 		ENERGY_INPUT = FlowComponentBuilder.create("energy_input", uuid -> new EnergyTransferComponent(uuid, true))
-				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/energy_input_button.png")
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
 				.displayName("gui.sfmflow.energy_input").codec(EnergyTransferComponent.INPUT_CODEC).build(registry);
 
 		ENERGY_OUTPUT = FlowComponentBuilder.create("energy_output", uuid -> new EnergyTransferComponent(uuid, false))
-				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/energy_output_button.png")
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("gui.sfmflow.energy_output").codec(EnergyTransferComponent.OUTPUT_CODEC).build(registry);
-		
-		// Inside registerComponents():
+
 		REDSTONE_TRIGGER = FlowComponentBuilder.create("redstone_trigger", RedstoneTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/redstone_trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
 				.displayName("gui.sfmflow.redstone_trigger").codec(RedstoneTriggerComponent.CODEC).build(registry);
-		
+
 		REDSTONE_EMITTER = FlowComponentBuilder.create("redstone_emitter", RedstoneEmitterComponent::new)
 				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/redstone_emitter_button.png")
 				.displayName("gui.sfmflow.redstone_emitter").codec(RedstoneEmitterComponent.CODEC).build(registry);
-		
+
 		OBSERVER_TRIGGER = FlowComponentBuilder.create("observer_trigger", ObserverTriggerComponent::new)
 				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
 				.displayName("gui.sfmflow.observer_trigger").codec(ObserverTriggerComponent.CODEC).build(registry);
-		
 	}
 
 	private void registerItemCapability() {
@@ -134,49 +132,52 @@ public class VanillaSFMFlowPlugin {
 			Map<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> slots = new HashMap<>();
 			int count = handler.getSlots();
 			for (int i = 0; i < count; i++) {
-				slots.put(i, new ThreadSafeInventorySnapshot.SlotSnapshot(handler.getStackInSlot(i), handler.getSlotLimit(i), i));
+				slots.put(i, new ThreadSafeInventorySnapshot.SlotSnapshot(handler.getStackInSlot(i),
+						handler.getSlotLimit(i), i));
 			}
 			return new ThreadSafeInventorySnapshot.InventorySnapshot(slots);
 		});
 
-		FlowCapabilityRegistry.registerTransfer(itemCapId, (Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
-			if (params instanceof ItemTransferParams task) {
-				IItemHandler source = level.getCapability(Capabilities.ItemHandler.BLOCK, src, srcSide);
-				IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, destSide);
+		FlowCapabilityRegistry.registerTransfer(itemCapId,
+				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+					if (params instanceof ItemTransferParams task) {
+						IItemHandler source = level.getCapability(Capabilities.ItemHandler.BLOCK, src, srcSide);
+						IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, destSide);
 
-				if (source == null) {
-					source = level.getCapability(Capabilities.ItemHandler.BLOCK, src, null);
-				}
-				if (target == null) {
-					target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, null);
-				}
-
-				if (source != null && target != null) {
-					ItemStack simExtracted = source.extractItem(task.srcSlot(), task.count(), true);
-					if (ItemStack.isSameItemSameComponents(simExtracted, task.item())) {
-						ItemStack targetRemaining;
-						if (task.destSlot() != -1) {
-							targetRemaining = target.insertItem(task.destSlot(), simExtracted, true);
-						} else {
-							targetRemaining = ItemHandlerHelper.insertItemStacked(target, simExtracted, true);
+						if (source == null) {
+							source = level.getCapability(Capabilities.ItemHandler.BLOCK, src, null);
+						}
+						if (target == null) {
+							target = level.getCapability(Capabilities.ItemHandler.BLOCK, dest, null);
 						}
 
-						int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
+						if (source != null && target != null) {
+							ItemStack simExtracted = source.extractItem(task.srcSlot(), task.count(), true);
+							if (ItemStack.isSameItemSameComponents(simExtracted, task.item())) {
+								ItemStack targetRemaining;
+								if (task.destSlot() != -1) {
+									targetRemaining = target.insertItem(task.destSlot(), simExtracted, true);
+								} else {
+									targetRemaining = ItemHandlerHelper.insertItemStacked(target, simExtracted, true);
+								}
 
-						if (realTransferCount > 0) {
-							ItemStack realExtracted = source.extractItem(task.srcSlot(), realTransferCount, false);
-							if (task.destSlot() != -1) {
-								target.insertItem(task.destSlot(), realExtracted, false);
-							} else {
-								ItemHandlerHelper.insertItemStacked(target, realExtracted, false);
+								int realTransferCount = simExtracted.getCount() - targetRemaining.getCount();
+
+								if (realTransferCount > 0) {
+									ItemStack realExtracted = source.extractItem(task.srcSlot(), realTransferCount,
+											false);
+									if (task.destSlot() != -1) {
+										target.insertItem(task.destSlot(), realExtracted, false);
+									} else {
+										ItemHandlerHelper.insertItemStacked(target, realExtracted, false);
+									}
+									return true;
+								}
 							}
-							return true;
 						}
 					}
-				}
-			}
-			return false;
-		});
+					return false;
+				});
 	}
 
 	private void registerFluidCapability() {
@@ -189,80 +190,84 @@ public class VanillaSFMFlowPlugin {
 			Map<Integer, ThreadSafeInventorySnapshot.TankSnapshot> tanks = new HashMap<>();
 			int count = handler.getTanks();
 			for (int i = 0; i < count; i++) {
-				tanks.put(i, new ThreadSafeInventorySnapshot.TankSnapshot(handler.getFluidInTank(i), handler.getTankCapacity(i)));
+				tanks.put(i, new ThreadSafeInventorySnapshot.TankSnapshot(handler.getFluidInTank(i),
+						handler.getTankCapacity(i)));
 			}
 			return new ThreadSafeInventorySnapshot.FluidInventorySnapshot(tanks);
 		});
 
-		FlowCapabilityRegistry.registerTransfer(fluidCapId, (Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
-			if (params instanceof FluidTransferParams task) {
-				IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, src, srcSide);
-				IFluidHandler target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, destSide);
+		FlowCapabilityRegistry.registerTransfer(fluidCapId,
+				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+					if (params instanceof FluidTransferParams task) {
+						IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, src, srcSide);
+						IFluidHandler target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, destSide);
 
-				if (source == null) {
-					source = level.getCapability(Capabilities.FluidHandler.BLOCK, src, null);
-				}
-				if (target == null) {
-					target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, null);
-				}
+						if (source == null) {
+							source = level.getCapability(Capabilities.FluidHandler.BLOCK, src, null);
+						}
+						if (target == null) {
+							target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, null);
+						}
 
-				if (source != null && target != null) {
-					FluidStack simDrained = source.drain(task.maxAmount(), IFluidHandler.FluidAction.SIMULATE);
-					if (!simDrained.isEmpty() && FluidStack.isSameFluid(simDrained, task.fluid())) {
-						int accepted = target.fill(simDrained, IFluidHandler.FluidAction.SIMULATE);
-						if (accepted > 0) {
-							FluidStack realDrain = source.drain(accepted, IFluidHandler.FluidAction.EXECUTE);
-							if (!realDrain.isEmpty()) {
-								target.fill(realDrain, IFluidHandler.FluidAction.EXECUTE);
-								return true;
+						if (source != null && target != null) {
+							FluidStack simDrained = source.drain(task.maxAmount(), IFluidHandler.FluidAction.SIMULATE);
+							if (!simDrained.isEmpty() && FluidStack.isSameFluid(simDrained, task.fluid())) {
+								int accepted = target.fill(simDrained, IFluidHandler.FluidAction.SIMULATE);
+								if (accepted > 0) {
+									FluidStack realDrain = source.drain(accepted, IFluidHandler.FluidAction.EXECUTE);
+									if (!realDrain.isEmpty()) {
+										target.fill(realDrain, IFluidHandler.FluidAction.EXECUTE);
+										return true;
+									}
+								}
 							}
 						}
 					}
-				}
-			}
-			return false;
-		});
+					return false;
+				});
 	}
 
 	private void registerEnergyCapability() {
 		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
-		FlowCapabilityRegistry
-				.register(new FlowCapability<>(energyCapId, Capabilities.EnergyStorage.BLOCK, "gui.sfmflow.type_energy"));
+		FlowCapabilityRegistry.register(
+				new FlowCapability<>(energyCapId, Capabilities.EnergyStorage.BLOCK, "gui.sfmflow.type_energy"));
 
 		// Register standard energy snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(energyCapId, (IEnergyStorage handler) -> {
-			return new ThreadSafeInventorySnapshot.EnergySnapshot(handler.getEnergyStored(), handler.getMaxEnergyStored(), handler.canExtract(), handler.canReceive());
+			return new ThreadSafeInventorySnapshot.EnergySnapshot(handler.getEnergyStored(),
+					handler.getMaxEnergyStored(), handler.canExtract(), handler.canReceive());
 		});
 
 		// Explicit parameter types prevent JMM-type inference breakdowns
-		FlowCapabilityRegistry.registerTransfer(energyCapId, (Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
-			if (params instanceof EnergyTransferParams task) {
-				IEnergyStorage source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, srcSide);
-				IEnergyStorage target = level.getCapability(Capabilities.EnergyStorage.BLOCK, dest, destSide);
+		FlowCapabilityRegistry.registerTransfer(energyCapId,
+				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+					if (params instanceof EnergyTransferParams task) {
+						IEnergyStorage source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, srcSide);
+						IEnergyStorage target = level.getCapability(Capabilities.EnergyStorage.BLOCK, dest, destSide);
 
-				if (source == null) {
-					source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, null);
-				}
-				if (target == null) {
-					target = level.getCapability(Capabilities.EnergyStorage.BLOCK, dest, null);
-				}
+						if (source == null) {
+							source = level.getCapability(Capabilities.EnergyStorage.BLOCK, src, null);
+						}
+						if (target == null) {
+							target = level.getCapability(Capabilities.EnergyStorage.BLOCK, dest, null);
+						}
 
-				if (source != null && target != null) {
-					int simDrained = source.extractEnergy(task.maxAmount(), true);
-					if (simDrained > 0) {
-						int accepted = target.receiveEnergy(simDrained, true);
-						if (accepted > 0) {
-							int realDrain = source.extractEnergy(accepted, false);
-							if (realDrain > 0) {
-								target.receiveEnergy(realDrain, false);
-								return true;
+						if (source != null && target != null) {
+							int simDrained = source.extractEnergy(task.maxAmount(), true);
+							if (simDrained > 0) {
+								int accepted = target.receiveEnergy(simDrained, true);
+								if (accepted > 0) {
+									int realDrain = source.extractEnergy(accepted, false);
+									if (realDrain > 0) {
+										target.receiveEnergy(realDrain, false);
+										return true;
+									}
+								}
 							}
 						}
 					}
-				}
-			}
-			return false;
-		});
+					return false;
+				});
 	}
 
 	@SuppressWarnings("unchecked")
@@ -278,19 +283,20 @@ public class VanillaSFMFlowPlugin {
 	private void registerRedstoneCapability() {
 		ResourceLocation redstoneCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone");
 		FlowCapabilityRegistry.register(new FlowCapability<>(redstoneCapId, null, "gui.sfmflow.type_redstone"));
-		
-		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone_emitter"), 
+
+		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone_emitter"),
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof RedstoneEmitterComponent.RedstoneEmitterParams task && destSide != null) {
-						net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(dest);
+						BlockEntity be = level.getBlockEntity(dest);
 						if (be instanceof RedstoneEmitterBlockEntity emitter) {
 							int currentPower = emitter.getPowerForSide(destSide);
-							int newPower = task.operator().apply(currentPower, task.modifierValue(), task.rolloverEnabled());
-							
+							int newPower = task.operator().apply(currentPower, task.modifierValue(),
+									task.rolloverEnabled());
+
 							if (task.isPulse()) {
 								emitter.setPowerForSide(destSide, newPower);
 								emitter.setPulsed(destSide, true);
-								// Schedule 1-tick delay to clear the pulse automatically [3]
+								// Schedule 1-tick delay to clear the pulse automatically
 								level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
 							} else {
 								emitter.setPowerForSide(destSide, newPower);
@@ -301,8 +307,6 @@ public class VanillaSFMFlowPlugin {
 					}
 					return false;
 				});
-		
-		
 	}
 
 	private void registerCauldronBridges() {

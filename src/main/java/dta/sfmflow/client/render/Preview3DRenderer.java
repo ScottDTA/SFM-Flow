@@ -33,6 +33,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -41,7 +42,7 @@ import javax.annotation.Nullable;
 import org.joml.Matrix4f;
 
 /**
- * Orchestrator class managing 3D block preview scene layers.
+ * Orchestrator class managing 3D block preview scene layers
  */
 @OnlyIn(Dist.CLIENT)
 public final class Preview3DRenderer {
@@ -98,7 +99,7 @@ public final class Preview3DRenderer {
 		BlockAndTintGetter brightLevel = new BlockAndTintGetter() {
 			@Override
 			public float getShade(Direction direction, boolean shade) {
-				return 1.0F; // Disable ambient shading [3]
+				return 1.0F;
 			}
 
 			@Override
@@ -171,7 +172,7 @@ public final class Preview3DRenderer {
 							float yRot = centerState.getValue(BlockStateProperties.FACING).toYRot();
 							poseStack.mulPose(Axis.YP.rotationDegrees(-yRot + 180.0F));
 						}
-						poseStack.scale(2.0F, 2.0F, 2.0F); // Scale item rendering to match 1x1x1 block size
+						poseStack.scale(2.0F, 2.0F, 2.0F);
 						Minecraft.getInstance().getItemRenderer().renderStatic(itemStack, ItemDisplayContext.FIXED,
 								15728880, OverlayTexture.NO_OVERLAY, poseStack, bufferSource, level, 0);
 					}
@@ -234,58 +235,71 @@ public final class Preview3DRenderer {
 		GhostRenderWrapper.GhostEntityBufferSource ghostEntitySource = new GhostRenderWrapper.GhostEntityBufferSource(
 				bufferSource, 0.3F);
 
+		// Calculate, project, and sort all neighbor blocks back-to-front before
+		// rendering
+		List<NeighborOffset> sortedOffsets = new ArrayList<>();
 		for (int dx = -1; dx <= 1; dx++) {
 			for (int dy = -1; dy <= 1; dy++) {
 				for (int dz = -1; dz <= 1; dz++) {
 					if (dx == 0 && dy == 0 && dz == 0) {
 						continue;
 					}
-
-					BlockPos currentPos = centerPos.offset(dx, dy, dz);
-					BlockState state = level.getBlockState(currentPos);
-					if (state.isAir()) {
-						continue;
-					}
-
-					poseStack.pushPose();
-					poseStack.translate(dx, dy, dz);
-
-					// Render neighbor blocks in SPECIAL_3D_RENDERS (Chests, etc.) translucent
-					// via dispatcher to preserve connected multi-block models
-					if (state.is(ModTags.SPECIAL_3D_RENDERS)) {
-						BlockEntity be = level.getBlockEntity(currentPos);
-						if (be != null) {
-							Minecraft.getInstance().getBlockEntityRenderDispatcher().render(be, 0.0F, poseStack,
-									ghostEntitySource // Preserves standard custom textures
-							);
-						}
-						poseStack.popPose();
-						continue;
-					}
-
-					BakedModel model = blockRenderer.getBlockModel(state);
-
-					ModelData neighborModelData = level.getModelData(currentPos);
-					if (neighborModelData == null) {
-						neighborModelData = ModelData.EMPTY;
-					}
-
-					var renderTypes = model.getRenderTypes(state, RandomSource.create(), neighborModelData);
-					if (renderTypes.isEmpty()) {
-						RenderType chunkType = ItemBlockRenderTypes.getChunkRenderType(state);
-						renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType, brightLevel,
-								poseStack, ghostSource);
-					} else {
-						for (RenderType chunkType : STANDARD_LAYERS) {
-							if (renderTypes.contains(chunkType)) {
-								renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType,
-										brightLevel, poseStack, ghostSource);
-							}
-						}
-					}
-					poseStack.popPose();
+					float depth = getRotatedZ(dx, dy, dz, yaw, pitch);
+					sortedOffsets.add(new NeighborOffset(dx, dy, dz, depth));
 				}
 			}
+		}
+		// Ascending sort: lowest depth (farthest from screen Z) is rendered first to
+		// satisfy translucency sorting
+		sortedOffsets.sort((o1, o2) -> Float.compare(o1.depth(), o2.depth()));
+
+		for (NeighborOffset offset : sortedOffsets) {
+			int dx = offset.dx();
+			int dy = offset.dy();
+			int dz = offset.dz();
+
+			BlockPos currentPos = centerPos.offset(dx, dy, dz);
+			BlockState state = level.getBlockState(currentPos);
+			if (state.isAir()) {
+				continue;
+			}
+
+			poseStack.pushPose();
+			poseStack.translate(dx, dy, dz);
+
+			// Render neighbor blocks in SPECIAL_3D_RENDERS (Chests, etc.) translucent
+			// via dispatcher to preserve connected multi-block models
+			if (state.is(ModTags.SPECIAL_3D_RENDERS)) {
+				BlockEntity be = level.getBlockEntity(currentPos);
+				if (be != null) {
+					Minecraft.getInstance().getBlockEntityRenderDispatcher().render(be, 0.0F, poseStack,
+							ghostEntitySource);
+				}
+				poseStack.popPose();
+				continue;
+			}
+
+			BakedModel model = blockRenderer.getBlockModel(state);
+
+			ModelData neighborModelData = level.getModelData(currentPos);
+			if (neighborModelData == null) {
+				neighborModelData = ModelData.EMPTY;
+			}
+
+			var renderTypes = model.getRenderTypes(state, RandomSource.create(), neighborModelData);
+			if (renderTypes.isEmpty()) {
+				RenderType chunkType = ItemBlockRenderTypes.getChunkRenderType(state);
+				renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType, brightLevel,
+						poseStack, ghostSource);
+			} else {
+				for (RenderType chunkType : STANDARD_LAYERS) {
+					if (renderTypes.contains(chunkType)) {
+						renderNeighborLayer(level, currentPos, state, model, neighborModelData, chunkType, brightLevel,
+								poseStack, ghostSource);
+					}
+				}
+			}
+			poseStack.popPose();
 		}
 
 		bufferSource.endBatch();
@@ -316,6 +330,18 @@ public final class Preview3DRenderer {
 		Minecraft.getInstance().getBlockRenderer().getModelRenderer().tesselateWithoutAO(brightLevel, model, state, pos,
 				poseStack, consumer, false, RandomSource.create(), state.getSeed(pos), OverlayTexture.NO_OVERLAY,
 				modelData, chunkType);
+	}
+
+	private static float getRotatedZ(float x, float y, float z, float yaw, float pitch) {
+		double yawRad = Math.toRadians(yaw);
+		double pitchRad = Math.toRadians(pitch);
+
+		double x1 = x * Math.cos(yawRad) + z * Math.sin(yawRad);
+		double y1 = y;
+		double z1 = -x * Math.sin(yawRad) + z * Math.cos(yawRad);
+
+		double z2 = y1 * Math.sin(pitchRad) + z1 * Math.cos(pitchRad);
+		return (float) z2;
 	}
 
 	private static void draw3DQuad(VertexConsumer builder, Matrix4f matrix, float x1, float y1, float z1, float x2,
@@ -356,7 +382,7 @@ public final class Preview3DRenderer {
 
 	private static void draw3DMarker(PoseStack poseStack, MultiBufferSource bufferSource, Direction face,
 			boolean active, boolean supported) {
-		Matrix4f matrix = poseStack.last().pose();
+		org.joml.Matrix4f matrix = poseStack.last().pose();
 		int r, g, b;
 		if (supported) {
 			if (active) {
@@ -420,5 +446,8 @@ public final class Preview3DRenderer {
 			}
 			}
 		}
+	}
+
+	private record NeighborOffset(int dx, int dy, int dz, float depth) {
 	}
 }

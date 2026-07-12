@@ -22,8 +22,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Common, stateless helper consolidating item transfer simulation, extraction, and
- * deposition planning routines [3].
+ * Common, stateless helper consolidating item transfer simulation, extraction,
+ * and deposition planning routines.
  */
 public final class ItemTransferPlanner {
 
@@ -33,7 +33,7 @@ public final class ItemTransferPlanner {
 	public static void planInput(FlowchartPlanningContext context, ItemTransferComponent component) {
 		FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 
-		// Carry over any incoming items passed from upstream input nodes [3]
+		// Carry over any incoming items passed from upstream input nodes
 		FlowItemBuffer myInputBuffer = context.getComponentBuffer(component.getId());
 		if (!myInputBuffer.isEmpty()) {
 			for (FlowItemBuffer.BufferedItem item : myInputBuffer.getItems()) {
@@ -41,10 +41,11 @@ public final class ItemTransferPlanner {
 			}
 		}
 
-		// Extract our own configured inventory items into the combined buffer [3]
+		// Extract our own configured inventory items into the combined buffer
 		extractItemsIntoBuffer(context, component, myOutputBuffer);
 
-		// Copy extracted buffer contents onto connected target input buffers sequentially [3]
+		// Copy extracted buffer contents onto connected target input buffers
+		// sequentially
 		if (!myOutputBuffer.isEmpty()) {
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
@@ -67,7 +68,8 @@ public final class ItemTransferPlanner {
 			FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 			depositItemsFromBuffer(context, component, myInputBuffer, myOutputBuffer);
 
-			// Propagate remaining un-deposited leftovers downstream along the connection lines [3]
+			// Propagate remaining un-deposited leftovers downstream along the connection
+			// lines
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
 					UUID targetId = conn.getTargetComponentId();
@@ -104,7 +106,8 @@ public final class ItemTransferPlanner {
 		}
 	}
 
-	private static void extractItemsIntoBuffer(FlowchartPlanningContext context, ItemTransferComponent component, FlowItemBuffer buffer) {
+	private static void extractItemsIntoBuffer(FlowchartPlanningContext context, ItemTransferComponent component,
+			FlowItemBuffer buffer) {
 		var inventories = context.getConnectedInventories();
 		BlockPos srcInventoryPos = null;
 
@@ -161,7 +164,7 @@ public final class ItemTransferPlanner {
 
 				int totalInSource = 0;
 				for (var entry : srcInv.slots().values()) {
-					if (ItemStack.isSameItem(srcStack, entry.stack())) {
+					if (ItemStack.isSameItemSameComponents(srcStack, entry.stack())) {
 						totalInSource += entry.stack().getCount();
 					}
 				}
@@ -193,9 +196,8 @@ public final class ItemTransferPlanner {
 					ItemStack extracted = srcStack.copy();
 					extracted.setCount(srcRemaining);
 
-					// Centralized debug log [3]
-					FlowLogger.execution("Extracting Slot %d: Side=%s, Count=%d, AlreadyGrabbed=%d",
-							srcSlot, srcSide, srcRemaining, grabbedCounts.getOrDefault(srcItem, 0));
+					FlowLogger.execution("Extracting Slot %d: Side=%s, Count=%d, AlreadyGrabbed=%d", srcSlot, srcSide,
+							srcRemaining, grabbedCounts.getOrDefault(srcItem, 0));
 
 					buffer.add(srcInventoryPos, srcSlot, srcSide, extracted);
 
@@ -207,8 +209,8 @@ public final class ItemTransferPlanner {
 		}
 	}
 
-	private static void depositItemsFromBuffer(FlowchartPlanningContext context, ItemTransferComponent component, FlowItemBuffer inputBuffer,
-			FlowItemBuffer outputBuffer) {
+	private static void depositItemsFromBuffer(FlowchartPlanningContext context, ItemTransferComponent component,
+			FlowItemBuffer inputBuffer, FlowItemBuffer outputBuffer) {
 		var inventories = context.getConnectedInventories();
 		BlockPos tgtInventoryPos = null;
 
@@ -273,6 +275,8 @@ public final class ItemTransferPlanner {
 				List<Integer> sortedTgtSlots = new ArrayList<>(tgtInv.slots().keySet());
 				Collections.sort(sortedTgtSlots);
 
+				// PASS 1: Fill up existing matching stacks strictly first to preserve inventory
+				// space
 				for (int tgtSlot : sortedTgtSlots) {
 					if (remainingToDeposit <= 0)
 						break;
@@ -289,65 +293,108 @@ public final class ItemTransferPlanner {
 						continue;
 					}
 
-					int totalInTarget = 0;
-					for (var entry : tgtInv.slots().values()) {
-						if (ItemStack.isSameItem(incoming, entry.stack())) {
-							totalInTarget += entry.stack().getCount();
+					if (!tgtStack.isEmpty() && ItemStack.isSameItemSameComponents(incoming, tgtStack)) {
+						int totalInTarget = 0;
+						for (var entry : tgtInv.slots().values()) {
+							if (ItemStack.isSameItemSameComponents(incoming, entry.stack())) {
+								totalInTarget += entry.stack().getCount();
+							}
 						}
-					}
 
-					int maxToDeposit = incoming.getMaxStackSize();
-
-					if (component.isWhitelist()) {
-						if (tgtLimit > 0) {
-							maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
+						int maxToDeposit = incoming.getMaxStackSize();
+						if (component.isWhitelist()) {
+							if (tgtLimit > 0) {
+								maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
+								if (maxToDeposit <= 0) {
+									continue;
+								}
+							}
+						} else {
+							maxToDeposit = allowedDeposit;
 							if (maxToDeposit <= 0) {
 								continue;
 							}
 						}
-					} else {
-						maxToDeposit = allowedDeposit;
-						if (maxToDeposit <= 0) {
-							continue;
-						}
-					}
 
-					boolean canInsert = false;
-					int maxInsertable = 0;
-					int actualLimit = Math.min(tgtEntry.slotLimit(), maxToDeposit);
-
-					if (tgtStack.isEmpty()) {
-						canInsert = true;
-						maxInsertable = actualLimit;
-					} else if (ItemStack.isSameItem(incoming, tgtStack)) {
-						int remainingSpace = actualLimit - tgtStack.getCount();
+						int remainingSpace = Math.min(tgtEntry.slotLimit(), maxToDeposit) - tgtStack.getCount();
 						if (remainingSpace > 0) {
-							canInsert = true;
-							maxInsertable = remainingSpace;
-						}
-					}
-
-					if (canInsert) {
-						int amountToTransfer = Math.min(remainingToDeposit, maxInsertable);
-						if (amountToTransfer > 0) {
-							// Centralized debug log [3]
-							FlowLogger.execution("Depositing Slot %d: Side=%s, Amount=%d, RemainingToDeposit=%d",
-									tgtSlot, tgtSide, amountToTransfer, remainingToDeposit);
-
-							boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
-									incomingItem.srcSide(), tgtInventoryPos, tgtSlot, tgtSide, incoming,
-									amountToTransfer);
-							if (success) {
-								if (tgtStack.isEmpty()) {
-									ItemStack newTgt = incoming.copy();
-									newTgt.setCount(amountToTransfer);
-									tgtInv.slots().put(tgtSlot, new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
-											tgtEntry.slotLimit(), mainTgtSlot));
-									updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, newTgt);
-								} else {
+							int amountToTransfer = Math.min(remainingToDeposit, remainingSpace);
+							if (amountToTransfer > 0) {
+								// If "All slots" (-1) is selected, pass -1 to let the server stack items
+								// naturally
+								int taskDestSlot = (component.getTargetSlot() == -1) ? -1 : tgtSlot;
+								boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
+										incomingItem.srcSide(), tgtInventoryPos, taskDestSlot, tgtSide, incoming,
+										amountToTransfer);
+								if (success) {
 									tgtStack.grow(amountToTransfer);
 									updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, tgtStack);
+									incoming.shrink(amountToTransfer);
+									remainingToDeposit -= amountToTransfer;
+									if (!component.isWhitelist()) {
+										allowedDeposit -= amountToTransfer;
+									}
 								}
+							}
+						}
+					}
+				}
+
+				// PASS 2: Place remaining items into empty slots
+				for (int tgtSlot : sortedTgtSlots) {
+					if (remainingToDeposit <= 0)
+						break;
+
+					ThreadSafeInventorySnapshot.SlotSnapshot tgtEntry = tgtInv.slots().get(tgtSlot);
+					ItemStack tgtStack = tgtEntry.stack();
+
+					if (component.getTargetSlot() != -1 && component.getTargetSlot() != tgtSlot) {
+						continue;
+					}
+
+					int mainTgtSlot = tgtEntry.mainSlotIndex();
+					if (!component.isSlotEnabled(tgtSide, mainTgtSlot)) {
+						continue;
+					}
+
+					if (tgtStack.isEmpty()) {
+						int totalInTarget = 0;
+						for (var entry : tgtInv.slots().values()) {
+							if (ItemStack.isSameItemSameComponents(incoming, entry.stack())) {
+								totalInTarget += entry.stack().getCount();
+							}
+						}
+
+						int maxToDeposit = incoming.getMaxStackSize();
+						if (component.isWhitelist()) {
+							if (tgtLimit > 0) {
+								maxToDeposit = Math.max(0, tgtLimit - totalInTarget);
+								if (maxToDeposit <= 0) {
+									continue;
+								}
+							}
+						} else {
+							maxToDeposit = allowedDeposit;
+							if (maxToDeposit <= 0) {
+								continue;
+							}
+						}
+
+						int amountToTransfer = Math.min(remainingToDeposit,
+								Math.min(tgtEntry.slotLimit(), maxToDeposit));
+						if (amountToTransfer > 0) {
+							// If "All slots" (-1) is selected, pass -1 to let the server stack items
+							// naturally
+							int taskDestSlot = (component.getTargetSlot() == -1) ? -1 : tgtSlot;
+							boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
+									incomingItem.srcSide(), tgtInventoryPos, taskDestSlot, tgtSide, incoming,
+									amountToTransfer);
+							if (success) {
+								ItemStack newTgt = incoming.copy();
+								newTgt.setCount(amountToTransfer);
+								tgtInv.slots().put(tgtSlot, new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
+										tgtEntry.slotLimit(), mainTgtSlot));
+								updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, newTgt);
 								incoming.shrink(amountToTransfer);
 								remainingToDeposit -= amountToTransfer;
 								if (!component.isWhitelist()) {
@@ -367,7 +414,8 @@ public final class ItemTransferPlanner {
 		}
 	}
 
-	private static boolean matchesFilter(FlowchartPlanningContext context, ItemTransferComponent component, ItemStack stack) {
+	private static boolean matchesFilter(FlowchartPlanningContext context, ItemTransferComponent component,
+			ItemStack stack) {
 		if (stack.isEmpty()) {
 			return false;
 		}
@@ -403,7 +451,7 @@ public final class ItemTransferPlanner {
 							}
 						}
 					}
-				} else if (ItemStack.isSameItem(stack, filter)) {
+				} else if (ItemStack.isSameItemSameComponents(stack, filter)) {
 					found = true;
 					limit = i < component.getFilterLimits().size() ? component.getFilterLimits().get(i) : -1;
 					break;
@@ -418,7 +466,8 @@ public final class ItemTransferPlanner {
 		}
 	}
 
-	private static int getFilterLimit(FlowchartPlanningContext context, ItemTransferComponent component, ItemStack stack) {
+	private static int getFilterLimit(FlowchartPlanningContext context, ItemTransferComponent component,
+			ItemStack stack) {
 		if (component.getBoundFilterVariableId() != null) {
 			AbstractFlowComponent boundComp = context.getComponents().get(component.getBoundFilterVariableId());
 			if (boundComp instanceof AdvancedItemFilterVariableComponent varComp) {
@@ -441,14 +490,14 @@ public final class ItemTransferPlanner {
 					if (varComp instanceof AdvancedItemFilterVariableComponent advancedVar) {
 						if (AdvancedItemFilterVariableComponent.matchesVariableFilter(advancedVar, stack)) {
 							int resolvedLimit = advancedVar.isUseQuantity() ? advancedVar.getQuantity() : -1;
-							// Centralized debug log [3]
-							FlowLogger.execution("getFilterLimit Resolved Variable Card: ID=%s, Item=%s, UseQty=%b, Limit=%d",
-									varId, stack.getItem().toString(), advancedVar.isUseQuantity(), resolvedLimit);
+							FlowLogger.execution(
+									"getFilterLimit Resolved Variable Card: ID=%s, Item=%s, UseQty=%b, Limit=%d", varId,
+									stack.getItem().toString(), advancedVar.isUseQuantity(), resolvedLimit);
 							return resolvedLimit;
 						}
 					}
 				}
-			} else if (ItemStack.isSameItem(stack, filter)) {
+			} else if (ItemStack.isSameItemSameComponents(stack, filter)) {
 				return component.getFilterLimit(stack);
 			}
 		}
