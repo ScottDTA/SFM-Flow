@@ -141,7 +141,8 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		ItemStack stack = this.inventory.getStackInSlot(slot);
 		if (stack.isEmpty())
 			return false;
-		return stack.is(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem());
+		return stack.is(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem())
+				|| stack.is(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem());
 	}
 
 	public @Nullable IItemHandler getItemHandler(@Nullable Direction side) {

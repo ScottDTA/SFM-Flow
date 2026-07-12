@@ -1,11 +1,16 @@
 7-12-2026
 
 
+
 ### [Added]
+* Added the Fluid Vacuum Valve, a dedicated network block capable of vacuuming fluid source blocks directly from the world when triggered by your flowchart.
+* Added the Fluid Ejector Valve, a dedicated, non-buffering block that instantaneously places fluid source blocks into the world.
 * Integrated the Item Vacuum Valve into the logic system; it can now dynamically detect, simulate, and transfer nearby ground items through your network pipelines during flowchart execution.
 * Implemented a multi-threaded copy mechanism for network inventories during background logic planning, resolving potential data conflicts and improving overall server stability.
 
 ### [Changed]
+* Split the old "Fluid Extraction Hatch" block and card into the two specialized valves above to simplify network setups.
+* Updated fluid block placement checks to prevent ejecting fluids into coordinates that already contain an active fluid source block.
 * Upgraded the Item Vacuum Valve with "intelligent filtering"; it will now scan your active flowchart and only suction ground items if they match your filter rules and have room in destination chests, preventing items from getting stuck inside the valve.
 * Made the Item Vacuum Valve completely passive to optimize server performance, removing its independent ticking loop.
 * Restricted network pipe connections for the Item Vacuum Valve, Item Ejection Valve, and Fluid Extraction Hatch so they can only interact with adjacent blocks on their front-facing side.
@@ -15,6 +20,7 @@
 * Reworked the Observer Cable block's visual model to render distinct front, back, top, bottom, and side texture overlays.
 
 ### [Fixed]
+* Removed the old, generic "Fluid Extraction Hatch" block, item, and creative tab entries.
 * Fixed a major logic simulation error where sided blocks (such as Furnaces and Brewing Stands) would fail to update simulated slot counts consistently across all of their faces during item transfer checks.
 
 

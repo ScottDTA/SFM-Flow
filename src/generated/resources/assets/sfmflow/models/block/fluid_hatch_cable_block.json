@@ -1,6 +1,0 @@
-{
-  "parent": "minecraft:block/cube_all",
-  "textures": {
-    "all": "sfmflow:block/fluid_hatch_cable_block"
-  }
-}

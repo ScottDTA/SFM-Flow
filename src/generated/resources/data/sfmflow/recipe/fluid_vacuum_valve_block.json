@@ -11,17 +11,20 @@
     "G": {
       "item": "minecraft:glass"
     },
+    "H": {
+      "item": "minecraft:hopper"
+    },
     "I": {
       "item": "minecraft:iron_ingot"
     }
   },
   "pattern": [
-    "IBI",
+    "IHI",
     "CGC",
     "IBI"
   ],
   "result": {
     "count": 1,
-    "id": "sfmflow:fluid_hatch_cable_block"
+    "id": "sfmflow:fluid_vacuum_valve_block"
   }
 }

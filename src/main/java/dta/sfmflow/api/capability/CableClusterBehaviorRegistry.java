@@ -31,21 +31,12 @@ public final class CableClusterBehaviorRegistry {
 			}
 		});
 
-		// Default Fluid Hatch Behavior
-		register(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem(), (level, pos, dir, slot, card, be) -> {
-			if ((level.getGameTime() + slot) % 10 == 0) {
-				String modeStr = "vacuum";
-				CompoundTag tag = card.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-				if (tag.contains("mode")) {
-					modeStr = tag.getString("mode");
-				}
-				if ("vacuum".equals(modeStr)) {
-					HatchBehaviorHelper.performFluidVacuum(level, pos, dir, be.getFluidBuffer(slot), be::setChanged);
-				} else {
-					HatchBehaviorHelper.performFluidEjection(level, pos, dir, be.getFluidBuffer(slot), be::setChanged);
-				}
-			}
-		});
+		// Default Fluid Ejector Behavior
+				register(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem(), (level, pos, dir, slot, card, be) -> {
+					if ((level.getGameTime() + slot) % 10 == 0) {
+						HatchBehaviorHelper.performFluidEjection(level, pos, dir, be.getFluidBuffer(slot), be::setChanged);
+					}
+				});
 	}
 
 	private CableClusterBehaviorRegistry() {

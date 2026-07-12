@@ -1,0 +1,27 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "sfmflow:block/fluid_vacuum_valve_block",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "sfmflow:block/fluid_vacuum_valve_block",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "sfmflow:block/fluid_vacuum_valve_block"
+    },
+    "facing=south": {
+      "model": "sfmflow:block/fluid_vacuum_valve_block",
+      "y": 180
+    },
+    "facing=up": {
+      "model": "sfmflow:block/fluid_vacuum_valve_block",
+      "x": 270
+    },
+    "facing=west": {
+      "model": "sfmflow:block/fluid_vacuum_valve_block",
+      "y": 270
+    }
+  }
+}

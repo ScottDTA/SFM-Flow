@@ -62,10 +62,15 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 				.define('D', Items.DROPPER).define('K', Items.CHEST)
 				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
-		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), 1).pattern("IBI")
-				.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
-				.define('B', Items.BUCKET).define('G', Items.GLASS)
-				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(), 1).pattern("IDI")
+		.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
+		.define('B', Items.BUCKET).define('G', Items.GLASS).define('D', Items.DROPPER)
+		.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+
+ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), 1).pattern("IHI")
+		.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
+		.define('B', Items.BUCKET).define('G', Items.GLASS).define('H', Items.HOPPER)
+		.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
 		// Cable Cluster Block (4x Cables, 4x Iron Ingots, 1x Chest)
 		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CABLE_CLUSTER_BLOCK.get(), 1).pattern("ICI")

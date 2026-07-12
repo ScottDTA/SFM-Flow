@@ -16,9 +16,9 @@ public class ModLanguageProvider extends LanguageProvider {
 
 	@Override
 	protected void addTranslations() {
-		add("block.sfmflow.advanced_cable_cluster_block", "Advanced Card Cluster");
+		add("block.sfmflow.advanced_cable_cluster_block", "Advanced Cable Cluster");
 		add("block.sfmflow.cable_block", "Network Cable");
-		add("block.sfmflow.cable_cluster_block", "Standard Card Cluster");
+		add("block.sfmflow.cable_cluster_block", "Standard Cable Cluster");
 		add("block.sfmflow.fluid_hatch_cable_block", "Fluid Extraction Hatch");
 		add("block.sfmflow.hardened_cable_block", "Hardened Network Cable");
 		add("block.sfmflow.item_ejector_valve_block", "Item Ejection Valve");
@@ -28,6 +28,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("block.sfmflow.redstone_emitter_block", "Redstone Network Emitter");
 		add("block.sfmflow.redstone_receiver_block", "Redstone Network Receiver");
 		add("block.sfmflow.redstone_emitter", "Redstone Emitter");
+		add("block.sfmflow.fluid_ejector_valve_block", "Fluid Ejection Valve");
+		add("block.sfmflow.fluid_vacuum_valve_block", "Fluid Vacuum Valve");
 		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
 		add("container.sfmflow.cable_cluster", "Cable Cluster");
 

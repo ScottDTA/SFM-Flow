@@ -213,6 +213,9 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.registerTransfer(fluidCapId,
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof FluidTransferParams task) {
+						if (level.getBlockState(src).is(dta.sfmflow.block.ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get())) {
+							return executeFluidVacuumTransfer(level, src, dest, destSide, task);
+						}
 						IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, src, srcSide);
 						IFluidHandler target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, destSide);
 
@@ -239,6 +242,34 @@ public class VanillaSFMFlowPlugin {
 					}
 					return false;
 				});
+	}
+	
+	private static boolean executeFluidVacuumTransfer(Level level, BlockPos src, BlockPos dest, Direction destSide, FluidTransferParams task) {
+		BlockState state = level.getBlockState(src);
+		if (!state.hasProperty(dta.sfmflow.block.FluidVacuumValveBlock.FACING)) {
+			return false;
+		}
+		Direction facing = state.getValue(dta.sfmflow.block.FluidVacuumValveBlock.FACING);
+		BlockPos mouthPos = src.relative(facing);
+
+		net.minecraft.world.level.material.FluidState fluidState = level.getFluidState(mouthPos);
+		if (fluidState.isSource() && fluidState.getType() == task.fluid().getFluid()) {
+			IFluidHandler target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, destSide);
+			if (target == null) {
+				target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, null);
+			}
+
+			if (target != null) {
+				FluidStack simDrained = new FluidStack(fluidState.getType(), 1000);
+				int accepted = target.fill(simDrained, IFluidHandler.FluidAction.SIMULATE);
+				if (accepted == 1000) {
+					target.fill(simDrained, IFluidHandler.FluidAction.EXECUTE);
+					level.setBlock(mouthPos, Blocks.AIR.defaultBlockState(), 3);
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	private void registerEnergyCapability() {

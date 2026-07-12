@@ -1,7 +1,6 @@
 package dta.sfmflow.registry;
 
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.block.FluidHatchCableBlock;
 import dta.sfmflow.block.ItemEjectorValveBlock;
 import dta.sfmflow.block.ItemVacuumValveBlock;
 import dta.sfmflow.block.entity.ModBlockEntities;
@@ -51,13 +50,21 @@ public class ModCapabilities {
 					return null;
 				});
 
-		// Restrict Fluid Hatch capability exposure exclusively to its in-world facing
-		// mouth
-		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.FLUID_HATCH_CABLE_BE.get(),
+		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.FLUID_EJECTOR_VALVE_BE.get(),
 				(be, side) -> {
 					BlockState state = be.getBlockState();
-					if (state.hasProperty(FluidHatchCableBlock.FACING)
-							&& side == state.getValue(FluidHatchCableBlock.FACING)) {
+					if (state.hasProperty(dta.sfmflow.block.FluidEjectorValveBlock.FACING) &&
+							side == state.getValue(dta.sfmflow.block.FluidEjectorValveBlock.FACING)) {
+						return be.getFluidHandler(side);
+					}
+					return null;
+				});
+
+		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.FLUID_VACUUM_VALVE_BE.get(),
+				(be, side) -> {
+					BlockState state = be.getBlockState();
+					if (state.hasProperty(dta.sfmflow.block.FluidVacuumValveBlock.FACING) &&
+							side == state.getValue(dta.sfmflow.block.FluidVacuumValveBlock.FACING)) {
 						return be.getFluidHandler(side);
 					}
 					return null;

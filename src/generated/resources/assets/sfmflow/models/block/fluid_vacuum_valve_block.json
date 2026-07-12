@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "sfmflow:block/fluid_vacuum_valve_block_front",
+    "side": "sfmflow:block/fluid_vacuum_valve_block",
+    "top": "sfmflow:block/fluid_vacuum_valve_block"
+  }
+}

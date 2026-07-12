@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "B": {
+      "item": "minecraft:bucket"
+    },
+    "C": {
+      "item": "sfmflow:cable_block"
+    },
+    "D": {
+      "item": "minecraft:dropper"
+    },
+    "G": {
+      "item": "minecraft:glass"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    }
+  },
+  "pattern": [
+    "IDI",
+    "CGC",
+    "IBI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "sfmflow:fluid_ejector_valve_block"
+  }
+}

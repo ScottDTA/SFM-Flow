@@ -34,9 +34,13 @@ public class ModBlockEntities {
 			.register("item_vacuum_hatch_be", () -> BlockEntityType.Builder
 					.of(ItemVacuumValveBlockEntity::new, ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get()).build(null));
 
-	public static final Supplier<BlockEntityType<FluidHatchCableBlockEntity>> FLUID_HATCH_CABLE_BE = BLOCK_ENTITIES
-			.register("fluid_hatch_cable_be", () -> BlockEntityType.Builder
-					.of(FluidHatchCableBlockEntity::new, ModBlocks.FLUID_HATCH_CABLE_BLOCK.get()).build(null));
+	public static final Supplier<BlockEntityType<FluidEjectorValveBlockEntity>> FLUID_EJECTOR_VALVE_BE = BLOCK_ENTITIES
+			.register("fluid_ejector_valve_be", () -> BlockEntityType.Builder
+					.of(FluidEjectorValveBlockEntity::new, ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get()).build(null));
+
+	public static final Supplier<BlockEntityType<FluidVacuumValveBlockEntity>> FLUID_VACUUM_VALVE_BE = BLOCK_ENTITIES
+			.register("fluid_vacuum_valve_be", () -> BlockEntityType.Builder
+					.of(FluidVacuumValveBlockEntity::new, ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get()).build(null));
 
 	public static final Supplier<BlockEntityType<CableClusterBlockEntity>> CABLE_CLUSTER_BE = BLOCK_ENTITIES
 			.register("cable_cluster_be", () -> BlockEntityType.Builder.of(CableClusterBlockEntity::new,

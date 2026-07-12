@@ -55,12 +55,22 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		directionalBlockFacingNorth(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), vacuumModel);
 		simpleBlockItem(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), vacuumModel);
 
-		// Configured Fluid Hatch Cable Block with correct North-facing rotations
-		BlockModelBuilder fluidHatchModel = models().cubeAll("fluid_hatch_cable_block",
-				modLoc("block/fluid_hatch_cable_block"));
-		directionalBlockFacingNorth(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), fluidHatchModel);
-		simpleBlockItem(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(), fluidHatchModel);
+		// Configured Fluid Ejector Valve to use its dedicated front-face texture orientably with custom rotations [3]
+				BlockModelBuilder fluidEjectorModel = models().orientable("fluid_ejector_valve_block",
+						modLoc("block/fluid_ejector_valve_block"),
+						modLoc("block/fluid_ejector_valve_block_front"),
+						modLoc("block/fluid_ejector_valve_block"));
+				directionalBlockFacingNorth(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(), fluidEjectorModel);
+				simpleBlockItem(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(), fluidEjectorModel);
 
+				// Configured Fluid Vacuum Valve to use its dedicated front-face texture orientably with custom rotations [3]
+				BlockModelBuilder fluidVacuumModel = models().orientable("fluid_vacuum_valve_block",
+						modLoc("block/fluid_vacuum_valve_block"),
+						modLoc("block/fluid_vacuum_valve_block_front"),
+						modLoc("block/fluid_vacuum_valve_block"));
+				directionalBlockFacingNorth(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), fluidVacuumModel);
+				simpleBlockItem(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), fluidVacuumModel);
+				
 		// Standard Cable Cluster
 		simpleBlock(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
 				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));

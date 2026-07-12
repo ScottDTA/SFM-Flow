@@ -12,6 +12,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -36,7 +37,7 @@ import java.util.ArrayDeque;
 
 /**
  * Common, stateless helper consolidating vacuum, ejection, and fluid hatch
- * execution logic.
+ * execution logic [3].
  */
 public final class HatchBehaviorHelper {
 
@@ -47,11 +48,11 @@ public final class HatchBehaviorHelper {
 	 * Suctions ground items in a 3x3x3 volume centered on the mouth position into
 	 * the target item handler.
 	 *
-	 * @param level       the world level context
-	 * @param pos         the base position of the block performing the action
-	 * @param facing      the direction the hatch face is looking
-	 * @param itemHandler the destination capability item handler
-	 * @param onChange    the callback run to mark changes and stamp dirtiness
+	 * @param level       the world level context [3]
+	 * @param pos         the base position of the block performing the action [3]
+	 * @param facing      the direction the hatch face is looking [3]
+	 * @param itemHandler the destination capability item handler [3]
+	 * @param onChange    the callback run to mark changes and stamp dirtiness [3]
 	 */
 	public static void performVacuum(Level level, BlockPos pos, Direction facing, IItemHandler itemHandler,
 			Runnable onChange) {
@@ -64,8 +65,7 @@ public final class HatchBehaviorHelper {
 			if (itemEntity.isAlive() && !itemEntity.hasPickUpDelay()) {
 				ItemStack stack = itemEntity.getItem();
 
-				// Restrict suctioning to valid, connected flowchart outputs with available
-				// space
+				// Restrict suctioning to valid, connected flowchart outputs with available space [3]
 				if (!hasFlowchartSpaceAndMatch(level, pos, stack)) {
 					continue;
 				}
@@ -87,13 +87,13 @@ public final class HatchBehaviorHelper {
 
 	/**
 	 * Ejects item stacks out of the first available slot of the target item handler
-	 * as floating entities.
+	 * as floating entities [3].
 	 *
-	 * @param level       the world level context
-	 * @param pos         the base position of the block performing the action
-	 * @param facing      the direction the hatch face is looking
-	 * @param itemHandler the source capability item handler
-	 * @param onChange    the callback run to mark changes and stamp dirtiness
+	 * @param level       the world level context [3]
+	 * @param pos         the base position of the block performing the action [3]
+	 * @param facing      the direction the hatch face is looking [3]
+	 * @param itemHandler the source capability item handler [3]
+	 * @param onChange    the callback run to mark changes and stamp dirtiness [3]
 	 */
 	public static void performEjection(Level level, BlockPos pos, Direction facing, IItemHandler itemHandler,
 			Runnable onChange) {
@@ -131,13 +131,13 @@ public final class HatchBehaviorHelper {
 	}
 
 	/**
-	 * Ingests adjacent fluid sources and fills the target fluid handler.
+	 * Ingests adjacent fluid sources and fills the target fluid handler [3].
 	 *
-	 * @param level        the world level context
-	 * @param pos          the base position of the block performing the action
-	 * @param facing       the direction the hatch face is looking
-	 * @param fluidHandler the target capability fluid handler
-	 * @param onChange     the callback run to mark changes and stamp dirtiness
+	 * @param level        the world level context [3]
+	 * @param pos          the base position of the block performing the action [3]
+	 * @param facing       the direction the hatch face is looking [3]
+	 * @param fluidHandler the target capability fluid handler [3]
+	 * @param onChange     the callback run to mark changes and stamp dirtiness [3]
 	 */
 	public static void performFluidVacuum(Level level, BlockPos pos, Direction facing, IFluidHandler fluidHandler,
 			Runnable onChange) {
@@ -159,13 +159,13 @@ public final class HatchBehaviorHelper {
 
 	/**
 	 * Ejects fluid from the target fluid handler to place as source blocks in the
-	 * world.
+	 * world [3].
 	 *
-	 * @param level        the world level context
-	 * @param pos          the base position of the block performing the action
-	 * @param facing       the direction the hatch face is looking
-	 * @param fluidHandler the source capability fluid handler
-	 * @param onChange     the callback run to mark changes and stamp dirtiness
+	 * @param level        the world level context [3]
+	 * @param pos          the base position of the block performing the action [3]
+	 * @param facing       the direction the hatch face is looking [3]
+	 * @param fluidHandler the source capability fluid handler [3]
+	 * @param onChange     the callback run to mark changes and stamp dirtiness [3]
 	 */
 	public static void performFluidEjection(Level level, BlockPos pos, Direction facing, IFluidHandler fluidHandler,
 			Runnable onChange) {
@@ -173,8 +173,10 @@ public final class HatchBehaviorHelper {
 		if (stored.getAmount() >= 1000) {
 			BlockPos mouthPos = pos.relative(facing);
 			BlockState mouthState = level.getBlockState(mouthPos);
+			FluidState fluidState = level.getFluidState(mouthPos);
 
-			if (mouthState.isAir() || mouthState.canBeReplaced(stored.getFluid())) {
+			// Prevent placing the fluid if the target location is already a fluid source block [3]
+			if (!fluidState.isSource() && (mouthState.isAir() || mouthState.canBeReplaced(stored.getFluid()))) {
 				BlockState fluidBlockState = stored.getFluid().defaultFluidState().createLegacyBlock();
 
 				if (!fluidBlockState.isAir()) {
@@ -187,36 +189,33 @@ public final class HatchBehaviorHelper {
 	}
 
 	/**
-	 * Scans the connected flowchart to verify if the item satisfies both Input and
-	 * Output cards, and checks if the targeted destination chest has room to
-	 * receive the item.
+	 * Scans the connected physical network for any target inventories that have space to put the stack [3].
 	 */
 	private static boolean hasFlowchartSpaceAndMatch(Level level, BlockPos valvePos, ItemStack stack) {
 		BlockPos controllerPos = dta.sfmflow.common.network.CableNetworkRegistry.getController(level, valvePos);
 		if (controllerPos == null) {
-			return false; // Not connected to a network [3]
+			return false; // Not connected to any network [3]
 		}
 		BlockEntity managerBe = level.getBlockEntity(controllerPos);
 		if (managerBe instanceof ManagerBlockEntity manager) {
-			int valveId = valvePos.hashCode();
+			int valveId = valvePos.hashCode(); // ConnectionBlock ID is pos.hashCode() [3]
 
 			for (AbstractFlowComponent comp : manager.getFlowComponents().values()) {
-				if (comp instanceof ItemTransferComponent inputComp && inputComp.isInput()
-						&& inputComp.getInventoryId() == valveId) {
-					// 1. Check if the item matches the Input Card's filter criteria
+				if (comp instanceof ItemTransferComponent inputComp && inputComp.isInput() && inputComp.getInventoryId() == valveId) {
+					// 1. Check if the item matches the Input Card's filter criteria [3]
 					if (!matchesFilterCommon(manager, inputComp, stack)) {
 						continue;
 					}
 
-					// 2. Traverse downstream to locate connected outputs
+					// 2. Traverse downstream to locate connected outputs [3]
 					List<ItemTransferComponent> outputs = findDownstreamOutputs(manager, inputComp.getId());
 					for (ItemTransferComponent outputComp : outputs) {
-						// 3. Check if the item matches the Output Card's filter criteria
+						// 3. Check if the item matches the Output Card's filter criteria [3]
 						if (!matchesFilterCommon(manager, outputComp, stack)) {
 							continue;
 						}
 
-						// 4. Find the chest bound to the Item Output
+						// 4. Find the chest bound to the Item Output [3]
 						ConnectionBlock destInv = null;
 						for (ConnectionBlock inv : manager.getInventories()) {
 							if (inv.getId() == outputComp.getInventoryId() && !inv.isSleeping()) {
@@ -228,11 +227,10 @@ public final class HatchBehaviorHelper {
 						if (destInv != null) {
 							IItemHandler handler = destInv.getItemHandler(null);
 							if (handler != null) {
-								// 5. Check if there is room in that chest
-								ItemStack remaining = ItemHandlerHelper.insertItemStacked(handler,
-										stack.copyWithCount(1), true);
+								// 5. Check if there is room in that chest [3]
+								ItemStack remaining = ItemHandlerHelper.insertItemStacked(handler, stack.copyWithCount(1), true);
 								if (remaining.isEmpty()) {
-									return true; // Found a valid target with space
+									return true; // Found a valid target with space [3]
 								}
 							}
 						}
@@ -244,8 +242,7 @@ public final class HatchBehaviorHelper {
 	}
 
 	/**
-	 * Performs a fast, non-allocating downstream search to locate all Output cards
-	 * connected to this Input.
+	 * Performs a fast, non-allocating downstream search to locate all Output cards connected to this Input [3].
 	 */
 	private static List<ItemTransferComponent> findDownstreamOutputs(ManagerBlockEntity manager, UUID startId) {
 		List<ItemTransferComponent> outputs = new ArrayList<>();
@@ -268,7 +265,7 @@ public final class HatchBehaviorHelper {
 							if (targetComp instanceof ItemTransferComponent outputComp && !outputComp.isInput()) {
 								outputs.add(outputComp);
 							} else {
-								// Continue searching down the chain for intermediate nodes (e.g. logic)
+								// Continue searching down the chain for intermediate nodes (e.g. logic) [3]
 								queue.add(targetId);
 							}
 						}
@@ -280,11 +277,9 @@ public final class HatchBehaviorHelper {
 	}
 
 	/**
-	 * Simplified matchesFilter method that works on live server thread using the
-	 * manager component map.
+	 * Simplified matchesFilter method that works on live server thread using the manager component map [3].
 	 */
-	private static boolean matchesFilterCommon(ManagerBlockEntity manager, ItemTransferComponent component,
-			ItemStack stack) {
+	private static boolean matchesFilterCommon(ManagerBlockEntity manager, ItemTransferComponent component, ItemStack stack) {
 		if (stack.isEmpty()) {
 			return false;
 		}

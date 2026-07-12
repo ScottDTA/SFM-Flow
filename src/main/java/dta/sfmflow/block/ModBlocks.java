@@ -54,10 +54,14 @@ public class ModBlocks {
 			() -> new ItemVacuumValveBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
-	public static final DeferredBlock<Block> FLUID_HATCH_CABLE_BLOCK = registerBlock("fluid_hatch_cable_block",
-			() -> new FluidHatchCableBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+	public static final DeferredBlock<Block> FLUID_EJECTOR_VALVE_BLOCK = registerBlock("fluid_ejector_valve_block",
+			() -> new FluidEjectorValveBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
+	public static final DeferredBlock<Block> FLUID_VACUUM_VALVE_BLOCK = registerBlock("fluid_vacuum_valve_block",
+			() -> new FluidVacuumValveBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+	
 	public static final DeferredBlock<Block> CABLE_CLUSTER_BLOCK = registerBlock("cable_cluster_block",
 			() -> new CableClusterBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));

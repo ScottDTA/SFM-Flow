@@ -30,6 +30,7 @@ public class ModItemTagProvider extends ItemTagsProvider {
 				ModBlocks.OBSERVER_CABLE_BLOCK.get().asItem(),
 				ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(),
 				ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(),
-				ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem());
+				ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem(),
+				ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem());
 	}
 }

@@ -1,8 +1,10 @@
 {
-  "block.sfmflow.advanced_cable_cluster_block": "Advanced Card Cluster",
+  "block.sfmflow.advanced_cable_cluster_block": "Advanced Cable Cluster",
   "block.sfmflow.cable_block": "Network Cable",
-  "block.sfmflow.cable_cluster_block": "Standard Card Cluster",
+  "block.sfmflow.cable_cluster_block": "Standard Cable Cluster",
+  "block.sfmflow.fluid_ejector_valve_block": "Fluid Ejection Valve",
   "block.sfmflow.fluid_hatch_cable_block": "Fluid Extraction Hatch",
+  "block.sfmflow.fluid_vacuum_valve_block": "Fluid Vacuum Valve",
   "block.sfmflow.hardened_cable_block": "Hardened Network Cable",
   "block.sfmflow.item_ejector_valve_block": "Item Ejection Valve",
   "block.sfmflow.item_vacuum_valve_block": "Item Vacuum Valve",

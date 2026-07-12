@@ -29,7 +29,8 @@ public class ModCreativeModeTabs {
 						output.accept(ModBlocks.OBSERVER_CABLE_BLOCK.get());
 						output.accept(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get());
 						output.accept(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get());
-						output.accept(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get());
+						output.accept(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get());
+						output.accept(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get());
 						output.accept(ModBlocks.CABLE_CLUSTER_BLOCK.get());
 						output.accept(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
 					}).build());

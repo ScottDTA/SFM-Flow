@@ -1,7 +1,7 @@
 package dta.sfmflow.block;
 
 import com.mojang.serialization.MapCodec;
-import dta.sfmflow.block.entity.FluidHatchCableBlockEntity;
+import dta.sfmflow.block.entity.FluidEjectorValveBlockEntity;
 import dta.sfmflow.block.entity.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -17,26 +17,18 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Fluid vacuumer and ejection hatch block [3].
+ * Specialized physical hatch block that ejects buffered fluids into the world [3].
  */
-public class FluidHatchCableBlock extends BaseEntityBlock {
+public class FluidEjectorValveBlock extends BaseEntityBlock {
 	public static final DirectionProperty FACING = BlockStateProperties.FACING;
-	public static final EnumProperty<HatchMode> HATCH_MODE = EnumProperty.create("mode", HatchMode.class);
-	public static final MapCodec<FluidHatchCableBlock> CODEC = simpleCodec(FluidHatchCableBlock::new);
+	public static final MapCodec<FluidEjectorValveBlock> CODEC = simpleCodec(FluidEjectorValveBlock::new);
 
-	/**
-	 * Initializes a new FluidHatchCableBlock [3].
-	 *
-	 * @param properties block behavior properties [3]
-	 */
-	public FluidHatchCableBlock(Properties properties) {
+	public FluidEjectorValveBlock(Properties properties) {
 		super(properties);
-		this.registerDefaultState(
-				this.stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(HATCH_MODE, HatchMode.VACUUM));
+		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
 	}
 
 	@Override
@@ -46,23 +38,22 @@ public class FluidHatchCableBlock extends BaseEntityBlock {
 
 	@Override
 	protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-		builder.add(FACING, HATCH_MODE);
+		builder.add(FACING);
 	}
 
 	@Override
 	public BlockState getStateForPlacement(BlockPlaceContext context) {
-		return this.defaultBlockState().setValue(FACING, context.getNearestLookingDirection().getOpposite())
-				.setValue(HATCH_MODE, HatchMode.VACUUM);
+		return this.defaultBlockState().setValue(FACING, context.getNearestLookingDirection().getOpposite());
 	}
 
 	@Nullable
 	@Override
 	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-		return new FluidHatchCableBlockEntity(pos, state);
+		return new FluidEjectorValveBlockEntity(pos, state);
 	}
 
 	@Override
-	public RenderShape getRenderShape(BlockState state) {
+	protected RenderShape getRenderShape(BlockState state) {
 		return RenderShape.MODEL;
 	}
 
@@ -70,9 +61,7 @@ public class FluidHatchCableBlock extends BaseEntityBlock {
 	@Override
 	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
 			BlockEntityType<T> type) {
-		if (level.isClientSide()) {
-			return null;
-		}
-		return createTickerHelper(type, ModBlockEntities.FLUID_HATCH_CABLE_BE.get(), FluidHatchCableBlockEntity::tick);
+		// Ticking is completely disabled since fluid placement is now handled instantaneously [3]
+		return null;
 	}
 }

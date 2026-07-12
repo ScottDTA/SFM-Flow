@@ -28,7 +28,8 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 		dropSelf(ModBlocks.OBSERVER_CABLE_BLOCK.get());
 		dropSelf(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get());
 		dropSelf(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get());
-		dropSelf(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get());
+		dropSelf(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get());
+		dropSelf(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get());
 		dropSelf(ModBlocks.CABLE_CLUSTER_BLOCK.get());
 		dropSelf(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
 	}
