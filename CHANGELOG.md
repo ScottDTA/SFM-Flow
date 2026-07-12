@@ -1,5 +1,18 @@
-7-11-2026
+7-12-2026
 
+### [Added]
+* Implemented a multi-threaded copy mechanism for network inventories during background logic planning, resolving potential data conflicts and improving overall server stability.
+
+### [Changed]
+* Renamed the "Item Vacuum Hatch" to the "Item Vacuum Valve" and the "Item Ejection Hatch" to the "Item Ejection Valve".
+* Optimized the manager's background scheduling system to increase processing speed and eliminate frame-skipping delays.
+* Reworked the Observer Cable block's visual model to render distinct front, back, top, bottom, and side texture overlays.
+
+### [Fixed]
+* Fixed a major logic simulation error where sided blocks (such as Furnaces and Brewing Stands) would fail to update simulated slot counts consistently across all of their faces during item transfer checks.
+
+
+7-11-2026
 
 ### [Added]
 * Added the Observer Trigger, a new flowchart trigger node that executes logical pathways when a connected Observer Cable block registers a state change.
