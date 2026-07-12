@@ -5,8 +5,8 @@
     "C": {
       "item": "sfmflow:cable_block"
     },
-    "D": {
-      "item": "minecraft:dropper"
+    "H": {
+      "item": "minecraft:hopper"
     },
     "I": {
       "item": "minecraft:iron_ingot"
@@ -16,12 +16,12 @@
     }
   },
   "pattern": [
-    "IDI",
+    "IHI",
     "CKC",
-    "IDI"
+    "IHI"
   ],
   "result": {
     "count": 1,
-    "id": "sfmflow:item_ejector_hatch_block"
+    "id": "sfmflow:item_vacuum_valve_block"
   }
 }

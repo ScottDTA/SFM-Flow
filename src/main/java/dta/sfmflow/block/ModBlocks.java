@@ -46,12 +46,12 @@ public class ModBlocks {
 			() -> new ObserverCableBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
-	public static final DeferredBlock<Block> ITEM_EJECTOR_HATCH_BLOCK = registerBlock("item_ejector_hatch_block",
-			() -> new ItemEjectorHatchBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+	public static final DeferredBlock<Block> ITEM_EJECTOR_VALVE_BLOCK = registerBlock("item_ejector_valve_block",
+			() -> new ItemEjectorValveBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
-	public static final DeferredBlock<Block> ITEM_VACUUM_HATCH_BLOCK = registerBlock("item_vacuum_hatch_block",
-			() -> new ItemVacuumHatchBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+	public static final DeferredBlock<Block> ITEM_VACUUM_VALVE_BLOCK = registerBlock("item_vacuum_valve_block",
+			() -> new ItemVacuumValveBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
 	public static final DeferredBlock<Block> FLUID_HATCH_CABLE_BLOCK = registerBlock("fluid_hatch_cable_block",

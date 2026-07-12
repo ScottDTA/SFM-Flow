@@ -28,7 +28,7 @@ public class ConnectionBlock implements IContainerSelection {
 	private int cableDistance;
 	private Set<ResourceLocation> types;
 	private int id;
-	private boolean sleeping = false;
+	private volatile boolean sleeping = false;
 
 	public record SidedCacheKey(ResourceLocation capId, @Nullable Direction side) {}
 
@@ -44,6 +44,18 @@ public class ConnectionBlock implements IContainerSelection {
 	public ConnectionBlock(Level level, BlockPos blockPos, int cableDistance) {
 		this(blockPos, cableDistance);
 		this.level = level;
+	}
+
+	/**
+	 * Copy constructor to create a thread-safe, isolated snapshot of a connection block [3].
+	 */
+	public ConnectionBlock(ConnectionBlock other) {
+		this.level = other.level;
+		this.blockPos = other.blockPos;
+		this.cableDistance = other.cableDistance;
+		this.types = other.types != null ? new HashSet<>(other.types) : new HashSet<>();
+		this.id = other.id;
+		this.sleeping = other.sleeping;
 	}
 
 	public BlockPos getBlockPos() {

@@ -22,7 +22,7 @@
 * **Visual Slot Sync Performance:** Shifted inventory slot packet parsing from the background network threads to the visual rendering pass. This alleviates network thread bottlenecks and ensures slot previews remain responsive even on congested servers.
 
 
-7-10-2026
+7-10-2026 (0.4.13.alpha)
 
 ### [Added]
 * **Redstone Emitter Node:** A new output node allowing flowcharts to programmatically toggle, add, or subtract analog redstone signals (0 to 15) on specific faces of Redstone Emitter blocks.

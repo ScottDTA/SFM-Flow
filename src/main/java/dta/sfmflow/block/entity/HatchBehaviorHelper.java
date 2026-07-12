@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * Common, stateless helper consolidating vacuum, ejection, and fluid hatch
- * execution logic [3].
+ * execution logic.
  */
 public final class HatchBehaviorHelper {
 
@@ -28,13 +28,13 @@ public final class HatchBehaviorHelper {
 
 	/**
 	 * Suctions ground items in a 3x3x3 volume centered on the mouth position into
-	 * the target item handler [3].
+	 * the target item handler.
 	 *
-	 * @param level       the world level context [3]
-	 * @param pos         the base position of the block performing the action [3]
-	 * @param facing      the direction the hatch face is looking [3]
-	 * @param itemHandler the destination capability item handler [3]
-	 * @param onChange    the callback run to mark changes and stamp dirtiness [3]
+	 * @param level       the world level context
+	 * @param pos         the base position of the block performing the action
+	 * @param facing      the direction the hatch face is looking
+	 * @param itemHandler the destination capability item handler
+	 * @param onChange    the callback run to mark changes and stamp dirtiness
 	 */
 	public static void performVacuum(Level level, BlockPos pos, Direction facing, IItemHandler itemHandler,
 			Runnable onChange) {
@@ -63,13 +63,13 @@ public final class HatchBehaviorHelper {
 
 	/**
 	 * Ejects item stacks out of the first available slot of the target item handler
-	 * as floating entities [3].
+	 * as floating entities.
 	 *
-	 * @param level       the world level context [3]
-	 * @param pos         the base position of the block performing the action [3]
-	 * @param facing      the direction the hatch face is looking [3]
-	 * @param itemHandler the source capability item handler [3]
-	 * @param onChange    the callback run to mark changes and stamp dirtiness [3]
+	 * @param level       the world level context
+	 * @param pos         the base position of the block performing the action
+	 * @param facing      the direction the hatch face is looking
+	 * @param itemHandler the source capability item handler
+	 * @param onChange    the callback run to mark changes and stamp dirtiness
 	 */
 	public static void performEjection(Level level, BlockPos pos, Direction facing, IItemHandler itemHandler,
 			Runnable onChange) {
@@ -107,13 +107,13 @@ public final class HatchBehaviorHelper {
 	}
 
 	/**
-	 * Ingests adjacent fluid sources and fills the target fluid handler [3].
+	 * Ingests adjacent fluid sources and fills the target fluid handler.
 	 *
-	 * @param level        the world level context [3]
-	 * @param pos          the base position of the block performing the action [3]
-	 * @param facing       the direction the hatch face is looking [3]
-	 * @param fluidHandler the target capability fluid handler [3]
-	 * @param onChange     the callback run to mark changes and stamp dirtiness [3]
+	 * @param level        the world level context
+	 * @param pos          the base position of the block performing the action
+	 * @param facing       the direction the hatch face is looking
+	 * @param fluidHandler the target capability fluid handler
+	 * @param onChange     the callback run to mark changes and stamp dirtiness
 	 */
 	public static void performFluidVacuum(Level level, BlockPos pos, Direction facing, IFluidHandler fluidHandler,
 			Runnable onChange) {
@@ -135,13 +135,13 @@ public final class HatchBehaviorHelper {
 
 	/**
 	 * Ejects fluid from the target fluid handler to place as source blocks in the
-	 * world [3].
+	 * world.
 	 *
-	 * @param level        the world level context [3]
-	 * @param pos          the base position of the block performing the action [3]
-	 * @param facing       the direction the hatch face is looking [3]
-	 * @param fluidHandler the source capability fluid handler [3]
-	 * @param onChange     the callback run to mark changes and stamp dirtiness [3]
+	 * @param level        the world level context
+	 * @param pos          the base position of the block performing the action
+	 * @param facing       the direction the hatch face is looking
+	 * @param fluidHandler the source capability fluid handler
+	 * @param onChange     the callback run to mark changes and stamp dirtiness
 	 */
 	public static void performFluidEjection(Level level, BlockPos pos, Direction facing, IFluidHandler fluidHandler,
 			Runnable onChange) {

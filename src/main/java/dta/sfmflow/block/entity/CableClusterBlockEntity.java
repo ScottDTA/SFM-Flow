@@ -133,8 +133,8 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		ItemStack stack = this.inventory.getStackInSlot(slot);
 		if (stack.isEmpty())
 			return false;
-		return stack.is(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get().asItem())
-				|| stack.is(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get().asItem());
+		return stack.is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem())
+				|| stack.is(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem());
 	}
 
 	public boolean isFluidCard(int slot) {

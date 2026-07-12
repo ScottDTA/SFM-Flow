@@ -1,7 +1,7 @@
 package dta.sfmflow.block;
 
 import com.mojang.serialization.MapCodec;
-import dta.sfmflow.block.entity.ItemVacuumHatchBlockEntity;
+import dta.sfmflow.block.entity.ItemVacuumValveBlockEntity;
 import dta.sfmflow.block.entity.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -23,16 +23,16 @@ import org.jetbrains.annotations.Nullable;
  * Specialized physical hatch block that vacuums ground items in a 3x3x3 area
  * [3].
  */
-public class ItemVacuumHatchBlock extends BaseEntityBlock {
+public class ItemVacuumValveBlock extends BaseEntityBlock {
 	public static final DirectionProperty FACING = BlockStateProperties.FACING;
-	public static final MapCodec<ItemVacuumHatchBlock> CODEC = simpleCodec(ItemVacuumHatchBlock::new);
+	public static final MapCodec<ItemVacuumValveBlock> CODEC = simpleCodec(ItemVacuumValveBlock::new);
 
 	/**
 	 * Initializes a new ItemVacuumHatchBlock instance [3].
 	 *
 	 * @param properties block behavior properties [3]
 	 */
-	public ItemVacuumHatchBlock(Properties properties) {
+	public ItemVacuumValveBlock(Properties properties) {
 		super(properties);
 		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
 	}
@@ -55,7 +55,7 @@ public class ItemVacuumHatchBlock extends BaseEntityBlock {
 	@Nullable
 	@Override
 	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-		return new ItemVacuumHatchBlockEntity(pos, state);
+		return new ItemVacuumValveBlockEntity(pos, state);
 	}
 
 	@Override
@@ -70,6 +70,6 @@ public class ItemVacuumHatchBlock extends BaseEntityBlock {
 		if (level.isClientSide()) {
 			return null;
 		}
-		return createTickerHelper(type, ModBlockEntities.ITEM_VACUUM_HATCH_BE.get(), ItemVacuumHatchBlockEntity::tick);
+		return createTickerHelper(type, ModBlockEntities.ITEM_VACUUM_HATCH_BE.get(), ItemVacuumValveBlockEntity::tick);
 	}
 }

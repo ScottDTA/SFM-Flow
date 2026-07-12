@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.Block;
 
 /**
  * Generates blocks' loot tables and validates drop rules during programmatic
- * data runs [3].
+ * data runs.
  */
 public class ModBlockLootTableProvider extends BlockLootSubProvider {
 
@@ -26,8 +26,8 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 		dropSelf(ModBlocks.REDSTONE_EMITTER_BLOCK.get());
 		dropSelf(ModBlocks.REDSTONE_RECEIVER_BLOCK.get());
 		dropSelf(ModBlocks.OBSERVER_CABLE_BLOCK.get());
-		dropSelf(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get());
-		dropSelf(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get());
+		dropSelf(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get());
+		dropSelf(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get());
 		dropSelf(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get());
 		dropSelf(ModBlocks.CABLE_CLUSTER_BLOCK.get());
 		dropSelf(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());

@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "sfmflow:block/item_ejector_hatch_block"
+    "all": "sfmflow:block/item_vacuum_valve_block"
   }
 }

@@ -70,7 +70,7 @@ public class VanillaSFMFlowPlugin {
 		registerCauldronBridges();
 
 		INTERVAL_TRIGGER = FlowComponentBuilder.create("interval_trigger", IntervalTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/interval_trigger_button.png")
 				.displayName("gui.sfmflow.interval_trigger").codec(IntervalTriggerComponent.CODEC).build(registry);
 
 		ITEM_INPUT = FlowComponentBuilder.create("item_input", uuid -> new ItemTransferComponent(uuid, true))
@@ -88,29 +88,29 @@ public class VanillaSFMFlowPlugin {
 				.codec(AdvancedItemFilterVariableComponent.CODEC).build(registry);
 
 		FLUID_INPUT = FlowComponentBuilder.create("fluid_input", uuid -> new FluidTransferComponent(uuid, true))
-				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/fluid_input_button.png")
 				.displayName("gui.sfmflow.fluid_input").codec(FluidTransferComponent.INPUT_CODEC).build(registry);
 
 		FLUID_OUTPUT = FlowComponentBuilder.create("fluid_output", uuid -> new FluidTransferComponent(uuid, false))
-				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/fluid_output_button.png")
 				.displayName("gui.sfmflow.fluid_output").codec(FluidTransferComponent.OUTPUT_CODEC).build(registry);
 
 		ADVANCED_FLUID_FILTER_VARIABLE = FlowComponentBuilder
 				.create("advanced_fluid_filter_variable", AdvancedFluidFilterVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/fluid_variable_button.png")
 				.displayName("gui.sfmflow.advanced_fluid_filter_variable")
 				.codec(AdvancedFluidFilterVariableComponent.CODEC).build(registry);
 
 		ENERGY_INPUT = FlowComponentBuilder.create("energy_input", uuid -> new EnergyTransferComponent(uuid, true))
-				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/input_button.png")
+				.category(NodeCategory.INPUT).icon("textures/gui/menu_buttons/energy_input_button.png")
 				.displayName("gui.sfmflow.energy_input").codec(EnergyTransferComponent.INPUT_CODEC).build(registry);
 
 		ENERGY_OUTPUT = FlowComponentBuilder.create("energy_output", uuid -> new EnergyTransferComponent(uuid, false))
-				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/output_button.png")
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/energy_output_button.png")
 				.displayName("gui.sfmflow.energy_output").codec(EnergyTransferComponent.OUTPUT_CODEC).build(registry);
 
 		REDSTONE_TRIGGER = FlowComponentBuilder.create("redstone_trigger", RedstoneTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/redstone_trigger_button.png")
 				.displayName("gui.sfmflow.redstone_trigger").codec(RedstoneTriggerComponent.CODEC).build(registry);
 
 		REDSTONE_EMITTER = FlowComponentBuilder.create("redstone_emitter", RedstoneEmitterComponent::new)
@@ -118,7 +118,7 @@ public class VanillaSFMFlowPlugin {
 				.displayName("gui.sfmflow.redstone_emitter").codec(RedstoneEmitterComponent.CODEC).build(registry);
 
 		OBSERVER_TRIGGER = FlowComponentBuilder.create("observer_trigger", ObserverTriggerComponent::new)
-				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/observer_trigger_button.png")
 				.displayName("gui.sfmflow.observer_trigger").codec(ObserverTriggerComponent.CODEC).build(registry);
 	}
 
@@ -132,8 +132,9 @@ public class VanillaSFMFlowPlugin {
 			Map<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> slots = new HashMap<>();
 			int count = handler.getSlots();
 			for (int i = 0; i < count; i++) {
+				int mainSlot = translateSlot(handler, i);
 				slots.put(i, new ThreadSafeInventorySnapshot.SlotSnapshot(handler.getStackInSlot(i),
-						handler.getSlotLimit(i), i));
+						handler.getSlotLimit(i), mainSlot));
 			}
 			return new ThreadSafeInventorySnapshot.InventorySnapshot(slots);
 		});
@@ -317,5 +318,44 @@ public class VanillaSFMFlowPlugin {
 				(level, pos, state, side) -> new CauldronFluidHandler(level, pos));
 		SpecialBlockCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, Blocks.LAVA_CAULDRON,
 				(level, pos, state, side) -> new CauldronFluidHandler(level, pos));
+	}
+
+	/**
+	 * Resolves the underlying main slot index from nested Capability Wrappers [3].
+	 */
+	private static int translateSlot(IItemHandler handler, int slotIndex) {
+		if (handler == null) {
+			return slotIndex;
+		}
+		String className = handler.getClass().getName();
+		try {
+			if (className.equals("net.neoforged.neoforge.items.wrapper.SidedInvWrapper")) {
+				java.lang.reflect.Field invField = handler.getClass().getDeclaredField("inv");
+				java.lang.reflect.Field sideField = handler.getClass().getDeclaredField("side");
+				invField.setAccessible(true);
+				sideField.setAccessible(true);
+				net.minecraft.world.WorldlyContainer inv = (net.minecraft.world.WorldlyContainer) invField.get(handler);
+				net.minecraft.core.Direction side = (net.minecraft.core.Direction) sideField.get(handler);
+				if (inv != null && side != null) {
+					int[] slots = inv.getSlotsForFace(side);
+					if (slots != null && slotIndex >= 0 && slotIndex < slots.length) {
+						return slots[slotIndex];
+					}
+				}
+			} else if (className.equals("net.neoforged.neoforge.items.wrapper.RangedWrapper")) {
+				java.lang.reflect.Field minSlotField = handler.getClass().getDeclaredField("minSlot");
+				minSlotField.setAccessible(true);
+				int minSlot = minSlotField.getInt(handler);
+
+				java.lang.reflect.Field composeField = handler.getClass().getDeclaredField("compose");
+				composeField.setAccessible(true);
+				IItemHandler compose = (IItemHandler) composeField.get(handler);
+
+				return translateSlot(compose, minSlot + slotIndex);
+			}
+		} catch (Exception e) {
+			// Fallback on security exceptions or missing fields
+		}
+		return slotIndex;
 	}
 }

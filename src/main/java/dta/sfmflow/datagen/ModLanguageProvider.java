@@ -6,7 +6,7 @@ import net.neoforged.neoforge.common.data.LanguageProvider;
 
 /**
  * Automated localization provider managing translation data generation for
- * SFM-Flow [3]. Populates localization mappings for blocks, UI menus, creative
+ * SFM-Flow. Populates localization mappings for blocks, UI menus, creative
  * tabs, and configurations.
  */
 public class ModLanguageProvider extends LanguageProvider {
@@ -21,8 +21,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("block.sfmflow.cable_cluster_block", "Standard Card Cluster");
 		add("block.sfmflow.fluid_hatch_cable_block", "Fluid Extraction Hatch");
 		add("block.sfmflow.hardened_cable_block", "Hardened Network Cable");
-		add("block.sfmflow.item_ejector_hatch_block", "Item Ejection Hatch");
-		add("block.sfmflow.item_vacuum_hatch_block", "Item Vacuum Hatch");
+		add("block.sfmflow.item_ejector_valve_block", "Item Ejection Valve");
+		add("block.sfmflow.item_vacuum_valve_block", "Item Vacuum Valve");
 		add("block.sfmflow.manager_block", "Machine Inventory Manager");
 		add("block.sfmflow.observer_cable_block", "Observer Cable");
 		add("block.sfmflow.redstone_emitter_block", "Redstone Network Emitter");
@@ -201,7 +201,7 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.limits.tooltip", 
 				"Configure scanning thresholds and workspace restrictions to protect server performance.");
 
-		// Execution Budget Option [3]
+		// Execution Budget Option
 		add("sfmflow.configuration.maxExecutionBudgetUs", "Max Execution Budget (Microseconds)");
 		add("sfmflow.configuration.maxExecutionBudgetUs.tooltip", 
 				"The maximum time budget (in microseconds) per Manager block per tick to execute transfer tasks.");
@@ -222,10 +222,10 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.yellow.button", "Yellow Settings");
 		add("sfmflow.configuration.yellow.tooltip", "Custom color overrides for the yellow mask.");
 
-		// Slot Layout entries [3]
+		// Slot Layout entries
 		add("gui.sfmflow.error.slot_not_accessible", "Slot not accessible on selected side");
 
-		// Warnings [3]
+		// Warnings
 		add("gui.sfmflow.warnings", "Warnings: %1$s");
 		add("gui.sfmflow.warning.empty_filter_variable", "Active filter variable cannot be empty!");
 	}

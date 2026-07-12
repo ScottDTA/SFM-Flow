@@ -6,8 +6,8 @@
     "sfmflow:redstone_emitter_block",
     "sfmflow:redstone_receiver_block",
     "sfmflow:observer_cable_block",
-    "sfmflow:item_ejector_hatch_block",
-    "sfmflow:item_vacuum_hatch_block",
+    "sfmflow:item_ejector_valve_block",
+    "sfmflow:item_vacuum_valve_block",
     "sfmflow:fluid_hatch_cable_block",
     "sfmflow:cable_cluster_block",
     "sfmflow:advanced_cable_cluster_block"

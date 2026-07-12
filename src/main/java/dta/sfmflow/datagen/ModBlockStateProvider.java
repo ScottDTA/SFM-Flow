@@ -37,15 +37,15 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		simpleBlockItem(ModBlocks.REDSTONE_RECEIVER_BLOCK.get(),
 				models().cubeAll("redstone_receiver_block", modLoc("block/redstone_receiver_block")));
 
-		directionalBlock(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
-				models().cubeAll("item_ejector_hatch_block", modLoc("block/item_ejector_hatch_block")));
-		simpleBlockItem(ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(),
-				models().cubeAll("item_ejector_hatch_block", modLoc("block/item_ejector_hatch_block")));
+		directionalBlock(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(),
+				models().cubeAll("item_ejector_valve_block", modLoc("block/item_ejector_valve_block")));
+		simpleBlockItem(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(),
+				models().cubeAll("item_ejector_valve_block", modLoc("block/item_ejector_valve_block")));
 
-		directionalBlock(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
-				models().cubeAll("item_vacuum_hatch_block", modLoc("block/item_vacuum_hatch_block")));
-		simpleBlockItem(ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(),
-				models().cubeAll("item_vacuum_hatch_block", modLoc("block/item_vacuum_hatch_block")));
+		directionalBlock(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(),
+				models().cubeAll("item_vacuum_valve_block", modLoc("block/item_vacuum_valve_block")));
+		simpleBlockItem(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(),
+				models().cubeAll("item_vacuum_valve_block", modLoc("block/item_vacuum_valve_block")));
 
 		directionalBlock(ModBlocks.FLUID_HATCH_CABLE_BLOCK.get(),
 				models().cubeAll("fluid_hatch_cable_block", modLoc("block/fluid_hatch_cable_block")));
@@ -113,12 +113,12 @@ public class ModBlockStateProvider extends BlockStateProvider {
 				.condition(BlockStateProperties.EAST, true);
 
 		var observerModel = models().cube("block/observer_cable_block",
-				modLoc("block/observer_cable_top"),           // down (bottom) [3]
-				modLoc("block/observer_cable_top2"),           // up (top) [3]
-				modLoc("block/observer_cable_front"),  // north (front face) [3]
-				modLoc("block/observer_cable_back"),   // south (back port) [3]
-				modLoc("block/observer_cable_side2"),           // west (side) [3]
-				modLoc("block/observer_cable_side")            // east (side) [3]
+				modLoc("block/observer_cable_top"), // down (bottom)
+				modLoc("block/observer_cable_top2"), // up (top)
+				modLoc("block/observer_cable_front"), // north (front face)
+				modLoc("block/observer_cable_back"), // south (back port)
+				modLoc("block/observer_cable_side2"), // west (side)
+				modLoc("block/observer_cable_side") // east (side)
 		).texture("particle", modLoc("block/cable_block"));
 
 		getVariantBuilder(ModBlocks.OBSERVER_CABLE_BLOCK.get()).forAllStates(state -> {
@@ -136,12 +136,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
 			case EAST -> rotY = 90;
 			case WEST -> rotY = 270;
 			}
-			return ConfiguredModel.builder()
-					.modelFile(observerModel)
-					.rotationX(rotX)
-					.rotationY(rotY)
-					.uvLock(false) // Ensures textures rotate dynamically with X/Y block states [3]
-					.build();
+			return ConfiguredModel.builder().modelFile(observerModel).rotationX(rotX).rotationY(rotY).uvLock(false).build();
 		});
 
 		simpleBlockItem(ModBlocks.OBSERVER_CABLE_BLOCK.get(), observerModel);

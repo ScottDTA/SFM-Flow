@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "sfmflow:item_vacuum_hatch_block"
+        "recipe": "sfmflow:item_ejector_valve_block"
       },
       "trigger": "minecraft:recipe_unlocked"
     }
@@ -26,7 +26,7 @@
   ],
   "rewards": {
     "recipes": [
-      "sfmflow:item_vacuum_hatch_block"
+      "sfmflow:item_ejector_valve_block"
     ]
   }
 }

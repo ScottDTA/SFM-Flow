@@ -80,7 +80,7 @@ public final class ThreadSafeInventorySnapshot {
 		Level level = manager.getLevel();
 		if (level != null && !level.isClientSide()) {
 			for (ConnectionBlock block : manager.getInventories()) {
-				capturedList.add(block);
+				capturedList.add(new ConnectionBlock(block)); // Deep copy to prevent data races [3]
 				BlockPos pos = block.getBlockPos();
 				if (level.hasChunkAt(pos)) {
 					BlockState state = level.getBlockState(pos);

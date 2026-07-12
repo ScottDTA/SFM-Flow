@@ -13,8 +13,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.common.conditions.IConditionBuilder;
 
 /**
- * Generates custom shaped and shapeless crafting recipes during datagen phases
- * [3].
+ * Generates custom shaped and shapeless crafting recipes during datagen phases.
  */
 public class ModRecipeProvider extends RecipeProvider implements IConditionBuilder {
 	public ModRecipeProvider(PackOutput output, CompletableFuture<Provider> registries) {
@@ -53,12 +52,12 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 				.define('O', Blocks.OBSERVER).unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get()))
 				.save(recipeOutput);
 
-		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get(), 1).pattern("IHI")
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), 1).pattern("IHI")
 				.pattern("CKC").pattern("IHI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
 				.define('H', Items.HOPPER).define('K', Items.CHEST)
 				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
-		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get(), 1).pattern("IDI")
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(), 1).pattern("IDI")
 				.pattern("CKC").pattern("IDI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
 				.define('D', Items.DROPPER).define('K', Items.CHEST)
 				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
@@ -68,12 +67,12 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 				.define('B', Items.BUCKET).define('G', Items.GLASS)
 				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
-		// Cable Cluster Block [3] (4x Cables, 4x Iron Ingots, 1x Chest)
+		// Cable Cluster Block (4x Cables, 4x Iron Ingots, 1x Chest)
 		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CABLE_CLUSTER_BLOCK.get(), 1).pattern("ICI")
 				.pattern("CKC").pattern("ICI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
 				.define('K', Items.CHEST).unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
-		// Advanced Cable Cluster [3] (Cable Cluster + 4x Hardened Cables + 4x Diamonds)
+		// Advanced Cable Cluster (Cable Cluster + 4x Hardened Cables + 4x Diamonds)
 		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(), 1).pattern("HDH")
 				.pattern("DKD").pattern("HDH").define('K', ModBlocks.CABLE_CLUSTER_BLOCK.get())
 				.define('H', ModBlocks.HARDENED_CABLE_BLOCK.get()).define('D', Items.DIAMOND)

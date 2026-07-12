@@ -13,7 +13,7 @@ import net.minecraft.world.level.block.Block;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 /**
- * Programmatic item tag compiler for data generation cycles [3].
+ * Programmatic item tag compiler for data generation cycles.
  */
 public class ModItemTagProvider extends ItemTagsProvider {
 	public ModItemTagProvider(PackOutput output, CompletableFuture<HolderLookup.Provider> lookupProvider,
@@ -24,9 +24,12 @@ public class ModItemTagProvider extends ItemTagsProvider {
 	@Override
 	protected void addTags(Provider provider) {
 		tag(ModTags.CLUSTER_COMPATIBLE).add(ModBlocks.CABLE_BLOCK.get().asItem(),
-				ModBlocks.HARDENED_CABLE_BLOCK.get().asItem(), ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem(),
-				ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem(), ModBlocks.OBSERVER_CABLE_BLOCK.get().asItem(),
-				ModBlocks.ITEM_VACUUM_HATCH_BLOCK.get().asItem(), ModBlocks.ITEM_EJECTOR_HATCH_BLOCK.get().asItem(),
+				ModBlocks.HARDENED_CABLE_BLOCK.get().asItem(),
+				ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem(),
+				ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem(),
+				ModBlocks.OBSERVER_CABLE_BLOCK.get().asItem(),
+				ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(),
+				ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(),
 				ModBlocks.FLUID_HATCH_CABLE_BLOCK.get().asItem());
 	}
 }

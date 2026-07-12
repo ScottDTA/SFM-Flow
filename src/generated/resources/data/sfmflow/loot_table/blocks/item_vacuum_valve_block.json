@@ -11,11 +11,11 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "sfmflow:item_vacuum_hatch_block"
+          "name": "sfmflow:item_vacuum_valve_block"
         }
       ],
       "rolls": 1.0
     }
   ],
-  "random_sequence": "sfmflow:blocks/item_vacuum_hatch_block"
+  "random_sequence": "sfmflow:blocks/item_vacuum_valve_block"
 }

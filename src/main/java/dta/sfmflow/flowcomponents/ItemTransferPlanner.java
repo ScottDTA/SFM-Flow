@@ -23,7 +23,7 @@ import java.util.UUID;
 
 /**
  * Common, stateless helper consolidating item transfer simulation, extraction,
- * and deposition planning routines.
+ * and deposition planning routines [3].
  */
 public final class ItemTransferPlanner {
 
@@ -33,7 +33,7 @@ public final class ItemTransferPlanner {
 	public static void planInput(FlowchartPlanningContext context, ItemTransferComponent component) {
 		FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 
-		// Carry over any incoming items passed from upstream input nodes
+		// Carry over any incoming items passed from upstream input nodes [3]
 		FlowItemBuffer myInputBuffer = context.getComponentBuffer(component.getId());
 		if (!myInputBuffer.isEmpty()) {
 			for (FlowItemBuffer.BufferedItem item : myInputBuffer.getItems()) {
@@ -41,10 +41,10 @@ public final class ItemTransferPlanner {
 			}
 		}
 
-		// Extract our own configured inventory items into the combined buffer
+		// Extract our own configured inventory items into the combined buffer [3]
 		extractItemsIntoBuffer(context, component, myOutputBuffer);
 
-		// Copy extracted buffer contents onto connected target input buffers
+		// Copy extracted buffer contents onto connected target input buffers [3]
 		// sequentially
 		if (!myOutputBuffer.isEmpty()) {
 			for (var conn : context.getConnections()) {
@@ -68,8 +68,7 @@ public final class ItemTransferPlanner {
 			FlowItemBuffer myOutputBuffer = new FlowItemBuffer();
 			depositItemsFromBuffer(context, component, myInputBuffer, myOutputBuffer);
 
-			// Propagate remaining un-deposited leftovers downstream along the connection
-			// lines
+			// Propagate remaining un-deposited leftovers downstream along the connection lines [3]
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
 					UUID targetId = conn.getTargetComponentId();
@@ -84,24 +83,35 @@ public final class ItemTransferPlanner {
 		}
 	}
 
-	private static void updateSnapshotCopies(FlowchartPlanningContext context, BlockPos pos, int slot,
+	/**
+	 * Updates simulation copies dynamically by mapping to the verified main slot index [3].
+	 */
+	private static void updateSnapshotCopies(FlowchartPlanningContext context, BlockPos pos, int mainSlot,
 			ItemStack updatedStack) {
 		for (Direction dir : Direction.values()) {
 			var inv = context.getSnapshot().getInventory(pos, dir);
 			if (inv != null) {
-				var slotSnap = inv.slots().get(slot);
-				if (slotSnap != null) {
-					inv.slots().put(slot, new ThreadSafeInventorySnapshot.SlotSnapshot(updatedStack.copy(),
-							slotSnap.slotLimit(), slotSnap.mainSlotIndex()));
+				for (var entry : inv.slots().entrySet()) {
+					if (entry.getValue().mainSlotIndex() == mainSlot) {
+						inv.slots().put(entry.getKey(), new ThreadSafeInventorySnapshot.SlotSnapshot(
+								updatedStack.copy(),
+								entry.getValue().slotLimit(),
+								mainSlot
+						));
+					}
 				}
 			}
 		}
 		var nullInv = context.getSnapshot().getInventory(pos, null);
 		if (nullInv != null) {
-			var slotSnap = nullInv.slots().get(slot);
-			if (slotSnap != null) {
-				nullInv.slots().put(slot, new ThreadSafeInventorySnapshot.SlotSnapshot(updatedStack.copy(),
-						slotSnap.slotLimit(), slotSnap.mainSlotIndex()));
+			for (var entry : nullInv.slots().entrySet()) {
+				if (entry.getValue().mainSlotIndex() == mainSlot) {
+					nullInv.slots().put(entry.getKey(), new ThreadSafeInventorySnapshot.SlotSnapshot(
+							updatedStack.copy(),
+							entry.getValue().slotLimit(),
+							mainSlot
+					));
+				}
 			}
 		}
 	}
@@ -202,7 +212,7 @@ public final class ItemTransferPlanner {
 					buffer.add(srcInventoryPos, srcSlot, srcSide, extracted);
 
 					srcStack.shrink(srcRemaining);
-					updateSnapshotCopies(context, srcInventoryPos, srcSlot, srcStack);
+					updateSnapshotCopies(context, srcInventoryPos, mainSrcSlot, srcStack); // PASS mainSrcSlot here [3]
 					grabbedCounts.put(srcItem, grabbedCounts.getOrDefault(srcItem, 0) + srcRemaining);
 				}
 			}
@@ -275,8 +285,7 @@ public final class ItemTransferPlanner {
 				List<Integer> sortedTgtSlots = new ArrayList<>(tgtInv.slots().keySet());
 				Collections.sort(sortedTgtSlots);
 
-				// PASS 1: Fill up existing matching stacks strictly first to preserve inventory
-				// space
+				// PASS 1: Fill up existing matching stacks strictly first to preserve inventory space [3]
 				for (int tgtSlot : sortedTgtSlots) {
 					if (remainingToDeposit <= 0)
 						break;
@@ -320,15 +329,14 @@ public final class ItemTransferPlanner {
 						if (remainingSpace > 0) {
 							int amountToTransfer = Math.min(remainingToDeposit, remainingSpace);
 							if (amountToTransfer > 0) {
-								// If "All slots" (-1) is selected, pass -1 to let the server stack items
-								// naturally
+								// If "All slots" (-1) is selected, pass -1 to let the server stack items naturally [3]
 								int taskDestSlot = (component.getTargetSlot() == -1) ? -1 : tgtSlot;
 								boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
 										incomingItem.srcSide(), tgtInventoryPos, taskDestSlot, tgtSide, incoming,
 										amountToTransfer);
 								if (success) {
 									tgtStack.grow(amountToTransfer);
-									updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, tgtStack);
+									updateSnapshotCopies(context, tgtInventoryPos, mainTgtSlot, tgtStack); // PASS mainTgtSlot here [3]
 									incoming.shrink(amountToTransfer);
 									remainingToDeposit -= amountToTransfer;
 									if (!component.isWhitelist()) {
@@ -340,7 +348,7 @@ public final class ItemTransferPlanner {
 					}
 				}
 
-				// PASS 2: Place remaining items into empty slots
+				// PASS 2: Place remaining items into empty slots [3]
 				for (int tgtSlot : sortedTgtSlots) {
 					if (remainingToDeposit <= 0)
 						break;
@@ -383,8 +391,7 @@ public final class ItemTransferPlanner {
 						int amountToTransfer = Math.min(remainingToDeposit,
 								Math.min(tgtEntry.slotLimit(), maxToDeposit));
 						if (amountToTransfer > 0) {
-							// If "All slots" (-1) is selected, pass -1 to let the server stack items
-							// naturally
+							// If "All slots" (-1) is selected, pass -1 to let the server stack items naturally [3]
 							int taskDestSlot = (component.getTargetSlot() == -1) ? -1 : tgtSlot;
 							boolean success = context.tryWriteTask(incomingItem.srcPos(), incomingItem.srcSlot(),
 									incomingItem.srcSide(), tgtInventoryPos, taskDestSlot, tgtSide, incoming,
@@ -394,7 +401,7 @@ public final class ItemTransferPlanner {
 								newTgt.setCount(amountToTransfer);
 								tgtInv.slots().put(tgtSlot, new ThreadSafeInventorySnapshot.SlotSnapshot(newTgt,
 										tgtEntry.slotLimit(), mainTgtSlot));
-								updateSnapshotCopies(context, tgtInventoryPos, tgtSlot, newTgt);
+								updateSnapshotCopies(context, tgtInventoryPos, mainTgtSlot, newTgt); // PASS mainTgtSlot here [3]
 								incoming.shrink(amountToTransfer);
 								remainingToDeposit -= amountToTransfer;
 								if (!component.isWhitelist()) {

@@ -1,7 +1,7 @@
 package dta.sfmflow.block;
 
 import com.mojang.serialization.MapCodec;
-import dta.sfmflow.block.entity.ItemEjectorHatchBlockEntity;
+import dta.sfmflow.block.entity.ItemEjectorValveBlockEntity;
 import dta.sfmflow.block.entity.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -23,16 +23,16 @@ import org.jetbrains.annotations.Nullable;
  * Specialized physical hatch block that ejects buffered item stacks into the
  * world [3].
  */
-public class ItemEjectorHatchBlock extends BaseEntityBlock {
+public class ItemEjectorValveBlock extends BaseEntityBlock {
 	public static final DirectionProperty FACING = BlockStateProperties.FACING;
-	public static final MapCodec<ItemEjectorHatchBlock> CODEC = simpleCodec(ItemEjectorHatchBlock::new);
+	public static final MapCodec<ItemEjectorValveBlock> CODEC = simpleCodec(ItemEjectorValveBlock::new);
 
 	/**
 	 * Initializes a new ItemEjectorHatchBlock instance [3].
 	 *
 	 * @param properties block behavior properties [3]
 	 */
-	public ItemEjectorHatchBlock(Properties properties) {
+	public ItemEjectorValveBlock(Properties properties) {
 		super(properties);
 		this.registerDefaultState(this.stateDefinition.any().setValue(FACING, Direction.NORTH));
 	}
@@ -55,7 +55,7 @@ public class ItemEjectorHatchBlock extends BaseEntityBlock {
 	@Nullable
 	@Override
 	public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-		return new ItemEjectorHatchBlockEntity(pos, state);
+		return new ItemEjectorValveBlockEntity(pos, state);
 	}
 
 	@Override
@@ -71,6 +71,6 @@ public class ItemEjectorHatchBlock extends BaseEntityBlock {
 			return null;
 		}
 		return createTickerHelper(type, ModBlockEntities.ITEM_EJECTOR_HATCH_BE.get(),
-				ItemEjectorHatchBlockEntity::tick);
+				ItemEjectorValveBlockEntity::tick);
 	}
 }

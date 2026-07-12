@@ -77,16 +77,14 @@ public final class FlowExecutionKernel {
 						activeTriggers
 				);
 
-				long budgetNs = 1_000_000L; // 1ms budget [3]
+				long budgetNs = 5_000_000L; // 5ms budget to prevent starvation while maintaining responsiveness [3]
 				boolean done = false;
 				while (!done) {
 					done = task.evaluateSlice(budgetNs);
 					if (!done) {
-						Thread.sleep(1); // Cooperative yield [3]
+						Thread.yield(); // Cooperative yield instead of timed-waiting sleep [3]
 					}
 				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
 			} catch (Exception e) {
 				SFMFlow.LOGGER.error("Exception occurred inside background flowchart planning executor", e);
 			} finally {
