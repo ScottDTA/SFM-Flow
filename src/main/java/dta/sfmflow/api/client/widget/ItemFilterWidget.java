@@ -27,8 +27,8 @@ import net.neoforged.neoforge.fluids.FluidStack;
 
 /**
  * Reusable UI widget managing Whitelist/Blacklist filtering and a 1x12 ghost
- * slot item grid [3]. Repositions physical menu slots to enable robust vanilla
- * drag-and-drop mechanics [3].
+ * slot item grid. Repositions physical menu slots to enable robust vanilla
+ * drag-and-drop mechanics.
  */
 @OnlyIn(Dist.CLIENT)
 public class ItemFilterWidget extends AbstractFlowWidget {
@@ -41,6 +41,11 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 	private final Runnable onChanged;
 
 	public ItemFilterWidget(int x, int y, IFilterable model, ManagerScreen parentScreen, Runnable onChanged) {
+		this(x, y, model, parentScreen, true, onChanged);
+	}
+
+	public ItemFilterWidget(int x, int y, IFilterable model, ManagerScreen parentScreen, boolean showToggle,
+			Runnable onChanged) {
 		super(x, y, 260, 40, Component.literal("Item Filter"));
 		this.model = model;
 		this.parentScreen = parentScreen;
@@ -52,7 +57,10 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 					btn.setMessage(Component.literal(model.isWhitelist() ? "Whitelist" : "Blacklist"));
 					this.onChanged.run();
 				}).pos(getX() + 130, getY()).size(120, 14).build();
-		this.children.add(new ApiWidgetAdapter<>(this.toggleWhitelistBtn));
+
+		if (showToggle) {
+			this.children.add(new ApiWidgetAdapter<>(this.toggleWhitelistBtn));
+		}
 
 		repositionGhostSlots();
 	}
@@ -86,7 +94,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			}
 		}
 
-		return false; // Let clicks fall through to the physical slots! [3]
+		return false; // Let clicks fall through to the physical slots!
 	}
 
 	@Override
@@ -158,7 +166,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 				}
 				guiGraphics.renderItemDecorations(parentScreen.getFont(), stack, slotX + 1, slotY + 1);
 
-				// Render "MID" overlay on variable cards that have UseModId enabled [3]
+				// Render "MID" overlay on variable cards that have UseModId enabled
 				if (stack.is(ModItems.VARIABLE_CARD.get())) {
 					CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
 					if (customData != null) {
@@ -201,7 +209,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x; // Fix inversion: absolute child tracking translation [3]
+		int dif = this.getX() - x;
 		super.setX(x);
 		updateChildrenXPositions(dif);
 		repositionGhostSlots();
@@ -209,7 +217,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y; // Fix inversion: absolute child tracking translation [3]
+		int dif = this.getY() - y;
 		super.setY(y);
 		updateChildrenYPositions(dif);
 		repositionGhostSlots();

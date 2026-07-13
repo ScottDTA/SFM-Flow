@@ -11,6 +11,7 @@ import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.capability.EnergyTransferParams;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
+import dta.sfmflow.block.FluidVacuumValveBlock;
 import dta.sfmflow.block.ItemVacuumValveBlock;
 import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
@@ -18,6 +19,7 @@ import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
+import dta.sfmflow.flowcomponents.ItemConditionalComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
@@ -34,6 +36,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -67,6 +70,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_TRIGGER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_EMITTER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> OBSERVER_TRIGGER;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_CONDITIONAL;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -128,6 +132,10 @@ public class VanillaSFMFlowPlugin {
 		OBSERVER_TRIGGER = FlowComponentBuilder.create("observer_trigger", ObserverTriggerComponent::new)
 				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/observer_trigger_button.png")
 				.displayName("gui.sfmflow.observer_trigger").codec(ObserverTriggerComponent.CODEC).build(registry);
+
+		ITEM_CONDITIONAL = FlowComponentBuilder.create("item_conditional", ItemConditionalComponent::new)
+				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/condition_button.png")
+				.displayName("gui.sfmflow.item_conditional").codec(ItemConditionalComponent.CODEC).build(registry);
 	}
 
 	private void registerItemCapability() {
@@ -213,7 +221,7 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.registerTransfer(fluidCapId,
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof FluidTransferParams task) {
-						if (level.getBlockState(src).is(dta.sfmflow.block.ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get())) {
+						if (level.getBlockState(src).is(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get())) {
 							return executeFluidVacuumTransfer(level, src, dest, destSide, task);
 						}
 						IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, src, srcSide);
@@ -243,16 +251,17 @@ public class VanillaSFMFlowPlugin {
 					return false;
 				});
 	}
-	
-	private static boolean executeFluidVacuumTransfer(Level level, BlockPos src, BlockPos dest, Direction destSide, FluidTransferParams task) {
+
+	private static boolean executeFluidVacuumTransfer(Level level, BlockPos src, BlockPos dest, Direction destSide,
+			FluidTransferParams task) {
 		BlockState state = level.getBlockState(src);
-		if (!state.hasProperty(dta.sfmflow.block.FluidVacuumValveBlock.FACING)) {
+		if (!state.hasProperty(FluidVacuumValveBlock.FACING)) {
 			return false;
 		}
-		Direction facing = state.getValue(dta.sfmflow.block.FluidVacuumValveBlock.FACING);
+		Direction facing = state.getValue(FluidVacuumValveBlock.FACING);
 		BlockPos mouthPos = src.relative(facing);
 
-		net.minecraft.world.level.material.FluidState fluidState = level.getFluidState(mouthPos);
+		FluidState fluidState = level.getFluidState(mouthPos);
 		if (fluidState.isSource() && fluidState.getType() == task.fluid().getFluid()) {
 			IFluidHandler target = level.getCapability(Capabilities.FluidHandler.BLOCK, dest, destSide);
 			if (target == null) {

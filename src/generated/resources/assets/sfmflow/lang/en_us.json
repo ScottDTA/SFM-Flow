@@ -28,6 +28,7 @@
   "gui.sfmflow.fluid_input": "Fluid Input",
   "gui.sfmflow.fluid_output": "Fluid Output",
   "gui.sfmflow.interval_trigger": "Interval Trigger",
+  "gui.sfmflow.item_conditional": "Item Conditional",
   "gui.sfmflow.item_input": "Item Input",
   "gui.sfmflow.item_output": "Item Output",
   "gui.sfmflow.loading": "%1$s REQUESTS LOADING...",

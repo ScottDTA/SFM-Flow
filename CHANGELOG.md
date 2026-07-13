@@ -1,3 +1,21 @@
+7-13-2026
+
+### [Added]
+* Added the **Item Conditional** logic component, allowing you to branch flowchart execution paths off-thread based on current item levels inside connected inventories.
+* Added support for dual-output terminals (Output 0 for True, Output 1 for False) on the Item Conditional component.
+* Added custom match mode toggles—Match All (AND) and Match Any (OR)—along with multiple conditional operators (e.g., `<=`, `>=`, `==`, `!=`, `<`, `>`) in the settings configuration overlay.
+* Added English localization entries supporting the new logic node in translation bundles.
+
+### [Changed]
+* Refactored `ItemFilterWidget` to support optional toggle configurations, suppressing the Whitelist/Blacklist button when rendering inside conditional logical evaluation scenes.
+
+### [Fixed]
+* None.
+
+### [Removed]
+* None.
+
+
 7-12-2026
 
 ### [Added]

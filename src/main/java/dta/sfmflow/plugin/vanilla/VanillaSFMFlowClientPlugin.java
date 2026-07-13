@@ -13,16 +13,19 @@ import dta.sfmflow.client.screen.widgets.EnergySideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.ItemConditionalSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ObserverTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
+import dta.sfmflow.flowcomponents.ItemConditionalComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
@@ -33,6 +36,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+
+import java.util.UUID;
+
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -46,7 +52,7 @@ public class VanillaSFMFlowClientPlugin {
 	 * Scans connections to verify if a targeted component ID participates in active
 	 * visual execution chains.
 	 */
-	private static boolean hasActiveConnections(ManagerScreen screen, java.util.UUID id) {
+	private static boolean hasActiveConnections(ManagerScreen screen, UUID id) {
 		var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
 		for (var conn : connections) {
 			if (conn.getSourceComponentId().equals(id) || conn.getTargetComponentId().equals(id)) {
@@ -134,7 +140,7 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.OBSERVER_TRIGGER.get(), (screen, component) -> {
 			if (component instanceof ObserverTriggerComponent trigger) {
 				return new ObserverTriggerSettingsOverlay(screen, trigger);
@@ -142,6 +148,12 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});
 
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ITEM_CONDITIONAL.get(), (screen, component) -> {
+			if (component instanceof ItemConditionalComponent conditional) {
+				return new ItemConditionalSettingsOverlay(screen, conditional);
+			}
+			return null;
+		});
 
 		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
@@ -155,6 +167,10 @@ public class VanillaSFMFlowClientPlugin {
 		SideConfigPopupRegistry.register(RedstoneEmitterComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new RedstoneEmitterSideConfigModalPopup(screen, (RedstoneEmitterComponent) sideModel, face, pos,
 					onChanged);
+		});
+
+		SideConfigPopupRegistry.register(ItemConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
+			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
 		});
 
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
@@ -340,21 +356,44 @@ public class VanillaSFMFlowClientPlugin {
 						return null;
 					}
 				});
-		
-		WorkspaceValidatorRegistry.register(ObserverTriggerComponent.class, new WorkspaceValidatorRegistry.INodeValidator<ObserverTriggerComponent>() {
-			@Override
-			public boolean hasError(ManagerScreen screen, ObserverTriggerComponent transfer) {
-				return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
-			}
 
-			@Override
-			public @Nullable Component getErrorTooltip(ManagerScreen screen, ObserverTriggerComponent transfer) {
-				if (hasError(screen, transfer)) {
-					return Component.translatable("gui.sfmflow.error.unbound_inventory");
-				}
-				return null;
-			}
-		});
+		WorkspaceValidatorRegistry.register(ObserverTriggerComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<ObserverTriggerComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, ObserverTriggerComponent transfer) {
+						return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							ObserverTriggerComponent transfer) {
+						if (hasError(screen, transfer)) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
+
+		WorkspaceValidatorRegistry.register(ItemConditionalComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<ItemConditionalComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, ItemConditionalComponent component) {
+						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
+							return hasActiveConnections(screen, component.getId());
+						}
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							ItemConditionalComponent component) {
+						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
+
 	}
 
 	/**
