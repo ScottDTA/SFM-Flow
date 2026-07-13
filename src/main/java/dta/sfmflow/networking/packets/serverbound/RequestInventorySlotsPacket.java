@@ -12,9 +12,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Optional;
 
 /**
- * Serverbound packet payload requesting slot inventory contents from the server [3].
+ * Serverbound packet payload requesting slot inventory contents with capability context.
  */
-public record RequestInventorySlotsPacket(BlockPos pos, @Nullable Direction side) implements CustomPacketPayload {
+public record RequestInventorySlotsPacket(BlockPos pos, @Nullable Direction side, ResourceLocation capabilityId) implements CustomPacketPayload {
 
 	public static final CustomPacketPayload.Type<RequestInventorySlotsPacket> TYPE = new CustomPacketPayload.Type<>(
 			ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "request_inventory_slots"));
@@ -23,10 +23,11 @@ public record RequestInventorySlotsPacket(BlockPos pos, @Nullable Direction side
 			id -> Direction.values()[id], Direction::ordinal);
 
 	public static final StreamCodec<ByteBuf, RequestInventorySlotsPacket> STREAM_CODEC = StreamCodec
-			.<ByteBuf, RequestInventorySlotsPacket, BlockPos, Optional<Direction>>composite(
+			.<ByteBuf, RequestInventorySlotsPacket, BlockPos, Optional<Direction>, ResourceLocation>composite(
 					BlockPos.STREAM_CODEC, RequestInventorySlotsPacket::pos,
 					DIRECTION_CODEC.apply(ByteBufCodecs::optional), p -> Optional.ofNullable(p.side()),
-					(pos, opt) -> new RequestInventorySlotsPacket(pos, opt.orElse(null)));
+					ResourceLocation.STREAM_CODEC, RequestInventorySlotsPacket::capabilityId,
+					(pos, opt, capId) -> new RequestInventorySlotsPacket(pos, opt.orElse(null), capId));
 
 	@Override
 	public CustomPacketPayload.Type<? extends CustomPacketPayload> type() {

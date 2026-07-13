@@ -55,7 +55,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		directionalBlockFacingNorth(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), vacuumModel);
 		simpleBlockItem(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), vacuumModel);
 
-		// Configured Fluid Ejector Valve to use its dedicated front-face texture orientably with custom rotations [3]
+		// Configured Fluid Ejector Valve to use its dedicated front-face texture orientably with custom rotations
 				BlockModelBuilder fluidEjectorModel = models().orientable("fluid_ejector_valve_block",
 						modLoc("block/fluid_ejector_valve_block"),
 						modLoc("block/fluid_ejector_valve_block_front"),
@@ -63,7 +63,7 @@ public class ModBlockStateProvider extends BlockStateProvider {
 				directionalBlockFacingNorth(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(), fluidEjectorModel);
 				simpleBlockItem(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(), fluidEjectorModel);
 
-				// Configured Fluid Vacuum Valve to use its dedicated front-face texture orientably with custom rotations [3]
+				// Configured Fluid Vacuum Valve to use its dedicated front-face texture orientably with custom rotations
 				BlockModelBuilder fluidVacuumModel = models().orientable("fluid_vacuum_valve_block",
 						modLoc("block/fluid_vacuum_valve_block"),
 						modLoc("block/fluid_vacuum_valve_block_front"),
@@ -73,15 +73,15 @@ public class ModBlockStateProvider extends BlockStateProvider {
 				
 		// Standard Cable Cluster
 		simpleBlock(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
-				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
+				models().cubeAll("cable_cluster_block", modLoc("block/cable_cluster")));
 		simpleBlockItem(ModBlocks.CABLE_CLUSTER_BLOCK.get(),
-				models().cubeAll("cable_cluster_block", modLoc("block/cable_block")));
+				models().cubeAll("cable_cluster_block", modLoc("block/cable_cluster")));
 
 		// Advanced Cable Cluster
 		simpleBlock(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(),
-				models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
+				models().cubeAll("advanced_cable_cluster_block", modLoc("block/cable_cluster_adv")));
 		simpleBlockItem(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get(),
-				models().cubeAll("advanced_cable_cluster_block", modLoc("block/hardened_cable_block")));
+				models().cubeAll("advanced_cable_cluster_block", modLoc("block/cable_cluster_adv")));
 
 		BlockModelBuilder faceOffModel = models()
 				.withExistingParent("block/redstone_emitter_face_off", mcLoc("block/block"))
@@ -131,8 +131,8 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		emitterBuilder.part().modelFile(faceOnModel).rotationX(90).rotationY(90).addModel()
 				.condition(BlockStateProperties.EAST, true);
 
-		var observerModel = models().cube("block/observer_cable_block", modLoc("block/observer_cable_top"), // down
-																											// (bottom)
+		var observerModel = models().cube("block/observer_cable_block",
+				modLoc("block/observer_cable_top"), // down (bottom)
 				modLoc("block/observer_cable_top2"), // up (top)
 				modLoc("block/observer_cable_front"), // north (front face)
 				modLoc("block/observer_cable_back"), // south (back port)

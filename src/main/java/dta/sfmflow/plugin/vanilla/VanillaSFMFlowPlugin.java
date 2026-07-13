@@ -150,7 +150,7 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.registerTransfer(itemCapId,
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof ItemTransferParams task) {
-						// Intercept transfer task if the source block is a Vacuum Valve [3]
+						// Intercept transfer task if the source block is a Vacuum Valve
 						if (level.getBlockState(src).is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get())) {
 							return executeVacuumTransfer(level, src, dest, destSide, task);
 						}

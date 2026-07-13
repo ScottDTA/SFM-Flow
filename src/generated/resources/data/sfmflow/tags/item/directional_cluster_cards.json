@@ -1,0 +1,9 @@
+{
+  "values": [
+    "sfmflow:item_vacuum_valve_block",
+    "sfmflow:item_ejector_valve_block",
+    "sfmflow:fluid_ejector_valve_block",
+    "sfmflow:fluid_vacuum_valve_block",
+    "sfmflow:observer_cable_block"
+  ]
+}

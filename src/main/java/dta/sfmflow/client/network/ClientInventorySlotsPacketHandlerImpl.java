@@ -9,7 +9,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Client-only packet handler processing synchronized slot item collections [3].
+ * Client-only packet handler processing synchronized slot item collections.
  */
 @OnlyIn(Dist.CLIENT)
 public class ClientInventorySlotsPacketHandlerImpl implements IPacketHandler<SyncInventorySlotsPacket> {
@@ -21,8 +21,8 @@ public class ClientInventorySlotsPacketHandlerImpl implements IPacketHandler<Syn
 				return;
 			}
 
-			// Synchronize server-verified slot configurations directly onto the client cache [3]
-			ClientInventoryCache.set(payload.pos(), payload.side(), payload.data());
+			// Synchronize server-verified slot configurations directly onto the isolated client cache
+			ClientInventoryCache.set(payload.pos(), payload.side(), payload.capabilityId(), payload.data());
 
 			// Trigger visual update instantly
 			if (mc.screen instanceof ManagerScreen screen) {

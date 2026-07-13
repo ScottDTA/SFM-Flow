@@ -1,14 +1,17 @@
 7-12-2026
 
-
-
 ### [Added]
+* Enforced strict card insertion limits within standard and advanced Card Clusters (maximum of 1 Cable Card, 1 of each omni-directional card, and 6 of each directional card type allowed total).
+* Added direction conflict prevention inside Card Clusters; two cards of the same type can no longer be assigned to the same active side.
 * Added the Fluid Vacuum Valve, a dedicated network block capable of vacuuming fluid source blocks directly from the world when triggered by your flowchart.
 * Added the Fluid Ejector Valve, a dedicated, non-buffering block that instantaneously places fluid source blocks into the world.
 * Integrated the Item Vacuum Valve into the logic system; it can now dynamically detect, simulate, and transfer nearby ground items through your network pipelines during flowchart execution.
 * Implemented a multi-threaded copy mechanism for network inventories during background logic planning, resolving potential data conflicts and improving overall server stability.
 
 ### [Changed]
+* Reworked the Card Cluster screen and slot configuration layouts into a structured, easily readable grid.
+* Adjusted the physical network scanner so that Card Clusters now require an installed Cable Card to bridge signals and carry connections across a cable line.
+* Updated standard and advanced Card Clusters to display custom textures matching their physical properties.
 * Split the old "Fluid Extraction Hatch" block and card into the two specialized valves above to simplify network setups.
 * Updated fluid block placement checks to prevent ejecting fluids into coordinates that already contain an active fluid source block.
 * Upgraded the Item Vacuum Valve with "intelligent filtering"; it will now scan your active flowchart and only suction ground items if they match your filter rules and have room in destination chests, preventing items from getting stuck inside the valve.
@@ -20,6 +23,7 @@
 * Reworked the Observer Cable block's visual model to render distinct front, back, top, bottom, and side texture overlays.
 
 ### [Fixed]
+* Fixed an inventory slot synchronization issue where viewing the tank configuration of a fluid block could temporarily override or corrupt cached item slot views.
 * Removed the old, generic "Fluid Extraction Hatch" block, item, and creative tab entries.
 * Fixed a major logic simulation error where sided blocks (such as Furnaces and Brewing Stands) would fail to update simulated slot counts consistently across all of their faces during item transfer checks.
 

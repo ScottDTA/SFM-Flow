@@ -8,13 +8,14 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Backing BlockEntity for the Fluid Ejector Valve block [3].
- * Employs a non-buffering, instantaneous capability handler to place fluid blocks [3].
+ * Backing BlockEntity for the Fluid Ejector Valve block. Employs a
+ * non-buffering, instantaneous capability handler to place fluid blocks.
  */
 public class FluidEjectorValveBlockEntity extends BlockEntity {
 
@@ -23,7 +24,7 @@ public class FluidEjectorValveBlockEntity extends BlockEntity {
 	}
 
 	public static void tick(Level level, BlockPos pos, BlockState state, FluidEjectorValveBlockEntity be) {
-		// No-op: Ejection is handled instantaneously during task execution [3]
+		// No-op: Ejection is handled instantaneously during task execution
 	}
 
 	@Override
@@ -42,7 +43,7 @@ public class FluidEjectorValveBlockEntity extends BlockEntity {
 	}
 
 	/**
-	 * Instantaneous, non-buffering fluid placement handler [3].
+	 * Instantaneous, non-buffering fluid placement handler.
 	 */
 	private static class EjectorFluidHandler implements IFluidHandler {
 		private final Level level;
@@ -62,12 +63,12 @@ public class FluidEjectorValveBlockEntity extends BlockEntity {
 
 		@Override
 		public @NotNull FluidStack getFluidInTank(int tank) {
-			return FluidStack.EMPTY; // No fluid is ever held [3]
+			return FluidStack.EMPTY;
 		}
 
 		@Override
 		public int getTankCapacity(int tank) {
-			return 1000; // Accepts exactly 1 bucket at a time [3]
+			return 1000;
 		}
 
 		@Override
@@ -78,13 +79,13 @@ public class FluidEjectorValveBlockEntity extends BlockEntity {
 		@Override
 		public int fill(FluidStack resource, FluidAction action) {
 			if (resource.isEmpty() || resource.getAmount() < 1000) {
-				return 0; // Requires at least 1 full bucket to place a source block [3]
+				return 0;
 			}
 			BlockPos mouthPos = pos.relative(facing);
 			BlockState mouthState = level.getBlockState(mouthPos);
-			net.minecraft.world.level.material.FluidState fluidState = level.getFluidState(mouthPos);
+			FluidState fluidState = level.getFluidState(mouthPos);
 
-			// Prevent placing fluid if target location is already a fluid source [3]
+			// Prevent placing fluid if target location is already a fluid source
 			if (!fluidState.isSource() && (mouthState.isAir() || mouthState.canBeReplaced(resource.getFluid()))) {
 				BlockState fluidBlockState = resource.getFluid().defaultFluidState().createLegacyBlock();
 
@@ -92,7 +93,7 @@ public class FluidEjectorValveBlockEntity extends BlockEntity {
 					if (action.execute()) {
 						level.setBlock(mouthPos, fluidBlockState, 3);
 					}
-					return 1000; // Consumed exactly 1 bucket [3]
+					return 1000;
 				}
 			}
 			return 0;
@@ -100,12 +101,12 @@ public class FluidEjectorValveBlockEntity extends BlockEntity {
 
 		@Override
 		public @NotNull FluidStack drain(FluidStack resource, FluidAction action) {
-			return FluidStack.EMPTY; // Cannot be drained [3]
+			return FluidStack.EMPTY;
 		}
 
 		@Override
 		public @NotNull FluidStack drain(int maxDrain, FluidAction action) {
-			return FluidStack.EMPTY; // Cannot be drained [3]
+			return FluidStack.EMPTY;
 		}
 	}
 }

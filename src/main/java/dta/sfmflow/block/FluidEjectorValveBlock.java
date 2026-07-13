@@ -2,7 +2,6 @@ package dta.sfmflow.block;
 
 import com.mojang.serialization.MapCodec;
 import dta.sfmflow.block.entity.FluidEjectorValveBlockEntity;
-import dta.sfmflow.block.entity.ModBlockEntities;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.context.BlockPlaceContext;
@@ -20,7 +19,7 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Specialized physical hatch block that ejects buffered fluids into the world [3].
+ * Specialized physical hatch block that ejects buffered fluids into the world.
  */
 public class FluidEjectorValveBlock extends BaseEntityBlock {
 	public static final DirectionProperty FACING = BlockStateProperties.FACING;
@@ -61,7 +60,7 @@ public class FluidEjectorValveBlock extends BaseEntityBlock {
 	@Override
 	public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state,
 			BlockEntityType<T> type) {
-		// Ticking is completely disabled since fluid placement is now handled instantaneously [3]
+		// Ticking is completely disabled since fluid placement is now handled instantaneously
 		return null;
 	}
 }

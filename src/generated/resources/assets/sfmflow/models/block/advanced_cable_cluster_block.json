@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "sfmflow:block/hardened_cable_block"
+    "all": "sfmflow:block/cable_cluster_adv"
   }
 }

@@ -11,7 +11,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 
 /**
- * Backing BlockEntity for the Fluid Vacuum Valve block [3].
+ * Backing BlockEntity for the Fluid Vacuum Valve block.
  */
 public class FluidVacuumValveBlockEntity extends BlockEntity {
 
@@ -22,7 +22,7 @@ public class FluidVacuumValveBlockEntity extends BlockEntity {
 	}
 
 	public static void tick(Level level, BlockPos pos, BlockState state, FluidVacuumValveBlockEntity be) {
-		// Standalone Fluid Vacuum Valve remains completely passive; fluid blocks are scanned as snapshots [3]
+		// Standalone Fluid Vacuum Valve remains completely passive; fluid blocks are scanned as snapshots 
 	}
 
 	@Override

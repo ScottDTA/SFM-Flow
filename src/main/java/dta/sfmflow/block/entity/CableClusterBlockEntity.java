@@ -16,8 +16,10 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -28,26 +30,21 @@ import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 /**
  * Backing BlockEntity logic running cluster card proxy sweeps, pre-allocated
  * directional capability routing, staggered logic executions, and adjacent pipe
- * cache flush notifications [3]. Fully cleaned to delegate execution behavior to
- * HatchBehaviorHelper [3].
+ * cache flush notifications.
  */
 public class CableClusterBlockEntity extends BlockEntity implements MenuProvider {
 	private final int numSlots;
 	private final ItemStackHandler inventory;
 	private final Direction[] slotDirections;
 
-	// Direct Pre-Allocated, face-locked capability routing proxies [3]
+	// Direct Pre-Allocated, face-locked capability routing proxies
 	private final IItemHandler[] directionalItemProxies = new IItemHandler[6];
 	private final IFluidHandler[] directionalFluidProxies = new IFluidHandler[6];
 
-	// Card-Specific Isolated Storage buffers [3]
+	// Card-Specific Isolated Storage buffers
 	private final ItemStackHandler[] slotBuffers;
 	private final FluidTank[] fluidBuffers;
 
@@ -58,19 +55,38 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		this.inventory = new ItemStackHandler(numSlots) {
 			@Override
 			public boolean isItemValid(int slot, @NotNull ItemStack stack) {
-				return stack.is(ModTags.CLUSTER_COMPATIBLE);
+				if (!stack.is(ModTags.CLUSTER_COMPATIBLE)) {
+					return false;
+				}
+				return isCardInsertionValid(slot, stack);
+			}
+
+			@Override
+			public int getSlotLimit(int slot) {
+				return 1;
 			}
 
 			@Override
 			protected void onContentsChanged(int slot) {
 				super.onContentsChanged(slot);
+				ItemStack stack = getStackInSlot(slot);
+				if (stack.isEmpty()) {
+
+					CableClusterBlockEntity.this.slotDirections[slot] = null;
+				} else {
+
+					Direction dir = CableClusterBlockEntity.this.slotDirections[slot];
+					if (dir != null && !isDirectionValid(slot, dir)) {
+						CableClusterBlockEntity.this.slotDirections[slot] = null;
+					}
+				}
 				CableClusterBlockEntity.this.setChanged();
 				CableClusterBlockEntity.this.notifyNeighbors();
 			}
 		};
 
 		this.slotDirections = new Direction[numSlots];
-		java.util.Arrays.fill(this.slotDirections, null); // Null/NONE unassigned by default
+		java.util.Arrays.fill(this.slotDirections, null);
 
 		this.slotBuffers = new ItemStackHandler[numSlots];
 		this.fluidBuffers = new FluidTank[numSlots];
@@ -121,12 +137,112 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 	public void setSlotDirection(int slot, int ordinal) {
 		if (slot >= 0 && slot < numSlots) {
 			Direction dir = (ordinal == -1 || ordinal < 0 || ordinal >= 6) ? null : Direction.values()[ordinal];
-			if (this.slotDirections[slot] != dir) {
-				this.slotDirections[slot] = dir;
-				this.setChanged();
-				this.notifyNeighbors();
+			if (isDirectionValid(slot, dir)) {
+				if (this.slotDirections[slot] != dir) {
+					this.slotDirections[slot] = dir;
+					this.setChanged();
+					this.notifyNeighbors();
+				}
 			}
 		}
+	}
+
+	/**
+	 * Determines if a specific directional value is valid and unconflicted for a
+	 * slot card.
+	 */
+	public boolean isDirectionValid(int slot, @Nullable Direction dir) {
+		if (dir == null)
+			return true;
+		ItemStack stack = inventory.getStackInSlot(slot);
+		if (stack.isEmpty())
+			return true;
+
+		// Query extensible Tag lists to support third-party addon directional cards
+		// natively
+		if (stack.is(ModTags.DIRECTIONAL_CLUSTER_CARDS)) {
+			Item item = stack.getItem();
+			for (int i = 0; i < numSlots; i++) {
+				if (i != slot) {
+					ItemStack s = inventory.getStackInSlot(i);
+					if (!s.isEmpty() && s.is(item) && slotDirections[i] == dir) {
+						return false;
+					}
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Evaluates if a card insertion satisfies standard cables, omni, and valve
+	 * capacity rules. Querying extensible ModTags guarantees full compatibility
+	 * with addon cards.
+	 */
+	public boolean isCardInsertionValid(int slot, ItemStack stack) {
+		if (stack.isEmpty())
+			return true;
+		Item item = stack.getItem();
+
+		// 1. Standard or Hardened Cable: maximum of 1 of either allowed total
+		boolean isCable = (stack.is(ModBlocks.CABLE_BLOCK.get().asItem())
+				|| stack.is(ModBlocks.HARDENED_CABLE_BLOCK.get().asItem()));
+		if (isCable) {
+			for (int i = 0; i < numSlots; i++) {
+				if (i != slot) {
+					ItemStack s = inventory.getStackInSlot(i);
+					if (!s.isEmpty() && (s.is(ModBlocks.CABLE_BLOCK.get().asItem())
+							|| s.is(ModBlocks.HARDENED_CABLE_BLOCK.get().asItem()))) {
+						return false;
+					}
+				}
+			}
+		}
+
+		// 2. Omni-Directional cables: maximum of 1 of each type allowed
+		if (stack.is(ModTags.OMNI_DIRECTIONAL_CLUSTER_CARDS)) {
+			for (int i = 0; i < numSlots; i++) {
+				if (i != slot) {
+					ItemStack s = inventory.getStackInSlot(i);
+					if (!s.isEmpty() && s.is(item)) {
+						return false;
+					}
+				}
+			}
+		}
+
+		// 3. Directional cables: maximum of 6 of each individual type allowed
+		if (stack.is(ModTags.DIRECTIONAL_CLUSTER_CARDS)) {
+			int count = 0;
+			for (int i = 0; i < numSlots; i++) {
+				if (i != slot) {
+					ItemStack s = inventory.getStackInSlot(i);
+					if (!s.isEmpty() && s.is(item)) {
+						count++;
+					}
+				}
+			}
+			if (count >= 6) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Determines if the network is allowed to route/traverse through this cluster
+	 * block.
+	 */
+	public boolean hasCableCard() {
+		for (int i = 0; i < numSlots; i++) {
+			ItemStack stack = inventory.getStackInSlot(i);
+			if (!stack.isEmpty() && (stack.is(ModBlocks.CABLE_BLOCK.get().asItem())
+					|| stack.is(ModBlocks.HARDENED_CABLE_BLOCK.get().asItem()))) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public boolean isItemCard(int slot) {
@@ -180,11 +296,22 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			if (dir == null) {
 				continue;
 			}
-			// Delegate custom ticking to the extensible behavior registry [3]
+			// Delegate custom ticking to the extensible behavior registry
 			ClusterCardBehavior behavior = CableClusterBehaviorRegistry.get(stack.getItem());
 			if (behavior != null) {
 				behavior.tick(level, pos, dir, i, stack, be);
 			}
+		}
+	}
+
+	@Override
+	public void setChanged() {
+		super.setChanged();
+		// Force server-to-client block entity sync whenever properties, directions, or
+		// items modify
+		if (this.level != null && !this.level.isClientSide()) {
+			BlockState state = this.getBlockState();
+			this.level.sendBlockUpdated(this.worldPosition, state, state, Block.UPDATE_ALL);
 		}
 	}
 
@@ -241,10 +368,8 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		}
 		if (tag.contains("FluidBuffers")) {
 			ListTag fluidBuffersList = tag.getList("FluidBuffers", Tag.TAG_COMPOUND);
-			for (int i = 0; i < this.numSlots; i++) {
-				if (i < fluidBuffersList.size()) {
-					this.fluidBuffers[i].readFromNBT(registries, fluidBuffersList.getCompound(i));
-				}
+			for (int i = 0; i < fluidBuffersList.size() && i < this.numSlots; i++) {
+				this.fluidBuffers[i].readFromNBT(registries, fluidBuffersList.getCompound(i));
 			}
 		}
 	}

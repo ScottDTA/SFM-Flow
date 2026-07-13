@@ -1,10 +1,7 @@
 package dta.sfmflow.networking;
 
 import java.lang.reflect.Field;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Set;
-import java.util.Collection;
 
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
@@ -109,7 +106,7 @@ public class ServerPayloadHandler {
 				AbstractFlowComponent component = manager.getFlowComponents().get(data.componentId());
 				if (component != null) {
 					component.loadData(data.settings());
-					manager.setDataDirty(true); // Flag dirty to trigger saving [3]
+					manager.setDataDirty(true);
 					manager.setChanged();
 
 					ServerPlayer player = (ServerPlayer) context.player();
@@ -143,13 +140,13 @@ public class ServerPayloadHandler {
 
 				connections.removeIf(conn -> (conn.getSourceComponentId().equals(data.sourceId())
 						&& conn.getOutputNodeIndex() == data.outputIdx())
-						// Alignment checks
+
 						|| (conn.getTargetComponentId().equals(data.targetId())
 								&& conn.getInputNodeIndex() == data.inputIdx()));
 
 				connections.add(new FlowComponentConnections(data.sourceId(), data.outputIdx(), data.targetId(),
 						data.inputIdx()));
-				manager.setDataDirty(true); // Flag dirty to trigger saving
+				manager.setDataDirty(true);
 				manager.setChanged();
 
 				CompoundTag dataTag = new CompoundTag();
@@ -175,7 +172,7 @@ public class ServerPayloadHandler {
 						&& conn.getOutputNodeIndex() == data.outputIdx()
 						&& conn.getTargetComponentId().equals(data.targetId())
 						&& conn.getInputNodeIndex() == data.inputIdx());
-				manager.setDataDirty(true); // Flag dirty to trigger saving
+				manager.setDataDirty(true);
 				manager.setChanged();
 
 				CompoundTag dataTag = new CompoundTag();
@@ -202,7 +199,7 @@ public class ServerPayloadHandler {
 					} else {
 						transfer.setBoundFilterVariableId(data.variableId());
 					}
-					manager.setDataDirty(true); // Flag dirty to trigger saving
+					manager.setDataDirty(true);
 					manager.setChanged();
 
 					CompoundTag settingsTag = new CompoundTag();
@@ -225,56 +222,60 @@ public class ServerPayloadHandler {
 				ListTag accessibleList = new ListTag();
 				int totalSlotsVal = 0;
 
-				// 1. Resolve absolute/maximum slot capacity from non-sided (null) capability handler
-				IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
-				IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), data.side());
-				
-				if (nullHandler != null) {
-					totalSlotsVal = nullHandler.getSlots();
-					
-					// Populate list of current item stacks based on raw slot indexes
-					for (int i = 0; i < totalSlotsVal; i++) {
-						ItemStack stack = nullHandler.getStackInSlot(i);
-						if (!stack.isEmpty()) {
-							CompoundTag slotTag = new CompoundTag();
-							slotTag.putInt("slot", i);
-							slotTag.put("item", stack.save(level.registryAccess()));
-							list.add(slotTag);
-						}
-					}
+				ResourceLocation capId = data.capabilityId();
 
-					// Resolve accessible slots from sided capability
-					if (itemHandler != null) {
-						int sideCount = itemHandler.getSlots();
-						if (sideCount == totalSlotsVal) {
-							for (int i = 0; i < totalSlotsVal; i++) {
-								accessibleList.add(IntTag.valueOf(i));
+				// Symmetrically segment queries based on the requested capability ID
+				if (capId.getPath().equals("item")) {
+					IItemHandler nullHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(), null);
+					IItemHandler itemHandler = level.getCapability(Capabilities.ItemHandler.BLOCK, data.pos(),
+							data.side());
+
+					if (nullHandler != null) {
+						totalSlotsVal = nullHandler.getSlots();
+
+						for (int i = 0; i < totalSlotsVal; i++) {
+							ItemStack stack = nullHandler.getStackInSlot(i);
+							if (!stack.isEmpty()) {
+								CompoundTag slotTag = new CompoundTag();
+								slotTag.putInt("slot", i);
+								slotTag.put("item", stack.save(level.registryAccess()));
+								list.add(slotTag);
 							}
-						} else {
-							for (int i = 0; i < sideCount; i++) {
-								accessibleList.add(IntTag.valueOf(i));
+						}
+
+						if (itemHandler != null) {
+							int sideCount = itemHandler.getSlots();
+							if (sideCount == totalSlotsVal) {
+								for (int i = 0; i < totalSlotsVal; i++) {
+									accessibleList.add(IntTag.valueOf(i));
+								}
+							} else {
+								for (int i = 0; i < sideCount; i++) {
+									accessibleList.add(IntTag.valueOf(i));
+								}
+							}
+						}
+
+						if (level.getBlockEntity(data.pos()) instanceof WorldlyContainer worldly
+								&& data.side() != null) {
+							accessibleList.clear();
+							int[] slots = worldly.getSlotsForFace(data.side());
+							if (slots != null) {
+								for (int s : slots) {
+									accessibleList.add(IntTag.valueOf(s));
+								}
 							}
 						}
 					}
-					
-					// WorldlyContainer (SidedInventory) mapping logic
-					if (level.getBlockEntity(data.pos()) instanceof WorldlyContainer worldly && data.side() != null) {
-						accessibleList.clear();
-						int[] slots = worldly.getSlotsForFace(data.side());
-						if (slots != null) {
-							for (int s : slots) {
-								accessibleList.add(IntTag.valueOf(s));
-							}
-						}
-					}
-				} else {
-					// 2. Fluid Handler query fallback
-					IFluidHandler nullFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), null);
+				} else if (capId.getPath().equals("fluid")) {
+					IFluidHandler nullFluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(),
+							null);
 					if (nullFluidHandler == null) {
 						nullFluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
 								level, data.pos(), level.getBlockState(data.pos()), null);
 					}
-					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(), data.side());
+					IFluidHandler fluidHandler = level.getCapability(Capabilities.FluidHandler.BLOCK, data.pos(),
+							data.side());
 					if (fluidHandler == null) {
 						fluidHandler = SpecialBlockCapabilityRegistry.getCapability(Capabilities.FluidHandler.BLOCK,
 								level, data.pos(), level.getBlockState(data.pos()), data.side());
@@ -282,7 +283,7 @@ public class ServerPayloadHandler {
 
 					if (nullFluidHandler != null) {
 						totalSlotsVal = nullFluidHandler.getTanks();
-						
+
 						for (int i = 0; i < totalSlotsVal; i++) {
 							FluidStack fluid = nullFluidHandler.getFluidInTank(i);
 							if (!fluid.isEmpty()) {
@@ -316,7 +317,8 @@ public class ServerPayloadHandler {
 				dataTag.putInt("totalSlots", totalSlotsVal);
 				dataTag.put("accessibleSlots", accessibleList);
 
-				PacketDistributor.sendToPlayer(player, new SyncInventorySlotsPacket(data.pos(), data.side(), dataTag));
+				PacketDistributor.sendToPlayer(player,
+						new SyncInventorySlotsPacket(data.pos(), data.side(), capId, dataTag));
 			}
 		});
 	}

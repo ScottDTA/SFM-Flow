@@ -1,6 +1,8 @@
 package dta.sfmflow.registry;
 
 import dta.sfmflow.SFMFlow;
+import dta.sfmflow.block.FluidEjectorValveBlock;
+import dta.sfmflow.block.FluidVacuumValveBlock;
 import dta.sfmflow.block.ItemEjectorValveBlock;
 import dta.sfmflow.block.ItemVacuumValveBlock;
 import dta.sfmflow.block.entity.ModBlockEntities;
@@ -53,8 +55,8 @@ public class ModCapabilities {
 		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.FLUID_EJECTOR_VALVE_BE.get(),
 				(be, side) -> {
 					BlockState state = be.getBlockState();
-					if (state.hasProperty(dta.sfmflow.block.FluidEjectorValveBlock.FACING) &&
-							side == state.getValue(dta.sfmflow.block.FluidEjectorValveBlock.FACING)) {
+					if (state.hasProperty(FluidEjectorValveBlock.FACING) &&
+							side == state.getValue(FluidEjectorValveBlock.FACING)) {
 						return be.getFluidHandler(side);
 					}
 					return null;
@@ -63,8 +65,8 @@ public class ModCapabilities {
 		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.FLUID_VACUUM_VALVE_BE.get(),
 				(be, side) -> {
 					BlockState state = be.getBlockState();
-					if (state.hasProperty(dta.sfmflow.block.FluidVacuumValveBlock.FACING) &&
-							side == state.getValue(dta.sfmflow.block.FluidVacuumValveBlock.FACING)) {
+					if (state.hasProperty(FluidVacuumValveBlock.FACING) &&
+							side == state.getValue(FluidVacuumValveBlock.FACING)) {
 						return be.getFluidHandler(side);
 					}
 					return null;

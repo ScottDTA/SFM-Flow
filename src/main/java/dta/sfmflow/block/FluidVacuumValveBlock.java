@@ -20,7 +20,7 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Specialized physical hatch block that vacuums fluid source blocks in front of it [3].
+ * Specialized physical hatch block that vacuums fluid source blocks in front of it.
  */
 public class FluidVacuumValveBlock extends BaseEntityBlock {
 	public static final DirectionProperty FACING = BlockStateProperties.FACING;

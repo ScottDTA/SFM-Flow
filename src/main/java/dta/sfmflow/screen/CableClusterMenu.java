@@ -6,28 +6,29 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.items.SlotItemHandler;
 
 /**
- * The container menu coordinating cluster card and player inventory slots [3].
+ * The container menu coordinating cluster card and player inventory slots.
  * Configured with dynamic slot baselines to prevent overlaps inside Advanced
- * layouts [3].
+ * layouts.
  */
 public class CableClusterMenu extends AbstractContainerMenu {
 	private final CableClusterBlockEntity blockEntity;
 
 	/**
-	 * Client-side container loader [3].
+	 * Client-side container loader.
 	 */
 	public CableClusterMenu(int containerId, Inventory playerInventory, FriendlyByteBuf extraData) {
 		this(containerId, playerInventory, playerInventory.player.level().getBlockEntity(extraData.readBlockPos()));
 	}
 
 	/**
-	 * Server/Common container initializer [3].
+	 * Server/Common container initializer.
 	 */
 	public CableClusterMenu(int containerId, Inventory playerInventory, BlockEntity entity) {
 		super(ModMenuTypes.CABLE_CLUSTER_MENU.get(), containerId);
@@ -39,33 +40,18 @@ public class CableClusterMenu extends AbstractContainerMenu {
 
 		int numSlots = this.blockEntity.getNumSlots();
 
-		// Cluster card slot layouts [3]
-		if (numSlots == 9) {
-			for (int i = 0; i < 9; i++) {
-				this.addSlot(new SlotItemHandler(this.blockEntity.getInventory(), i, 8 + i * 18, 18) {
-					@Override
-					public boolean mayPlace(ItemStack stack) {
-						return stack.is(ModTags.CLUSTER_COMPATIBLE);
-					}
-				});
-			}
-		} else {
-			for (int r = 0; r < 2; r++) {
-				for (int c = 0; c < 9; c++) {
-					int idx = r * 9 + c;
-					// Spaced r * 34 apart: Row 0 -> y = 18, Row 1 -> y = 52
-					this.addSlot(new SlotItemHandler(this.blockEntity.getInventory(), idx, 8 + c * 18, 18 + r * 34) {
-						@Override
-						public boolean mayPlace(ItemStack stack) {
-							return stack.is(ModTags.CLUSTER_COMPATIBLE);
-						}
-					});
-				}
-			}
+		// Dynamic slot allocation based on vertical layout columns
+		for (int i = 0; i < numSlots; i++) {
+			int col = i % 3;
+			int row = i / 3;
+			int slotX = 8 + col * 54;
+			int slotY = 14 + row * 18;
+
+			this.addSlot(new SlotItemHandler(this.blockEntity.getInventory(), i, slotX, slotY));
 		}
 
-		// Dynamic player inventory positioning based on cluster size [3]
-		int startY = (numSlots == 18) ? 104 : 72;
+		// Dynamic player inventory positioning based on the corrected cluster size
+		int startY = (numSlots == 18) ? 132 : 78;
 		for (int r = 0; r < 3; r++) {
 			for (int c = 0; c < 9; c++) {
 				this.addSlot(new Slot(playerInventory, c + r * 9 + 9, 8 + c * 18, startY + r * 18));
@@ -84,8 +70,8 @@ public class CableClusterMenu extends AbstractContainerMenu {
 
 	@Override
 	public boolean stillValid(Player player) {
-		return stillValid(net.minecraft.world.inventory.ContainerLevelAccess.create(blockEntity.getLevel(),
-				blockEntity.getBlockPos()), player, blockEntity.getBlockState().getBlock());
+		return stillValid(ContainerLevelAccess.create(blockEntity.getLevel(), blockEntity.getBlockPos()), player,
+				blockEntity.getBlockState().getBlock());
 	}
 
 	@Override

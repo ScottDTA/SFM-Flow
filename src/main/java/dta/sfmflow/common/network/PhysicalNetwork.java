@@ -4,26 +4,20 @@ import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.logging.FlowLogger;
 import dta.sfmflow.block.ModBlocks;
+import dta.sfmflow.block.entity.CableClusterBlockEntity;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.util.ConnectionBlock;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 
-import java.util.ArrayDeque;
-import java.util.BitSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.*;
 
 /**
  * Manages topological scanning and target inventory indices. Extracted to
@@ -32,7 +26,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class PhysicalNetwork {
 	private final Set<BlockPos> scannedCables = new HashSet<>();
-	private final List<ConnectionBlock> scannedInventories = new CopyOnWriteArrayList<>();
+	private final List<ConnectionBlock> scannedInventories = new java.util.concurrent.CopyOnWriteArrayList<>();
 	private final PhysicalNetworkMap networkMap = new PhysicalNetworkMap();
 	private long lastScanTime = 0L;
 	private boolean isDirty = true;
@@ -55,7 +49,7 @@ public class PhysicalNetwork {
 	 * @param chunkPacked packed long representation
 	 */
 	public void handleChunkUnload(long chunkPacked) {
-		IntArrayList nodesInChunk = this.networkMap.getNodesInChunk(chunkPacked);
+		it.unimi.dsi.fastutil.ints.IntArrayList nodesInChunk = this.networkMap.getNodesInChunk(chunkPacked);
 		if (nodesInChunk != null) {
 			for (int i = 0; i < nodesInChunk.size(); i++) {
 				int nodeId = nodesInChunk.getInt(i);
@@ -119,6 +113,11 @@ public class PhysicalNetwork {
 			BlockPos adjacent = startPos.relative(dir);
 			BlockState state = level.getBlockState(adjacent);
 			if (state.is(ModTags.CABLES)) {
+				// Prevent mapping through cable clusters if they do not contain a cable card
+				if (isClusterAndMissingCable(level, adjacent)) {
+					continue;
+				}
+
 				int adjacentId = this.networkMap.getOrAddNode(adjacent);
 				visited.set(adjacentId);
 				this.networkMap.addEdge(startId, adjacentId);
@@ -160,6 +159,11 @@ public class PhysicalNetwork {
 				BlockState state = level.getBlockState(neighbor);
 
 				if (state.is(ModTags.CABLES)) {
+					// Prevent mapping through cable clusters if they do not contain a cable card
+					if (isClusterAndMissingCable(level, neighbor)) {
+						continue;
+					}
+
 					int newNeighborId = this.networkMap.getOrAddNode(neighbor);
 					visited.set(newNeighborId);
 					this.networkMap.addEdge(currentId, newNeighborId);
@@ -185,6 +189,14 @@ public class PhysicalNetwork {
 
 		FlowLogger.pathfinder("Scan completed in %.3f ms. Cables: %d, Targets: %d", durationMs,
 				this.scannedCables.size(), this.scannedInventories.size());
+	}
+
+	private boolean isClusterAndMissingCable(Level level, BlockPos pos) {
+		BlockEntity be = level.getBlockEntity(pos);
+		if (be instanceof CableClusterBlockEntity cluster) {
+			return !cluster.hasCableCard();
+		}
+		return false;
 	}
 
 	@SuppressWarnings("unchecked")
