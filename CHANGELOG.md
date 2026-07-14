@@ -1,5 +1,25 @@
-7-13-2026
+7-14-2026
 
+
+### [Added]
+* Added the **Redstone Conditional** logic component, allowing you to branch flowchart execution depending on analog redstone signal strengths of connected blocks.
+* Added support for dual-output execution terminals (Output 0 for True, Output 1 for False) on the new Redstone Conditional component.
+* Added a settings panel allowing you to configure the evaluation mode between ALL (AND) and ANY (OR) active faces.
+* Added a sided configuration modal popup enabling distinct operators (e.g., `<=`, `>=`, `==`) and analog sliders (0 to 15) to be mapped per face.
+* Added thread-safe redstone signal caching to `ThreadSafeInventorySnapshot`, allowing background threads to evaluate analog signal strengths securely without causing server-side thread safety conflicts.
+* Added English localization entries for the new Redstone Conditional component.
+
+### [Changed]
+* None.
+
+### [Fixed]
+* None.
+
+### [Removed]
+* None.
+
+
+7-13-2026
 
 ### [Added]
 * Added the **Energy Conditional** logic component, allowing you to branch flowchart logic based on the Forge Energy (FE) stored in connected blocks.
@@ -19,12 +39,6 @@
 ### [Changed]
 * Decoupled fluid-style texture rendering inside the `ItemFilterWidget` by switching from a hardcoded type-check check of the fluid transfer node to the new `renderAsFluid()` interface method.
 * Refactored `ItemFilterWidget` to support optional toggle configurations, suppressing the Whitelist/Blacklist button when rendering inside conditional logical evaluation scenes.
-
-### [Fixed]
-* None.
-
-### [Removed]
-* None.
 
 
 7-12-2026

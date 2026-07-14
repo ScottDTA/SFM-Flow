@@ -5,6 +5,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
@@ -18,6 +19,7 @@ import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.ItemVacuumValveBlock;
 import dta.sfmflow.block.FluidVacuumValveBlock;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
+import dta.sfmflow.block.entity.RedstoneReceiverBlockEntity;
 import dta.sfmflow.util.ConnectionBlock;
 import org.jetbrains.annotations.Nullable;
 
@@ -56,6 +58,12 @@ public final class ThreadSafeInventorySnapshot {
 			this.tanks = new HashMap<>(tanks);
 		}
 	}
+	
+	public record RedstoneSnapshot(int[] power) {}
+
+	public @Nullable RedstoneSnapshot getRedstone(BlockPos pos) {
+		return getCustomSnapshot(pos, null, ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"), RedstoneSnapshot.class);
+	}	
 
 	public record EnergySnapshot(int energyStored, int maxEnergyStored, boolean canExtract, boolean canReceive) {}
 
@@ -109,16 +117,26 @@ public final class ThreadSafeInventorySnapshot {
 						}
 					}
 
-					// Overrides snapshotter for the Item Vacuum Valve to represent ground items as slot contents 
-					if (state.is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get())) {
-						nullCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
-								createVacuumGroundSnapshot(level, pos, state));
-					}
-
 					// Overrides snapshotter for Fluid Vacuum Valve to represent ground fluids as tank contents
 					if (state.is(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get())) {
 						nullCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"),
 								createFluidVacuumGroundSnapshot(level, pos, state));
+					}
+
+					// Capture Redstone signals for Redstone Cables/Blocks [3]
+					if (state.is(dta.sfmflow.registry.ModTags.REDSTONE_CABLES)) {
+						int[] power = new int[6];
+						BlockEntity targetBe = level.getBlockEntity(pos);
+						if (targetBe instanceof RedstoneReceiverBlockEntity receiver) {
+							for (Direction dir : Direction.values()) {
+								power[dir.ordinal()] = receiver.getPowerForSide(dir);
+							}
+						} else {
+							for (Direction dir : Direction.values()) {
+								power[dir.ordinal()] = level.getSignal(pos, dir);
+							}
+						}
+						nullCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"), new RedstoneSnapshot(power));
 					}
 
 					if (!nullCapsMap.isEmpty()) {
@@ -154,6 +172,22 @@ public final class ThreadSafeInventorySnapshot {
 						if (state.is(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get())) {
 							dirCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"),
 									createFluidVacuumGroundSnapshot(level, pos, state));
+						}
+
+						// Capture Redstone signals directionally [3]
+						if (state.is(dta.sfmflow.registry.ModTags.REDSTONE_CABLES)) {
+							int[] power = new int[6];
+							BlockEntity targetBe = level.getBlockEntity(pos);
+							if (targetBe instanceof RedstoneReceiverBlockEntity receiver) {
+								for (Direction d : Direction.values()) {
+									power[d.ordinal()] = receiver.getPowerForSide(d);
+								}
+							} else {
+								for (Direction d : Direction.values()) {
+									power[d.ordinal()] = level.getSignal(pos, d);
+								}
+							}
+							dirCapsMap.put(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"), new RedstoneSnapshot(power));
 						}
 
 						if (!dirCapsMap.isEmpty()) {

@@ -27,7 +27,7 @@ import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
-
+import dta.sfmflow.flowcomponents.RedstoneConditionalComponent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
@@ -75,6 +75,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_CONDITIONAL;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_CONDITIONAL;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_CONDITIONAL;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_CONDITIONAL;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -143,16 +144,23 @@ public class VanillaSFMFlowPlugin {
 		
 		FLUID_CONDITIONAL = FlowComponentBuilder.create("fluid_conditional", FluidConditionalComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/fluid_condition_button.png") // Reuses standard logical condition icon
+				.icon("textures/gui/menu_buttons/fluid_condition_button.png") 
 				.displayName("gui.sfmflow.fluid_conditional")
 				.codec(FluidConditionalComponent.CODEC)
 				.build(registry);
 		
 		ENERGY_CONDITIONAL = FlowComponentBuilder.create("energy_conditional", EnergyConditionalComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/energy_condition_button.png") // Reuses logical condition icon
+				.icon("textures/gui/menu_buttons/energy_condition_button.png") 
 				.displayName("gui.sfmflow.energy_conditional")
 				.codec(EnergyConditionalComponent.CODEC)
+				.build(registry);
+		
+		REDSTONE_CONDITIONAL = FlowComponentBuilder.create("redstone_conditional", RedstoneConditionalComponent::new)
+				.category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/condition_button.png")
+				.displayName("gui.sfmflow.redstone_conditional")
+				.codec(RedstoneConditionalComponent.CODEC)
 				.build(registry);
 		
 		

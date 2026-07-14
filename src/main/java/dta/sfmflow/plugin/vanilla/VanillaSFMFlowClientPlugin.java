@@ -18,6 +18,8 @@ import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemConditionalSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ObserverTriggerSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.RedstoneConditionalSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.RedstoneConditionalSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
@@ -31,6 +33,7 @@ import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemConditionalComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
+import dta.sfmflow.flowcomponents.RedstoneConditionalComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
@@ -173,6 +176,13 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.REDSTONE_CONDITIONAL.get(), (screen, component) -> {
+			if (component instanceof RedstoneConditionalComponent conditional) {
+				return new RedstoneConditionalSettingsOverlay(screen, conditional);
+			}
+			return null;
+		});
 
 		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
@@ -194,6 +204,11 @@ public class VanillaSFMFlowClientPlugin {
 		
 		SideConfigPopupRegistry.register(FluidConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
+		});
+		
+		// Register custom sideconfig popup modal for the Redstone Conditional
+		SideConfigPopupRegistry.register(RedstoneConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
+			return new RedstoneConditionalSideConfigModalPopup(screen, (RedstoneConditionalComponent) sideModel, face, pos, onChanged);
 		});
 		
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
@@ -448,6 +463,25 @@ public class VanillaSFMFlowClientPlugin {
 
 					@Override
 					public @Nullable Component getErrorTooltip(ManagerScreen screen, EnergyConditionalComponent component) {
+						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
+		
+		WorkspaceValidatorRegistry.register(RedstoneConditionalComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<RedstoneConditionalComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, RedstoneConditionalComponent component) {
+						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
+							return hasActiveConnections(screen, component.getId());
+						}
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, RedstoneConditionalComponent component) {
 						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
 							return Component.translatable("gui.sfmflow.error.unbound_inventory");
 						}
