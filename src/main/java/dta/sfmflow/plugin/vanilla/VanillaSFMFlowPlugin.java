@@ -17,6 +17,7 @@ import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemConditionalComponent;
@@ -73,6 +74,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> OBSERVER_TRIGGER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_CONDITIONAL;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_CONDITIONAL;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_CONDITIONAL;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -145,6 +147,14 @@ public class VanillaSFMFlowPlugin {
 				.displayName("gui.sfmflow.fluid_conditional")
 				.codec(FluidConditionalComponent.CODEC)
 				.build(registry);
+		
+		ENERGY_CONDITIONAL = FlowComponentBuilder.create("energy_conditional", EnergyConditionalComponent::new)
+				.category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/condition_button.png") // Reuses logical condition icon
+				.displayName("gui.sfmflow.energy_conditional")
+				.codec(EnergyConditionalComponent.CODEC)
+				.build(registry);
+		
 		
 	}
 

@@ -19,6 +19,7 @@
   "gui.sfmflow.advanced_fluid_filter_variable": "Advanced Fluid Filter",
   "gui.sfmflow.advanced_item_filter_variable": "Advanced Item Filter",
   "gui.sfmflow.commands": "Commands: %1$s",
+  "gui.sfmflow.energy_conditional": "Energy Conditional",
   "gui.sfmflow.energy_input": "Energy Input",
   "gui.sfmflow.energy_output": "Energy Output",
   "gui.sfmflow.error.empty_whitelist": "Active whitelist cannot be completely empty!",

@@ -1,8 +1,11 @@
 7-13-2026
 
 
-
 ### [Added]
+* Added the **Energy Conditional** logic component, allowing you to branch flowchart logic based on the Forge Energy (FE) stored in connected blocks.
+* Added support for dual-output execution terminals (Output 0 for True, Output 1 for False) on the new Energy Conditional component.
+* Added a settings panel featuring custom comparison operators (e.g., `<=`, `>=`, `==`, `!=`, `<`, `>`) and a numeric text field to specify precise FE thresholds.
+* Added English localization entries for the new Energy Conditional component.
 * Added the **Fluid Conditional** logic component, allowing flowchart systems to evaluate fluid volumes across targeted block tanks off-thread.
 * Added support for dual-output execution paths (Output 0 for True, Output 1 for False) on the new Fluid Conditional component.
 * Added custom match modes—Match All (AND) and Match Any (OR)—along with multiple comparison operators (e.g., `<=`, `>=`, `==`, `!=`, `<`, `>`) in the settings configuration overlay.

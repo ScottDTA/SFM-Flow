@@ -9,6 +9,7 @@ import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOver
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
+import dta.sfmflow.client.screen.widgets.EnergyConditionalSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.EnergySideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidConditionalSettingsOverlay;
@@ -24,6 +25,7 @@ import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemConditionalComponent;
@@ -39,6 +41,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -162,7 +165,14 @@ public class VanillaSFMFlowClientPlugin {
 				return new FluidConditionalSettingsOverlay(screen, conditional);
 			}
 			return null;
-		});		
+		});	
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ENERGY_CONDITIONAL.get(), (screen, component) -> {
+			if (component instanceof EnergyConditionalComponent conditional) {
+				return new EnergyConditionalSettingsOverlay(screen, conditional);
+			}
+			return null;
+		});
 
 		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
@@ -185,7 +195,7 @@ public class VanillaSFMFlowClientPlugin {
 		SideConfigPopupRegistry.register(FluidConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
 		});
-
+		
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
 		DataComponentOverlayRegistry.register(DataComponents.ENCHANTMENTS, EnchantmentsComponentSettingsModal::new);
 
@@ -425,6 +435,25 @@ public class VanillaSFMFlowClientPlugin {
 						return null;
 					}
 				});
+		
+		WorkspaceValidatorRegistry.register(EnergyConditionalComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<EnergyConditionalComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, EnergyConditionalComponent component) {
+						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
+							return hasActiveConnections(screen, component.getId());
+						}
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, EnergyConditionalComponent component) {
+						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
 
 	}
 
@@ -448,7 +477,7 @@ public class VanillaSFMFlowClientPlugin {
 	 * Shared helper identifying if a registered whitelist layout contains zero
 	 * items.
 	 */
-	private static boolean isWhitelistEmpty(java.util.List<ItemStack> filterItems) {
+	private static boolean isWhitelistEmpty(List<ItemStack> filterItems) {
 		for (ItemStack stack : filterItems) {
 			if (stack != null && !stack.isEmpty()) {
 				return false;
