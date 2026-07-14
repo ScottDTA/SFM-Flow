@@ -143,14 +143,14 @@ public class VanillaSFMFlowPlugin {
 		
 		FLUID_CONDITIONAL = FlowComponentBuilder.create("fluid_conditional", FluidConditionalComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/condition_button.png") // Reuses standard logical condition icon
+				.icon("textures/gui/menu_buttons/fluid_condition_button.png") // Reuses standard logical condition icon
 				.displayName("gui.sfmflow.fluid_conditional")
 				.codec(FluidConditionalComponent.CODEC)
 				.build(registry);
 		
 		ENERGY_CONDITIONAL = FlowComponentBuilder.create("energy_conditional", EnergyConditionalComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/condition_button.png") // Reuses logical condition icon
+				.icon("textures/gui/menu_buttons/energy_condition_button.png") // Reuses logical condition icon
 				.displayName("gui.sfmflow.energy_conditional")
 				.codec(EnergyConditionalComponent.CODEC)
 				.build(registry);
