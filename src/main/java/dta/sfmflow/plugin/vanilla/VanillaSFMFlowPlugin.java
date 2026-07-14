@@ -24,6 +24,7 @@ import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
+import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 
 import net.minecraft.core.BlockPos;
@@ -71,6 +72,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_EMITTER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> OBSERVER_TRIGGER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_CONDITIONAL;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_CONDITIONAL;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -136,6 +138,14 @@ public class VanillaSFMFlowPlugin {
 		ITEM_CONDITIONAL = FlowComponentBuilder.create("item_conditional", ItemConditionalComponent::new)
 				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/condition_button.png")
 				.displayName("gui.sfmflow.item_conditional").codec(ItemConditionalComponent.CODEC).build(registry);
+		
+		FLUID_CONDITIONAL = FlowComponentBuilder.create("fluid_conditional", FluidConditionalComponent::new)
+				.category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/condition_button.png") // Reuses standard logical condition icon
+				.displayName("gui.sfmflow.fluid_conditional")
+				.codec(FluidConditionalComponent.CODEC)
+				.build(registry);
+		
 	}
 
 	private void registerItemCapability() {

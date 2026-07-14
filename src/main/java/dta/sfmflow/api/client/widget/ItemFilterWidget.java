@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.IFilterable;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.util.MenuSlotRepositioner;
 import net.minecraft.client.Minecraft;
@@ -129,7 +128,7 @@ public class ItemFilterWidget extends AbstractFlowWidget {
 			}
 
 			if (hasItem) {
-				boolean renderAsFluid = model instanceof FluidTransferComponent;
+				boolean renderAsFluid = model.renderAsFluid();
 				boolean drewFluid = false;
 
 				if (renderAsFluid) {

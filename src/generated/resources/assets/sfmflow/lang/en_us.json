@@ -25,6 +25,7 @@
   "gui.sfmflow.error.no_active_sides": "At least one active inventory side must be selected!",
   "gui.sfmflow.error.slot_not_accessible": "Slot not accessible on selected side",
   "gui.sfmflow.errors": "Errors: %1$s",
+  "gui.sfmflow.fluid_conditional": "Fluid Conditional",
   "gui.sfmflow.fluid_input": "Fluid Input",
   "gui.sfmflow.fluid_output": "Fluid Output",
   "gui.sfmflow.interval_trigger": "Interval Trigger",

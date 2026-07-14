@@ -1,12 +1,20 @@
 7-13-2026
 
+
+
 ### [Added]
+* Added the **Fluid Conditional** logic component, allowing flowchart systems to evaluate fluid volumes across targeted block tanks off-thread.
+* Added support for dual-output execution paths (Output 0 for True, Output 1 for False) on the new Fluid Conditional component.
+* Added custom match modes—Match All (AND) and Match Any (OR)—along with multiple comparison operators (e.g., `<=`, `>=`, `==`, `!=`, `<`, `>`) in the settings configuration overlay.
+* Added English localization mapping for the new Fluid Conditional component.
+* Added a `renderAsFluid()` contract to the `IFilterable` interface, permitting any custom filterable card to dynamically declare whether its ghost slots represent liquids.
 * Added the **Item Conditional** logic component, allowing you to branch flowchart execution paths off-thread based on current item levels inside connected inventories.
 * Added support for dual-output terminals (Output 0 for True, Output 1 for False) on the Item Conditional component.
 * Added custom match mode toggles—Match All (AND) and Match Any (OR)—along with multiple conditional operators (e.g., `<=`, `>=`, `==`, `!=`, `<`, `>`) in the settings configuration overlay.
 * Added English localization entries supporting the new logic node in translation bundles.
 
 ### [Changed]
+* Decoupled fluid-style texture rendering inside the `ItemFilterWidget` by switching from a hardcoded type-check check of the fluid transfer node to the new `renderAsFluid()` interface method.
 * Refactored `ItemFilterWidget` to support optional toggle configurations, suppressing the Whitelist/Blacklist button when rendering inside conditional logical evaluation scenes.
 
 ### [Fixed]

@@ -39,8 +39,8 @@ import java.util.List;
 
 /**
  * Unified logic component handling both fluid inputs (extractions) and fluid
- * outputs (depositions) [3]. Supports NBT serialization for per-side enabled
- * tank bitmasks, variable bindings, and custom fluid quantity limits [3].
+ * outputs (depositions). Supports NBT serialization for per-side enabled
+ * tank bitmasks, variable bindings, and custom fluid quantity limits.
  */
 public class FluidTransferComponent extends AbstractFlowComponent
 		implements IFilterable, IInventoryTarget, ISideConfigurable, IGhostSlotAware, ISlotConfigurable {
@@ -442,5 +442,10 @@ public class FluidTransferComponent extends AbstractFlowComponent
 			return Component.literal(this.getCustomName());
 		}
 		return Component.translatable(isInput ? "gui.sfmflow.fluid_input" : "gui.sfmflow.fluid_output");
+	}
+	
+	@Override
+	public boolean renderAsFluid() {
+		return true;
 	}
 }
