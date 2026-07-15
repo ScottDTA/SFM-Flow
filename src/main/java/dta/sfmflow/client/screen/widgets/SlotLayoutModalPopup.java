@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.layout.SlotLayout;
 import dta.sfmflow.api.client.layout.SlotEntry;
+import dta.sfmflow.api.client.layout.LayoutKey;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.client.NineSliceUtil;
@@ -12,6 +13,7 @@ import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.network.ClientInventoryCache;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
+import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import dta.sfmflow.networking.packets.serverbound.RequestInventorySlotsPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -48,7 +50,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 
 /**
  * Visual configuration modal displaying individual slot mappings for selected
- * block directions.
+ * block directions and capabilities.
  */
 @OnlyIn(Dist.CLIENT)
 public class SlotLayoutModalPopup extends AbstractModalPopup {
@@ -72,25 +74,31 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 	private final int unscaledWidth;
 	private final int unscaledHeight;
 
-	/**
-	 * Main constructor that resolves layouts and dimensions cleanly before calling
-	 * the parent modal constructor.
-	 */
+	// Dynamic capability tracking
+	private final ResourceLocation capabilityId;
+
 	public SlotLayoutModalPopup(ManagerScreen parentScreen, ISideConfigurable sideModel, Direction side,
 			BlockPos blockPos, Runnable onChanged) {
-		this(parentScreen, sideModel, side, blockPos, onChanged,
-				parentScreen.getMenu().getManagerBlockEntity().getLevel(), sideModel instanceof FluidTransferComponent);
+		this(parentScreen, sideModel, side, blockPos, resolveCapabilityId(sideModel), onChanged);
+	}
+
+	public SlotLayoutModalPopup(ManagerScreen parentScreen, ISideConfigurable sideModel, Direction side,
+			BlockPos blockPos, ResourceLocation capabilityId, Runnable onChanged) {
+		this(parentScreen, sideModel, side, blockPos, capabilityId, onChanged,
+				parentScreen.getMenu().getManagerBlockEntity().getLevel(),
+				capabilityId.getPath().equals("fluid"));
 	}
 
 	private SlotLayoutModalPopup(ManagerScreen parentScreen, ISideConfigurable sideModel, Direction side,
-			BlockPos blockPos, Runnable onChanged, Level level, boolean isFluid) {
-		this(parentScreen, sideModel, side, blockPos, onChanged, level, isFluid, resolveLayout(level, blockPos),
+			BlockPos blockPos, ResourceLocation capabilityId, Runnable onChanged, Level level, boolean isFluid) {
+		this(parentScreen, sideModel, side, blockPos, capabilityId, onChanged, level, isFluid,
+				resolveLayout(level, blockPos, capabilityId),
 				resolveTotalSlots(level, blockPos, isFluid));
 	}
 
 	private SlotLayoutModalPopup(ManagerScreen parentScreen, ISideConfigurable sideModel, Direction side,
-			BlockPos blockPos, Runnable onChanged, Level level, boolean isFluid, @Nullable SlotLayout layout,
-			int totalSlots) {
+			BlockPos blockPos, ResourceLocation capabilityId, Runnable onChanged, Level level, boolean isFluid,
+			@Nullable SlotLayout layout, int totalSlots) {
 		super(parentScreen, getUnscaledWidth(layout, totalSlots) / 2, getUnscaledHeight(layout, totalSlots) / 2,
 				Component.literal("Slot Layout"));
 
@@ -99,6 +107,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		this.blockPos = blockPos;
 		this.onChanged = onChanged;
 		this.isFluid = isFluid;
+		this.capabilityId = capabilityId;
 		this.layout = layout;
 		this.totalSlots = totalSlots;
 		this.unscaledWidth = getUnscaledWidth(layout, totalSlots);
@@ -166,21 +175,28 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		ResourceLocation capId = isFluid ? ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid")
-				: ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
-		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos, this.side, capId));
+		// Dispatch the exact, verified capability ID over the packet handshake [3]
+		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos, this.side, this.capabilityId));
 	}
 
-	private static @Nullable SlotLayout resolveLayout(Level level, BlockPos blockPos) {
+	private static ResourceLocation resolveCapabilityId(ISideConfigurable sideModel) {
+		if (sideModel instanceof FluidTransferComponent || sideModel instanceof FluidConditionalComponent) {
+			return ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
+		}
+		return ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
+	}
+
+	private static @Nullable SlotLayout resolveLayout(Level level, BlockPos blockPos, ResourceLocation capabilityId) {
 		if (level == null || blockPos == null) {
 			return null;
 		}
 		BlockState state = level.getBlockState(blockPos);
 		ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
 		if (blockId != null) {
-			SlotLayout layout = FlowLayoutRegistry.getLayout(blockId);
+			LayoutKey key = new LayoutKey(blockId, capabilityId);
+			SlotLayout layout = FlowLayoutRegistry.getLayout(key);
 			if (layout == null) {
-				layout = SlotLayoutManager.getLayout(blockId);
+				layout = SlotLayoutManager.getLayout(key);
 			}
 			return layout;
 		}
@@ -235,9 +251,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 	}
 
 	private Set<Integer> getLiveAccessibleSlots() {
-		ResourceLocation capId = isFluid ? ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid")
-				: ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
-		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side, capId);
+		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side, this.capabilityId);
 		if (cachedData.contains("accessibleSlots")) {
 			Set<Integer> live = new HashSet<>();
 			ListTag list = cachedData.getList("accessibleSlots", Tag.TAG_INT);
@@ -250,9 +264,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 	}
 
 	private int getLiveTotalSlots() {
-		ResourceLocation capId = isFluid ? ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid")
-				: ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
-		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side, capId);
+		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side, this.capabilityId);
 		if (cachedData.contains("totalSlots")) {
 			return cachedData.getInt("totalSlots");
 		}
@@ -260,9 +272,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 	}
 
 	private ItemStack[] getLiveCachedItems() {
-		ResourceLocation capId = isFluid ? ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid")
-				: ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
-		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side, capId);
+		CompoundTag cachedData = ClientInventoryCache.get(this.blockPos, this.side, this.capabilityId);
 		int total = getLiveTotalSlots();
 		ItemStack[] items = new ItemStack[total];
 		for (int i = 0; i < total; i++) {
@@ -305,7 +315,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 		Set<Integer> liveAccessible = getLiveAccessibleSlots();
 		int liveTotal = getLiveTotalSlots();
 
-		// Hit checks now respect dynamic width and height properties
 		if (button == 0 && this.layout != null) {
 			for (SlotEntry entry : this.layout.slots()) {
 				int i = entry.index();
@@ -394,7 +403,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				int sWidth = entry.width();
 				int sHeight = entry.height();
 
-				// Handles optional generic vs custom texture bindings dynamically
 				if (entry.useGenericTexture()) {
 					guiGraphics.blit(SLOT_TEXTURE, slotX, slotY, 0, 0, sWidth, sHeight, 18, 18);
 				} else if (entry.customTexture().isPresent()) {
@@ -406,7 +414,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 				if (!isAccessible) {
 					guiGraphics.fill(slotX + 1, slotY + 1, slotX + sWidth - 1, slotY + sHeight - 1, 0x80151515);
 
-					// Dynamic scaled blocking cross
 					for (int k = 0; k < Math.min(sWidth, sHeight) - 4; k++) {
 						guiGraphics.fill(slotX + 2 + k, slotY + 2 + k, slotX + 3 + k, slotY + 3 + k, 0xFFFF0000);
 						guiGraphics.fill(slotX + 2 + k, slotY + sHeight - 3 - k, slotX + 3 + k, slotY + sHeight - 2 - k,
@@ -447,7 +454,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 								}
 							}
 							if (!drewFluid) {
-								// Center real item representation within rectangular dimensions
 								int centeredItemX = slotX + (sWidth - 16) / 2;
 								int centeredItemY = slotY + (sHeight - 16) / 2;
 								guiGraphics.renderItem(stack, centeredItemX, centeredItemY);
@@ -565,7 +571,6 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 					int scaledW = (int) (entry.width() * 0.5);
 					int scaledH = (int) (entry.height() * 0.5);
 
-					// Dynamic scaled hovering tooltip bounds calculation
 					if (mouseX >= slotX && mouseX < slotX + scaledW && mouseY >= slotY && mouseY < slotY + scaledH) {
 						boolean isAccessible = liveAccessible.contains(i);
 						if (!isAccessible) {

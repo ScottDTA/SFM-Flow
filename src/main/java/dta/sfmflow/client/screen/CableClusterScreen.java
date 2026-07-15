@@ -63,7 +63,7 @@ public class CableClusterScreen extends AbstractContainerScreen<CableClusterMenu
 			int btnY = top + slotY - 1;
 
 			Direction dir = this.menu.getBlockEntity().getSlotDirection(slotIdx);
-			String name = (dir == null) ? "NONE" : dir.name().substring(0, 2);
+			String name = (dir == null) ? "NONE" : dir.name();
 
 			Button btn = Button.builder(Component.literal(name), b -> {
 				Direction current = this.menu.getBlockEntity().getSlotDirection(slotIdx);

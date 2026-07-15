@@ -3,19 +3,28 @@
   "height": 98,
   "slots": [
     {
+      "height": 16,
       "index": 0,
+      "useGenericTexture": false,
+      "width": 16,
       "x": 56,
       "y": 17
     },
     {
+      "height": 16,
       "index": 1,
+      "useGenericTexture": false,
+      "width": 16,
       "x": 56,
       "y": 53
     },
     {
+      "height": 26,
       "index": 2,
-      "x": 115,
-      "y": 34
+      "useGenericTexture": false,
+      "width": 26,
+      "x": 111,
+      "y": 30
     }
   ]
 }

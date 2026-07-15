@@ -1,0 +1,46 @@
+{
+  "background": "sfmflow:textures/gui/slot_layouts/hopper.png",
+  "height": 66,
+  "slots": [
+    {
+      "height": 16,
+      "index": 0,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 44,
+      "y": 20
+    },
+    {
+      "height": 16,
+      "index": 1,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 62,
+      "y": 20
+    },
+    {
+      "height": 16,
+      "index": 2,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 80,
+      "y": 20
+    },
+    {
+      "height": 16,
+      "index": 3,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 98,
+      "y": 20
+    },
+    {
+      "height": 16,
+      "index": 4,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 116,
+      "y": 20
+    }
+  ]
+}

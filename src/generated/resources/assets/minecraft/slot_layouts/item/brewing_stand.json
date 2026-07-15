@@ -1,0 +1,44 @@
+{
+  "background": "sfmflow:textures/gui/slot_layouts/brewing_stand.png",
+  "height": 98,
+  "slots": [
+    {
+      "height": 16,
+      "index": 0,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 56,
+      "y": 50
+    },
+    {
+      "height": 16,
+      "index": 1,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 79,
+      "y": 57
+    },
+    {
+      "height": 16,
+      "index": 2,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 102,
+      "y": 50
+    },
+    {
+      "index": 3,
+      "useGenericTexture": false,
+      "x": 78,
+      "y": 16
+    },
+    {
+      "height": 16,
+      "index": 4,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 17,
+      "y": 17
+    }
+  ]
+}

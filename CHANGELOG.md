@@ -1,3 +1,18 @@
+7-15-2026
+
+### [Added]
+* Added support for capability-specific slot layouts, allowing blocks that possess both fluid tanks and item inventories to show unique slot configuration layouts for each capability.
+* Added capability-specific resource folder parsing, allowing custom layouts to be loaded from assets folders like `slot_layouts/item/` and `slot_layouts/fluid/` with backward compatibility for legacy flat layouts.
+* Added exact, pixel-perfect coordinates and dimension mappings for vanilla crafting stations and containers (Furnaces, Smokers, Brewing Stands, Hoppers, Dispensers, and Crafters).
+
+### [Changed]
+* Re-engineered the automated layout datagen provider to output configurations cleanly into capability-sorted resource subdirectories.
+* Updated slot direction configuration buttons inside the `CableClusterScreen` to display full directional face names (e.g., "NORTH", "SOUTH") instead of truncated two-letter abbreviations.
+
+### [Fixed]
+* Fixed standard slot overlay panels drawing redundant generic slot textures over custom data-driven GUI backdrops by introducing a flag to disable generic texture renders.
+
+
 7-14-2026
 
 
@@ -23,9 +38,6 @@
 * Fixed an issue where changing card items or directional faces inside a Cable Cluster failed to notify the system, ensuring instant cable network rescans on modification.
 * Fixed Cable Cluster configurations (including card stacks, slot indices, and directions) resetting or failing to persist across world saves and reloads.
 * Fixed logical check leakages inside shared Cable Clusters by restricting transfer and conditional planners strictly to the targeted card's slot index.
-
-### [Removed]
-* None.
 
 
 7-13-2026

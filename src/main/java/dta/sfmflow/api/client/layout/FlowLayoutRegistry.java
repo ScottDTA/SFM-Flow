@@ -10,34 +10,43 @@ import java.util.Map;
 
 /**
  * Public client-only API registry allowing addon developers to register custom
- * visual slot layouts programmatically [3].
+ * visual slot layouts programmatically.
  */
 @OnlyIn(Dist.CLIENT)
 public final class FlowLayoutRegistry {
-	private static final Map<ResourceLocation, SlotLayout> REGISTRY = new HashMap<>();
+	private static final Map<LayoutKey, SlotLayout> REGISTRY = new HashMap<>();
 
 	private FlowLayoutRegistry() {}
 
 	/**
-	 * Registers a custom slot layout programmatically for a specific block registry key [3].
+	 * Registers a custom slot layout programmatically for a specific block and capability.
 	 *
-	 * @param blockId the registry identifier of the block [3]
-	 * @param layout  the custom slot layout details [3]
+	 * @param key    the composite layout key
+	 * @param layout the custom slot layout details
 	 */
-	public static void register(ResourceLocation blockId, SlotLayout layout) {
-		if (blockId != null && layout != null) {
-			REGISTRY.put(blockId, layout);
+	public static void register(LayoutKey key, SlotLayout layout) {
+		if (key != null && layout != null) {
+			REGISTRY.put(key, layout);
 		}
 	}
 
 	/**
-	 * Retrieves the programmatically registered slot layout for a specific block registry key [3].
-	 *
-	 * @param blockId the registry identifier of the block [3]
-	 * @return the SlotLayout, or null if unregistered [3]
+	 * Convenience overload to register programmatically with raw resource locations.
 	 */
-	public static @Nullable SlotLayout getLayout(ResourceLocation blockId) {
-		return REGISTRY.get(blockId);
+	public static void register(ResourceLocation blockId, ResourceLocation capabilityId, SlotLayout layout) {
+		if (blockId != null && capabilityId != null && layout != null) {
+			REGISTRY.put(new LayoutKey(blockId, capabilityId), layout);
+		}
+	}
+
+	/**
+	 * Retrieves the programmatically registered slot layout for a specific composite key.
+	 *
+	 * @param key the composite layout key
+	 * @return the SlotLayout, or null if unregistered
+	 */
+	public static @Nullable SlotLayout getLayout(LayoutKey key) {
+		return REGISTRY.get(key);
 	}
 
 	public static void clear() {

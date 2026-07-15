@@ -5,6 +5,7 @@ import com.mojang.serialization.JsonOps;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.layout.SlotLayout;
 import dta.sfmflow.api.client.layout.SlotEntry;
+import dta.sfmflow.api.client.layout.LayoutKey;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
@@ -17,12 +18,11 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * Programmatic datagen provider that serializes data-driven slot layouts to
- * disk [3]. Designed to be safely subclassed by third-party integration addons
- * [3].
+ * disk under capability-specific subfolders [3].
  */
 public class SlotLayoutProvider implements DataProvider {
 	protected final PackOutput packOutput;
-	protected final Map<ResourceLocation, SlotLayout> layouts = new HashMap<>();
+	protected final Map<LayoutKey, SlotLayout> layouts = new HashMap<>();
 
 	public SlotLayoutProvider(PackOutput packOutput) {
 		this.packOutput = packOutput;
@@ -31,135 +31,136 @@ public class SlotLayoutProvider implements DataProvider {
 
 	/**
 	 * Registers a custom slot layout configuration to be generated as a JSON asset [3].
-	 *
-	 * @param id     the unique Block registry identifier [3]
-	 * @param layout the custom slot layout details [3]
 	 */
-	protected final void addLayout(ResourceLocation id, SlotLayout layout) {
-		if (id != null && layout != null) {
-			this.layouts.put(id, layout);
+	protected final void addLayout(ResourceLocation blockId, ResourceLocation capabilityId, SlotLayout layout) {
+		if (blockId != null && capabilityId != null && layout != null) {
+			this.layouts.put(new LayoutKey(blockId, capabilityId), layout);
 		}
 	}
 
 	/**
-	 * Populates the layout map. Can be overridden by subclasses to register custom layouts [3].
+	 * Populates the layout map. Set useGenericTexture to false for slot positions
+	 * baked directly into the custom background art [3].
 	 */
 	protected void buildLayouts() {
-		// Furnace layout mimicking vanilla furnace UI (indices: 0 = Input, 1 = Fuel, 2 = Output)
-		layouts.put(ResourceLocation.withDefaultNamespace("furnace"),
+		ResourceLocation itemCapId = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item");
+		java.util.Optional<ResourceLocation> noCustomTex = java.util.Optional.empty();
+
+		// Furnace layout mimicking vanilla furnace UI
+		addLayout(ResourceLocation.withDefaultNamespace("furnace"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"),
 						176, 98, List.of(
-								new SlotEntry(0, 56, 17), // Input Slot
-								new SlotEntry(1, 56, 53), // Fuel Slot
-								new SlotEntry(2, 115, 34) // Output Slot
+								new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex), // Input Slot [3]
+								new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), // Fuel Slot [3]
+								new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex) // Output Slot [3]
 						)));
 
 		// Blast Furnace layout
-		layouts.put(ResourceLocation.withDefaultNamespace("blast_furnace"),
+		addLayout(ResourceLocation.withDefaultNamespace("blast_furnace"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"),
 						176, 98, List.of(
-								new SlotEntry(0, 56, 17), 
-								new SlotEntry(1, 56, 53), 
-								new SlotEntry(2, 115, 34)
+								new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex), 
+								new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), 
+								new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex)
 						)));
 
 		// Smoker layout
-		layouts.put(ResourceLocation.withDefaultNamespace("smoker"), 
+		addLayout(ResourceLocation.withDefaultNamespace("smoker"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"), 
 						176, 98, List.of(
-								new SlotEntry(0, 56, 17), 
-								new SlotEntry(1, 56, 53), 
-								new SlotEntry(2, 115, 34)
+								new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex), 
+								new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), 
+								new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex)
 						)));
 
 		// Brewing Stand layout
-		layouts.put(ResourceLocation.withDefaultNamespace("brewing_stand"), 
+		addLayout(ResourceLocation.withDefaultNamespace("brewing_stand"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/brewing_stand.png"),
 						176, 98, List.of(
-								new SlotEntry(0, 55, 50),
-								new SlotEntry(1, 78, 57),
-								new SlotEntry(2, 101, 50),
-								new SlotEntry(3, 78, 16),
-								new SlotEntry(4, 16, 16)
+								new SlotEntry(0, 56, 50, 16, 16, false, noCustomTex),
+								new SlotEntry(1, 79, 57, 16, 16, false, noCustomTex),
+								new SlotEntry(2, 102, 50, 16, 16, false, noCustomTex),
+								new SlotEntry(3, 78, 16, 18, 18, false, noCustomTex),
+								new SlotEntry(4, 17, 17, 16, 16, false, noCustomTex)
 						)));
 
 		// Dropper layout
-		layouts.put(ResourceLocation.withDefaultNamespace("dropper"), 
+		addLayout(ResourceLocation.withDefaultNamespace("dropper"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/dropper.png"),
 						176, 98, List.of(
-								new SlotEntry(0, 61, 16),
-								new SlotEntry(1, 79, 16),
-								new SlotEntry(2, 97, 16),
-								new SlotEntry(3, 61, 34),
-								new SlotEntry(4, 79, 34),
-								new SlotEntry(5, 97, 34),
-								new SlotEntry(6, 61, 52),
-								new SlotEntry(7, 79, 52),
-								new SlotEntry(8, 97, 52)
+								new SlotEntry(0, 62, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(1, 80, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(2, 98, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(3, 62, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(4, 80, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(5, 98, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(6, 62, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(7, 80, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(8, 98, 53, 16, 16, false, noCustomTex)
 						)));
 
 		// Dispenser layout
-		layouts.put(ResourceLocation.withDefaultNamespace("dispenser"), 
+		addLayout(ResourceLocation.withDefaultNamespace("dispenser"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/dropper.png"),
 						176, 98, List.of(
-								new SlotEntry(0, 61, 16),
-								new SlotEntry(1, 79, 16),
-								new SlotEntry(2, 97, 16),
-								new SlotEntry(3, 61, 34),
-								new SlotEntry(4, 79, 34),
-								new SlotEntry(5, 97, 34),
-								new SlotEntry(6, 61, 52),
-								new SlotEntry(7, 79, 52),
-								new SlotEntry(8, 97, 52)
+								new SlotEntry(0, 62, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(1, 80, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(2, 98, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(3, 62, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(4, 80, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(5, 98, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(6, 62, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(7, 80, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(8, 98, 53, 16, 16, false, noCustomTex)
 						)));
 
 		// Crafter layout
-		layouts.put(ResourceLocation.withDefaultNamespace("crafter"), 
+		addLayout(ResourceLocation.withDefaultNamespace("crafter"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/crafter.png"),
 						176, 98, List.of(
-								new SlotEntry(0, 25, 16),
-								new SlotEntry(1, 43, 16),
-								new SlotEntry(2, 61, 16),
-								new SlotEntry(3, 25, 34),
-								new SlotEntry(4, 43, 34),
-								new SlotEntry(5, 61, 34),
-								new SlotEntry(6, 25, 52),
-								new SlotEntry(7, 43, 52),
-								new SlotEntry(8, 61, 52),
-								new SlotEntry(9, 132, 34)
+								new SlotEntry(0, 26, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(1, 44, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(2, 62, 17, 16, 16, false, noCustomTex),
+								new SlotEntry(3, 26, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(4, 44, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(5, 62, 35, 16, 16, false, noCustomTex),
+								new SlotEntry(6, 26, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(7, 44, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(8, 62, 53, 16, 16, false, noCustomTex),
+								new SlotEntry(9, 129, 30, 26, 26, false, noCustomTex)
 						)));
 
 		// Hopper layout
-		layouts.put(ResourceLocation.withDefaultNamespace("hopper"), 
+		addLayout(ResourceLocation.withDefaultNamespace("hopper"), itemCapId,
 				new SlotLayout(
 						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/hopper.png"),
 						176, 66, List.of(
-								new SlotEntry(0, 43, 19),
-								new SlotEntry(1, 61, 19),
-								new SlotEntry(2, 79, 19),
-								new SlotEntry(3, 97, 19),
-								new SlotEntry(4, 115, 19)
+								new SlotEntry(0, 44, 20, 16, 16, false, noCustomTex),
+								new SlotEntry(1, 62, 20, 16, 16, false, noCustomTex),
+								new SlotEntry(2, 80, 20, 16, 16, false, noCustomTex),
+								new SlotEntry(3, 98, 20, 16, 16, false, noCustomTex),
+								new SlotEntry(4, 116, 20, 16, 16, false, noCustomTex)
 						)));
 	}
 
 	@Override
 	public CompletableFuture<?> run(CachedOutput cache) {
 		CompletableFuture<?>[] futures = layouts.entrySet().stream().map(entry -> {
-			ResourceLocation id = entry.getKey();
+			LayoutKey key = entry.getKey();
 			SlotLayout layout = entry.getValue();
 			JsonElement json = SlotLayout.CODEC.encodeStart(JsonOps.INSTANCE, layout)
 					.getOrThrow(IllegalStateException::new);
 
-			// Output resolved directly to assets namespace to match resource listener [3]
+			// Output path: block_namespace/slot_layouts/capability_path/block_path.json [3]
 			Path path = packOutput.getOutputFolder(PackOutput.Target.RESOURCE_PACK)
-					.resolve(id.getNamespace() + "/slot_layouts/" + id.getPath() + ".json");
+					.resolve(key.blockId().getNamespace() + "/slot_layouts/" + key.capabilityId().getPath() + "/" + key.blockId().getPath() + ".json");
 			return DataProvider.saveStable(cache, json, path);
 		}).toArray(CompletableFuture[]::new);
 		return CompletableFuture.allOf(futures);

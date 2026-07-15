@@ -1,0 +1,86 @@
+{
+  "background": "sfmflow:textures/gui/slot_layouts/crafter.png",
+  "height": 98,
+  "slots": [
+    {
+      "height": 16,
+      "index": 0,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 26,
+      "y": 17
+    },
+    {
+      "height": 16,
+      "index": 1,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 44,
+      "y": 17
+    },
+    {
+      "height": 16,
+      "index": 2,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 62,
+      "y": 17
+    },
+    {
+      "height": 16,
+      "index": 3,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 26,
+      "y": 35
+    },
+    {
+      "height": 16,
+      "index": 4,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 44,
+      "y": 35
+    },
+    {
+      "height": 16,
+      "index": 5,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 62,
+      "y": 35
+    },
+    {
+      "height": 16,
+      "index": 6,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 26,
+      "y": 53
+    },
+    {
+      "height": 16,
+      "index": 7,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 44,
+      "y": 53
+    },
+    {
+      "height": 16,
+      "index": 8,
+      "useGenericTexture": false,
+      "width": 16,
+      "x": 62,
+      "y": 53
+    },
+    {
+      "height": 26,
+      "index": 9,
+      "useGenericTexture": false,
+      "width": 26,
+      "x": 129,
+      "y": 30
+    }
+  ]
+}
