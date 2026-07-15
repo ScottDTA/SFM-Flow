@@ -36,15 +36,13 @@ public class ModBlockTagProvider extends BlockTagsProvider {
 				ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(),
 				ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), ModBlocks.CABLE_CLUSTER_BLOCK.get(),
 				ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
-		
+
 		tag(ModTags.REDSTONE_CABLES).add(ModBlocks.REDSTONE_EMITTER_BLOCK.get(),
 				ModBlocks.REDSTONE_RECEIVER_BLOCK.get(), ModBlocks.OBSERVER_CABLE_BLOCK.get());
 
 		// Populate 3D special render blocks tag to handle containers programmatically
-		tag(ModTags.SPECIAL_3D_RENDERS).add(
-				Blocks.CHEST,
-				Blocks.TRAPPED_CHEST,
-				Blocks.ENDER_CHEST
-		);
+		tag(ModTags.SPECIAL_3D_RENDERS).add(Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.ENDER_CHEST);
+
+		tag(ModTags.CONDUCTIVE_CABLES).add(ModBlocks.CABLE_BLOCK.get(), ModBlocks.HARDENED_CABLE_BLOCK.get());
 	}
 }

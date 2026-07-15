@@ -96,7 +96,7 @@ public class PhysicalNetwork {
 	private void performScan(Level level, BlockPos startPos) {
 		long startTime = System.nanoTime();
 
-		// Cleanly unregister previously scanned cables to prevent stale dangling pointer leaks
+		// Cleanly unregister previously scanned cables to prevent stale dangling pointer leaks [3]
 		for (BlockPos oldCable : this.scannedCables) {
 			CableNetworkRegistry.unregisterCable(level, oldCable);
 		}
@@ -114,23 +114,15 @@ public class PhysicalNetwork {
 		for (Direction dir : Direction.values()) {
 			BlockPos adjacent = startPos.relative(dir);
 			BlockState state = level.getBlockState(adjacent);
-			if (state.is(ModTags.CABLES)) {
-				// Prevent mapping through cable clusters if they do not contain a cable card
-				if (isClusterAndMissingCable(level, adjacent)) {
-					continue;
-				}
-
+			
+			// Only allow conductive cables/clusters to extend the pathfinding search [3]
+			if (canConductNetwork(level, adjacent, state)) {
 				int adjacentId = this.networkMap.getOrAddNode(adjacent);
 				visited.set(adjacentId);
 				this.networkMap.addEdge(startId, adjacentId);
 				CableNetworkRegistry.registerCable(level, adjacent, startPos);
 
 				queue.add(new ScanNode(adjacent, 1));
-
-				// Evaluate any functional cable that has a block entity or redstone tag 
-				if (state.is(ModTags.REDSTONE_CABLES) || level.getBlockEntity(adjacent) != null) {
-					evaluateAndAddInventory(level, adjacent, state, 1, visited, true);
-				}
 			} else if (!state.is(ModBlocks.MANAGER_BLOCK.get())) {
 				evaluateAndAddInventory(level, adjacent, state, 1, visited, false);
 			}
@@ -160,22 +152,13 @@ public class PhysicalNetwork {
 
 				BlockState state = level.getBlockState(neighbor);
 
-				if (state.is(ModTags.CABLES)) {
-					// Prevent mapping through cable clusters if they do not contain a cable card
-					if (isClusterAndMissingCable(level, neighbor)) {
-						continue;
-					}
-
+				// Only allow conductive cables/clusters to extend the pathfinding search [3]
+				if (canConductNetwork(level, neighbor, state)) {
 					int newNeighborId = this.networkMap.getOrAddNode(neighbor);
 					visited.set(newNeighborId);
 					this.networkMap.addEdge(currentId, newNeighborId);
 
 					queue.add(new ScanNode(neighbor, current.depth() + 1));
-
-					// Evaluate any functional cable that has a block entity or redstone tag
-					if (state.is(ModTags.REDSTONE_CABLES) || level.getBlockEntity(neighbor) != null) {
-						evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, true);
-					}
 				} else if (this.scannedInventories.size() < maxInventories
 						&& !state.is(ModBlocks.MANAGER_BLOCK.get())) {
 					evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, false);
@@ -191,6 +174,20 @@ public class PhysicalNetwork {
 
 		FlowLogger.pathfinder("Scan completed in %.3f ms. Cables: %d, Targets: %d", durationMs,
 				this.scannedCables.size(), this.scannedInventories.size());
+	}
+
+	/**
+	 * Helper determining if a block is a conductive medium that can extend the network pathfinding search.
+	 */
+	private boolean canConductNetwork(Level level, BlockPos pos, BlockState state) {
+		if (state.is(ModTags.CONDUCTIVE_CABLES)) {
+			return true;
+		}
+		BlockEntity be = level.getBlockEntity(pos);
+		if (be instanceof CableClusterBlockEntity cluster) {
+			return cluster.hasCableCard();
+		}
+		return false;
 	}
 
 	private boolean isClusterAndMissingCable(Level level, BlockPos pos) {

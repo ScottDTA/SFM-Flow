@@ -1,8 +1,9 @@
 7-14-2026
 
 
-
 ### [Added]
+* Added the `conductive_cables` block tag, permitting custom conductive cables registered by other add-on mods to extend network searches natively.
+* Added programmatic datagen generation for the new conductive cables tag, mapping the plain and hardened cables.
 * Added detailed, multi-line tooltips inside the inventory selection panel that list the targeted container's name, coordinates, and active direction.
 * Added native card icon rendering in the inventory selection bar, displaying the exact card installed (e.g., Vacuum or Ejector Valve) rather than a generic Cable Cluster block.
 * Added the **Redstone Conditional** logic component, allowing you to branch flowchart execution depending on analog redstone signal strengths of connected blocks.
@@ -13,6 +14,8 @@
 * Added English localization entries for the new Redstone Conditional component.
 
 ### [Changed]
+* Re-engineered the primary pathfinding scanner, manager discovery sweeps, and adjacent network dirty checks to propagate exclusively along conductive blocks and active cable clusters, preventing non-conductive blocks from bridging independent searches.
+* Updated fast O(1) extension and connection optimization checks inside `CableBlock` to evaluate the new tag rather than hardcoded block classes.
 * Improved Cable Cluster integration by segmenting each slot card into its own logical inventory entry, allowing you to target specific cards inside a cluster independently.
 * Updated settings overlays to restrict 3D block preview face selections strictly to the face matching the targeted card's active directional side.
 

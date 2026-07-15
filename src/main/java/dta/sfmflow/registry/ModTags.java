@@ -58,4 +58,11 @@ public final class ModTags {
 	 */
 	public static final TagKey<Block> SPECIAL_3D_RENDERS = TagKey.create(Registries.BLOCK,
 			ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "special_3d_renders"));
+	
+	/**
+	 * Block tag identifying all cables that physically conduct/extend the network search.
+	 * Addon developers can register custom cables here to support network extensions [3].
+	 */
+	public static final TagKey<Block> CONDUCTIVE_CABLES = TagKey.create(Registries.BLOCK,
+			ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "conductive_cables"));
 }

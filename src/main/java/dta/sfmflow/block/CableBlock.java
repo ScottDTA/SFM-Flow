@@ -7,6 +7,8 @@ import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import dta.sfmflow.api.capability.FlowCapabilityRegistry;
+import dta.sfmflow.block.entity.CableClusterBlockEntity;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.common.network.PhysicalNetwork;
 import dta.sfmflow.common.network.PhysicalNetworkMap;
@@ -39,14 +41,15 @@ public class CableBlock extends Block {
 				PhysicalNetwork network = manager.getPhysicalNetwork();
 				if (!network.isDirty()) {
 					boolean touchesCapability = false;
-					// Check if any newly connected neighbor exposes registry capabilities [3]
+					// Check if any newly connected neighbor exposes registry capabilities
+					// Only treat plain conductive cables as inert wiring; functional endpoints must be checked/scanned
 					for (Direction dir : Direction.values()) {
 						BlockPos neighbor = pos.relative(dir);
 						BlockState nState = level.getBlockState(neighbor);
-						// Only treat plain cables as inert wiring; functional endpoints must be checked/scanned [3]
-						if ((!nState.is(ModBlocks.CABLE_BLOCK.get()) && !nState.is(ModBlocks.HARDENED_CABLE_BLOCK.get())) && !nState.is(ModBlocks.MANAGER_BLOCK.get())) {
+						
+						if (!nState.is(ModTags.CONDUCTIVE_CABLES) && !nState.is(ModBlocks.MANAGER_BLOCK.get())) {
 							BlockEntity be = level.getBlockEntity(neighbor);
-							for (var cap : dta.sfmflow.api.capability.FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
+							for (var cap : FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
 								if (cap.isPresentAnywhere(level, neighbor, nState, be)) {
 									touchesCapability = true;
 									break;
@@ -136,8 +139,8 @@ public class CableBlock extends Block {
 					int currentId = map.getNodeId(pos);
 					if (currentId != -1) {
 						BlockState neighborState = level.getBlockState(neighborPos);
-						// Only allow fast O(1) extension without rescanning for plain inert cable blocks [3]
-						if (neighborState.is(ModBlocks.CABLE_BLOCK.get()) || neighborState.is(ModBlocks.HARDENED_CABLE_BLOCK.get())) {
+						// Only allow fast O(1) extension without rescanning for plain conductive cable blocks
+						if (neighborState.is(ModTags.CONDUCTIVE_CABLES)) {
 							int neighborId = map.getOrAddNode(neighborPos);
 							map.addEdge(currentId, neighborId);
 							CableNetworkRegistry.registerCable(level, neighborPos, manager.getBlockPos());
@@ -178,7 +181,7 @@ public class CableBlock extends Block {
 					if (be instanceof ManagerBlockEntity manager) {
 						manager.getPhysicalNetwork().markDirty();
 					}
-				} else if (state.is(ModTags.CABLES)) {
+				} else if (canConduct(level, neighbor)) { // Walk strictly along conductive blocks [3]
 					visited.add(neighbor);
 					queue.add(neighbor);
 				}
@@ -211,12 +214,27 @@ public class CableBlock extends Block {
 					if (be instanceof ManagerBlockEntity manager) {
 						return manager;
 					}
-				} else if (state.is(ModTags.CABLES)) {
+				} else if (canConduct(level, neighbor)) { // Walk strictly along conductive blocks [3]
 					visited.add(neighbor);
 					queue.add(neighbor);
 				}
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Helper determining if an adjacent block is a conductive medium.
+	 */
+	private static boolean canConduct(LevelAccessor level, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+		if (state.is(ModTags.CONDUCTIVE_CABLES)) {
+			return true;
+		}
+		BlockEntity be = level.getBlockEntity(pos);
+		if (be instanceof CableClusterBlockEntity cluster) {
+			return cluster.hasCableCard();
+		}
+		return false;
 	}
 }
