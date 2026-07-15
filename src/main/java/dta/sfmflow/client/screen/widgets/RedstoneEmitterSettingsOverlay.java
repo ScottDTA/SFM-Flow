@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
 import dta.sfmflow.api.client.widget.InventorySelectorWidget;
+import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
@@ -18,7 +19,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Side configuration layout overlay for Redstone Emitters [3].
+ * Side configuration layout overlay for Redstone Emitters.
  */
 @OnlyIn(Dist.CLIENT)
 public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
@@ -28,7 +29,7 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 	public RedstoneEmitterSettingsOverlay(ManagerScreen parentScreen, RedstoneEmitterComponent component) {
 		super(parentScreen, component);
 		this.width = 300;
-		this.height = 360; // Standardized to 360 [3]
+		this.height = 360; // Standardized to 360
 		this.setX((parentScreen.width - 300) / 2);
 		this.setY(parentScreen.getOverlayTargetY(this.height));
 
@@ -51,16 +52,16 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"),
 				parentScreen, 
-				// Sided Filter: Only show Redstone Emitter Blocks in selection menu [3]
+				// Sided Filter: Only show Redstone Emitter Blocks in selection menu
 				block -> {
 					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 					if (level != null) {
-						return level.getBlockState(block.getBlockPos()).is(dta.sfmflow.block.ModBlocks.REDSTONE_EMITTER_BLOCK.get());
+						return level.getBlockState(block.getBlockPos()).is(ModBlocks.REDSTONE_EMITTER_BLOCK.get());
 					}
 					return true;
 				},
 				newInv -> {
-					component.setActiveSidesMask(0); // Reset side selection mask [3]
+					component.setActiveSidesMask(0); // Reset side selection mask
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
 					}
@@ -88,6 +89,13 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
+		
+		// If targeting a cluster card, support only the card's active direction face
+		ConnectionBlock inv = getSelectedInventory();
+		if (inv != null && inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
 		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
 		if (flowCap != null) {
 			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);

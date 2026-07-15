@@ -43,15 +43,15 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
- * Conditional logic node that checks the contents of targeted inventories
- * off-thread. Routes execution along either True (Output 0) or False (Output 1)
- * paths.
+ * Conditional logic node that checks the contents of targeted inventories off-thread.
+ * Routes execution along either True (Output 0) or False (Output 1) paths.
  */
 public class ItemConditionalComponent extends AbstractFlowComponent
 		implements IFilterable, IInventoryTarget, ISideConfigurable, IGhostSlotAware, ISlotConfigurable {
 
 	public enum MatchMode implements StringRepresentable {
-		MATCH_ALL("match_all"), MATCH_ANY("match_any");
+		MATCH_ALL("match_all"),
+		MATCH_ANY("match_any");
 
 		private final String name;
 
@@ -66,8 +66,12 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 	}
 
 	public enum ConditionOperator implements StringRepresentable {
-		GREATER_OR_EQUAL("greater_or_equal", ">="), LESS_OR_EQUAL("less_or_equal", "<="), EQUAL("equal_to", "=="),
-		NOT_EQUAL("not_equal", "!="), GREATER("greater_than", ">"), LESS("less_than", "<");
+		GREATER_OR_EQUAL("greater_or_equal", ">="),
+		LESS_OR_EQUAL("less_or_equal", "<="),
+		EQUAL("equal_to", "=="),
+		NOT_EQUAL("not_equal", "!="),
+		GREATER("greater_than", ">"),
+		LESS("less_than", "<");
 
 		private final String name;
 		private final String symbol;
@@ -88,25 +92,23 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 
 		public boolean compare(int current, int threshold) {
 			return switch (this) {
-			case GREATER_OR_EQUAL -> current >= threshold;
-			case LESS_OR_EQUAL -> current <= threshold;
-			case EQUAL -> current == threshold;
-			case NOT_EQUAL -> current != threshold;
-			case GREATER -> current > threshold;
-			case LESS -> current < threshold;
+				case GREATER_OR_EQUAL -> current >= threshold;
+				case LESS_OR_EQUAL -> current <= threshold;
+				case EQUAL -> current == threshold;
+				case NOT_EQUAL -> current != threshold;
+				case GREATER -> current > threshold;
+				case LESS -> current < threshold;
 			};
 		}
 	}
 
 	public static final Codec<MatchMode> MATCH_MODE_CODEC = StringRepresentable.fromEnum(MatchMode::values);
-	public static final Codec<ConditionOperator> OPERATOR_CODEC = StringRepresentable
-			.fromEnum(ConditionOperator::values);
+	public static final Codec<ConditionOperator> OPERATOR_CODEC = StringRepresentable.fromEnum(ConditionOperator::values);
 
 	public static final MapCodec<ItemConditionalComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 			.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemConditionalComponent::getBaseProperties),
 					Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(ItemConditionalComponent::getInventoryId),
-					Codec.INT.optionalFieldOf("activeSidesMask", 0)
-							.forGetter(ItemConditionalComponent::getActiveSidesMask),
+					Codec.INT.optionalFieldOf("activeSidesMask", 0).forGetter(ItemConditionalComponent::getActiveSidesMask),
 					Codec.LONG.listOf().optionalFieldOf("enabledSlotsMasks", List.of(-1L, -1L, -1L, -1L, -1L, -1L))
 							.forGetter(ItemConditionalComponent::getEnabledSlotsMasks),
 					UUIDUtil.CODEC.optionalFieldOf("boundGroupVariableId")
@@ -116,15 +118,11 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 					Codec.BOOL.optionalFieldOf("whitelist", true).forGetter(ItemConditionalComponent::isWhitelist),
 					ItemStack.OPTIONAL_CODEC.listOf().optionalFieldOf("filterItems", List.of())
 							.forGetter(ItemConditionalComponent::getFilterItems),
-					Codec.INT.listOf()
-							.optionalFieldOf("filterLimits", List.of(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1))
+					Codec.INT.listOf().optionalFieldOf("filterLimits", List.of(-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1))
 							.forGetter(ItemConditionalComponent::getFilterLimits),
-					MATCH_MODE_CODEC.optionalFieldOf("matchMode", MatchMode.MATCH_ANY)
-							.forGetter(ItemConditionalComponent::getMatchMode),
-					OPERATOR_CODEC.optionalFieldOf("operator", ConditionOperator.GREATER_OR_EQUAL)
-							.forGetter(ItemConditionalComponent::getOperator))
-			.apply(instance, (baseProps, invId, sidesMask, masksList, groupVar, filterVar, whitelistVal, filtersList,
-					limitsList, mMode, op) -> {
+					MATCH_MODE_CODEC.optionalFieldOf("matchMode", MatchMode.MATCH_ANY).forGetter(ItemConditionalComponent::getMatchMode),
+					OPERATOR_CODEC.optionalFieldOf("operator", ConditionOperator.GREATER_OR_EQUAL).forGetter(ItemConditionalComponent::getOperator))
+			.apply(instance, (baseProps, invId, sidesMask, masksList, groupVar, filterVar, whitelistVal, filtersList, limitsList, mMode, op) -> {
 				ItemConditionalComponent comp = new ItemConditionalComponent(baseProps.id());
 				comp.setBaseProperties(baseProps);
 				comp.inventoryId = invId;
@@ -168,7 +166,7 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 		this.hasInputNodes = true;
 		this.numInputs = 1;
 		this.hasOutputNodes = true;
-		this.numOutputs = 2; // Index 0 = True, Index 1 = False
+		this.numOutputs = 2; // Output 0 = True, Output 1 = False
 		for (int i = 0; i < 12; i++) {
 			this.filterItems.add(ItemStack.EMPTY);
 			this.filterLimits.add(-1);
@@ -185,8 +183,7 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 	}
 
 	public long getEnabledSlotsMask(Direction dir) {
-		if (dir == null)
-			return -1L;
+		if (dir == null) return -1L;
 		int idx = dir.ordinal();
 		if (idx >= 0 && idx < enabledSlotsMasks.size()) {
 			return enabledSlotsMasks.get(idx);
@@ -195,8 +192,7 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 	}
 
 	public void setEnabledSlotsMask(Direction dir, long mask) {
-		if (dir == null)
-			return;
+		if (dir == null) return;
 		int idx = dir.ordinal();
 		while (enabledSlotsMasks.size() <= idx) {
 			enabledSlotsMasks.add(-1L);
@@ -205,19 +201,15 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 	}
 
 	public boolean isSlotEnabled(Direction dir, int slot) {
-		if (dir == null)
-			return true;
-		if (slot < 0 || slot >= 64)
-			return true;
+		if (dir == null) return true;
+		if (slot < 0 || slot >= 64) return true;
 		long mask = getEnabledSlotsMask(dir);
 		return (mask & (1L << slot)) != 0;
 	}
 
 	public void toggleSlot(Direction dir, int slot) {
-		if (dir == null)
-			return;
-		if (slot < 0 || slot >= 64)
-			return;
+		if (dir == null) return;
+		if (slot < 0 || slot >= 64) return;
 		long mask = getEnabledSlotsMask(dir);
 		mask ^= (1L << slot);
 		setEnabledSlotsMask(dir, mask);
@@ -352,12 +344,19 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 			activeSides.add(null);
 		}
 
+		// Restrict slot indexing strictly to the targeted cluster card
+		int allowedSlot = targetBlock.getSlotIndex();
+
 		// Pull current items safely from the thread-safe snapshot
 		List<ItemStack> inventoryItems = new ArrayList<>();
 		for (Direction side : activeSides) {
 			var inv = context.getSnapshot().getInventory(targetPos, side);
 			if (inv != null) {
 				for (var entry : inv.slots().entrySet()) {
+					int slotIdx = entry.getKey();
+					if (allowedSlot != -1 && slotIdx != allowedSlot) {
+						continue;
+					}
 					if (isSlotEnabled(side, entry.getValue().mainSlotIndex())) {
 						inventoryItems.add(entry.getValue().stack());
 					}
@@ -383,10 +382,9 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 				if (filter != null && !filter.isEmpty()) {
 					hasFilters = true;
 					int targetQty = i < this.filterLimits.size() ? this.filterLimits.get(i) : 1;
-					if (targetQty <= 0)
-						targetQty = 1;
+					if (targetQty <= 0) targetQty = 1;
 
-					// If this filter item is a Variable Card, resolve its actual custom quantity
+					// If this filter item is a Variable Card, resolve its actual custom quantity 
 					if (filter.getItem() == ModItems.VARIABLE_CARD.get()) {
 						CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 						if (tag.contains("VariableId")) {
@@ -405,7 +403,7 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 			}
 		}
 
-		// Wildcard Check (Empty Filters / Empty Whitelist)
+		// Wildcard Check (Empty Filters / Empty Whitelist) 
 		if (!hasFilters) {
 			int totalCount = 0;
 			for (ItemStack stack : inventoryItems) {
@@ -413,8 +411,7 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 					totalCount += stack.getCount();
 				}
 			}
-			int targetQty = (this.filterLimits.size() > 0 && this.filterLimits.get(0) > 0) ? this.filterLimits.get(0)
-					: 1;
+			int targetQty = (this.filterLimits.size() > 0 && this.filterLimits.get(0) > 0) ? this.filterLimits.get(0) : 1;
 			return this.operator.compare(totalCount, targetQty);
 		}
 
@@ -487,12 +484,11 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 
 		ItemConditionalComponent.CODEC.codec().parse(ops, compoundTag)
-				.resultOrPartial(
-						err -> SFMFlow.LOGGER.error("Failed to parse item conditional component data: {}", err))
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse item conditional component data: {}", err))
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
 					this.inventoryId = decoded.getInventoryId();
-					this.activeSidesMask = decoded.activeSidesMask;
+					this.activeSidesMask = decoded.getActiveSidesMask();
 					this.enabledSlotsMasks.clear();
 					this.enabledSlotsMasks.addAll(decoded.getEnabledSlotsMasks());
 					this.boundGroupVariableId = decoded.getBoundGroupVariableId();
@@ -574,21 +570,19 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 		if (compoundTag.contains("matchMode")) {
 			try {
 				this.matchMode = MatchMode.valueOf(compoundTag.getString("matchMode"));
-			} catch (IllegalArgumentException ignored) {
-			}
+			} catch (IllegalArgumentException ignored) {}
 		}
 		if (compoundTag.contains("operator")) {
 			try {
 				this.operator = ConditionOperator.valueOf(compoundTag.getString("operator"));
-			} catch (IllegalArgumentException ignored) {
-			}
+			} catch (IllegalArgumentException ignored) {}
 		}
 	}
 
 	@Override
 	public Component getName() {
-		if (this.getCustomName() != null && !this.getCustomName().isEmpty()) {
-			return Component.literal(this.getCustomName());
+		if (getCustomName() != null && !getCustomName().isEmpty()) {
+			return Component.literal(getCustomName());
 		}
 		return Component.translatable("gui.sfmflow.item_conditional");
 	}
@@ -623,16 +617,14 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 		public int countMatches(FlowchartPlanningContext context, List<ItemStack> inventoryItems) {
 			int total = 0;
 			for (ItemStack stack : inventoryItems) {
-				if (stack.isEmpty())
-					continue;
+				if (stack.isEmpty()) continue;
 				if (varComp != null) {
 					if (AdvancedItemFilterVariableComponent.matchesVariableFilter(varComp, stack)) {
 						total += stack.getCount();
 					}
 				} else {
 					if (filterStack.getItem() == ModItems.VARIABLE_CARD.get()) {
-						CompoundTag tag = filterStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY)
-								.copyTag();
+						CompoundTag tag = filterStack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 						if (tag.contains("VariableId")) {
 							UUID varId = tag.getUUID("VariableId");
 							AbstractFlowComponent comp = context.getComponents().get(varId);

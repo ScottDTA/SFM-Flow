@@ -38,6 +38,7 @@ import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -58,6 +59,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -382,6 +384,12 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			invTag.putLong("pos", inv.getBlockPos().asLong());
 			invTag.putInt("id", inv.getId());
 			invTag.putInt("distance", inv.getCableDistance());
+			invTag.putInt("slotIndex", inv.getSlotIndex());
+			invTag.putInt("direction", inv.getDirection() != null ? inv.getDirection().ordinal() : -1); 
+			
+			if (!inv.getCardStack().isEmpty()) {
+				invTag.put("cardStack", inv.getCardStack().save(pRegistries)); 
+			}
 
 			ListTag typeList = new ListTag();
 			for (ResourceLocation type : inv.getTypes()) {
@@ -481,7 +489,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 		var ops = RegistryOps.create(NbtOps.INSTANCE, pRegistries);
 
-		// Handle client update tag synchronization
+		// Handle client update tag synchronization 
 		if (pTag.contains("flowchart")) {
 			try {
 				this.flowchart = Flowchart.CODEC.parse(ops, pTag.get("flowchart"))
@@ -504,7 +512,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			long[] flatPosArray = pTag.getLongArray("ScannedCablePositions");
 			PhysicalNetworkMap map = this.physicalNetwork.getNetworkMap();
 			map.clear();
-			for (long longVal : flatPosArray) { // Iterate directly [3]
+			for (long longVal : flatPosArray) { // Iterate directly
 				map.getOrAddNode(BlockPos.of(longVal));
 			}
 		}
@@ -537,8 +545,15 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				BlockPos pos = BlockPos.of(invTag.getLong("pos"));
 				int id = invTag.getInt("id");
 				int distance = invTag.getInt("distance");
+				int slotIndex = invTag.contains("slotIndex") ? invTag.getInt("slotIndex") : -1;
+				int dirOrd = invTag.getInt("direction");
+				Direction direction = (dirOrd == -1) ? null : Direction.values()[dirOrd]; // Load direction [3]
 
-				ConnectionBlock inv = new ConnectionBlock(pos, distance);
+				ItemStack cardStack = invTag.contains("cardStack") 
+				        ? ItemStack.parse(pRegistries, invTag.getCompound("cardStack")).orElse(ItemStack.EMPTY) 
+				        : ItemStack.EMPTY;
+
+				ConnectionBlock inv = new ConnectionBlock(level, pos, distance, slotIndex, cardStack, direction);
 				inv.setId(id);
 
 				Set<ResourceLocation> types = new HashSet<>();

@@ -19,7 +19,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Screen interface mapping slots to directional faces for fluid components [3].
+ * Screen interface mapping slots to directional faces for fluid components.
  */
 @OnlyIn(Dist.CLIENT)
 public class FluidTransferSettingsOverlay extends NodeSettingsOverlay {
@@ -57,9 +57,9 @@ public class FluidTransferSettingsOverlay extends NodeSettingsOverlay {
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"),
 				parentScreen, newInv -> {
-					component.setActiveSidesMask(0); // Reset side selection to default (all disabled) [3]
+					component.setActiveSidesMask(0); // Reset side selection to default (all disabled)
 					for (Direction dir : Direction.values()) {
-						component.setEnabledSlotsMask(dir, -1L); // Reset enabled slot masks to default [3]
+						component.setEnabledSlotsMask(dir, -1L); // Reset enabled slot masks to default
 					}
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
@@ -94,7 +94,13 @@ public class FluidTransferSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
-		// Symmetrically check the registered FlowCapability to support bridges natively [3]
+		
+		// If targeting a cluster card, support only the card's active direction face
+		ConnectionBlock inv = getSelectedInventory();
+		if (inv != null && inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
 		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
 		if (flowCap != null) {
 			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);

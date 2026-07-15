@@ -20,8 +20,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Screen interface mapping slots to directional faces via instant feedback
- * widgets [3]. Redesigned with dynamic panel metrics to eliminate visual
- * overlaps completely [3].
+ * widgets. Redesigned with dynamic panel metrics to eliminate visual
+ * overlaps completely.
  */
 @OnlyIn(Dist.CLIENT)
 public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
@@ -39,10 +39,10 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		component.setUseAll(false);
 		component.setTargetSlot(-1);
 
-		// Activate the ghost slots on the client menu [3]
+		// Activate the ghost slots on the client menu
 		parentScreen.getMenu().setActiveFilterComponent(component);
 
-		// Activate the ghost slots on the server menu [3]
+		// Activate the ghost slots on the server menu
 		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
 				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId()));
 
@@ -58,10 +58,10 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
 				parentScreen, newInv -> {
-					// Reset side selection settings to default when binding a different inventory [3]
-					component.setActiveSidesMask(0); // Reset side selection mask to 0 (all sides disabled) [3]
+					// Reset side selection settings to default when binding a different inventory
+					component.setActiveSidesMask(0); // Reset side selection mask to 0 (all sides disabled) 
 					for (Direction dir : Direction.values()) {
-						component.setEnabledSlotsMask(dir, -1L); // Reset per-side slot exclusions to all enabled [3]
+						component.setEnabledSlotsMask(dir, -1L); // Reset per-side slot exclusions to all enabled 
 					}
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
@@ -96,7 +96,13 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
-		// Symmetrically check the registered FlowCapability to support bridges natively [3]
+		
+		// If targeting a cluster card, support only the card's active direction face 
+		ConnectionBlock inv = getSelectedInventory();
+		if (inv != null && inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
 		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"));
 		if (flowCap != null) {
 			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);
@@ -113,10 +119,10 @@ public class ItemTransferSettingsOverlay extends NodeSettingsOverlay {
 
 	@Override
 	public void closeAndSave() {
-		// Reset active filter component on the client menu [3]
+		// Reset active filter component on the client menu
 		parentScreen.getMenu().setActiveFilterComponent(null);
 
-		// Reset active filter component on the server menu [3]
+		// Reset active filter component on the server menu
 		PacketDistributor.sendToServer(
 				new SetActiveFilterComponentPacket(parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), null));
 		super.closeAndSave();

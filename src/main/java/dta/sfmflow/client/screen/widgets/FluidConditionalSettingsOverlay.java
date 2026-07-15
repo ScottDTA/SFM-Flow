@@ -117,6 +117,13 @@ public class FluidConditionalSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
+		
+		// If targeting a cluster card, support only the card's active direction face
+		ConnectionBlock inv = getSelectedInventory();
+		if (inv != null && inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
 		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
 		if (flowCap != null) {
 			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);

@@ -2,6 +2,7 @@ package dta.sfmflow.block.entity;
 
 import dta.sfmflow.api.capability.CableClusterBehaviorRegistry;
 import dta.sfmflow.api.capability.ClusterCardBehavior;
+import dta.sfmflow.block.CableBlock;
 import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.screen.CableClusterMenu;
@@ -11,7 +12,11 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.Connection;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -27,6 +32,9 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
+
+import java.util.Arrays;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -71,10 +79,8 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 				super.onContentsChanged(slot);
 				ItemStack stack = getStackInSlot(slot);
 				if (stack.isEmpty()) {
-
 					CableClusterBlockEntity.this.slotDirections[slot] = null;
 				} else {
-
 					Direction dir = CableClusterBlockEntity.this.slotDirections[slot];
 					if (dir != null && !isDirectionValid(slot, dir)) {
 						CableClusterBlockEntity.this.slotDirections[slot] = null;
@@ -82,11 +88,17 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 				}
 				CableClusterBlockEntity.this.setChanged();
 				CableClusterBlockEntity.this.notifyNeighbors();
+
+				// Flag the nearby cable networks as dirty to force a topology rescan
+				if (CableClusterBlockEntity.this.level != null && !CableClusterBlockEntity.this.level.isClientSide()) {
+					CableBlock.markNearbyNetworksDirty(CableClusterBlockEntity.this.level,
+							CableClusterBlockEntity.this.worldPosition);
+				}
 			}
 		};
 
 		this.slotDirections = new Direction[numSlots];
-		java.util.Arrays.fill(this.slotDirections, null);
+		Arrays.fill(this.slotDirections, null);
 
 		this.slotBuffers = new ItemStackHandler[numSlots];
 		this.fluidBuffers = new FluidTank[numSlots];
@@ -142,6 +154,11 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 					this.slotDirections[slot] = dir;
 					this.setChanged();
 					this.notifyNeighbors();
+
+					// Flag the nearby cable networks as dirty to force a topology rescan
+					if (this.level != null && !this.level.isClientSide()) {
+						CableBlock.markNearbyNetworksDirty(this.level, this.worldPosition);
+					}
 				}
 			}
 		}
@@ -533,5 +550,23 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			}
 			return FluidStack.EMPTY;
 		}
+	}
+
+	@Override
+	public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+		CompoundTag tag = super.getUpdateTag(registries);
+		this.saveAdditional(tag, registries);
+		return tag;
+	}
+
+	@Override
+	public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {
+		return ClientboundBlockEntityDataPacket.create(this);
+	}
+
+	@Override
+	public void onDataPacket(Connection connection, ClientboundBlockEntityDataPacket packet,
+			HolderLookup.Provider registries) {
+		super.onDataPacket(connection, packet, registries);
 	}
 }

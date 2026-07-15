@@ -25,13 +25,13 @@ import java.util.UUID;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Common, stateless helper consolidating fluid transfer simulation, extraction, and
- * deposition planning routines utilizing thread-safe snapshots [3].
+ * Common, stateless helper consolidating fluid transfer simulation, extraction,
+ * and deposition planning routines utilizing thread-safe snapshots.
  */
 public final class FluidTransferPlanner {
 
 	/**
-	 * Unique key tracking a specific fluid tank coordinate during the simulation sweep [3].
+	 * Unique key tracking a specific fluid tank coordinate during the simulation sweep.
 	 */
 	public record TankKey(BlockPos pos, @Nullable Direction side, int tankIndex) {
 	}
@@ -194,7 +194,13 @@ public final class FluidTransferPlanner {
 
 			int tankCount = srcInv.tanks().size();
 			for (int tankIndex = 0; tankIndex < tankCount; tankIndex++) {
-				if (component.getTargetSlot() != -1 && component.getTargetSlot() != tankIndex) {
+				// Restrict extraction strictly to the targeted cluster card
+				int allowedSlot = srcInventory.getSlotIndex();
+				if (allowedSlot != -1) {
+					if (tankIndex != allowedSlot) {
+						continue;
+					}
+				} else if (component.getTargetSlot() != -1 && component.getTargetSlot() != tankIndex) {
 					continue;
 				}
 
@@ -301,7 +307,13 @@ public final class FluidTransferPlanner {
 					if (remainingToDeposit <= 0)
 						break;
 
-					if (component.getTargetSlot() != -1 && component.getTargetSlot() != tankIndex) {
+					// Restrict deposition strictly to the targeted cluster card
+					int allowedSlot = tgtInventory.getSlotIndex();
+					if (allowedSlot != -1) {
+						if (tankIndex != allowedSlot) {
+							continue;
+						}
+					} else if (component.getTargetSlot() != -1 && component.getTargetSlot() != tankIndex) {
 						continue;
 					}
 

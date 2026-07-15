@@ -27,7 +27,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Multi-interval and sided threshold configuration screen for Redstone Triggers [3].
+ * Multi-interval and sided threshold configuration screen for Redstone Triggers.
  */
 @OnlyIn(Dist.CLIENT)
 public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
@@ -48,7 +48,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 	public RedstoneTriggerSettingsOverlay(ManagerScreen parentScreen, RedstoneTriggerComponent component) {
 		super(parentScreen, component);
 		this.width = 300;
-		this.height = 360; // Expanded to 360 to prevent viewport clip desyncs [3]
+		this.height = 360; // Expanded to 360 to prevent viewport clip desyncs
 		this.setX((parentScreen.width - 300) / 2);
 		this.setY(parentScreen.getOverlayTargetY(this.height));
 
@@ -59,7 +59,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 						: null,
 				component.getId()));
 
-		// Height increased to 190 to allow correct 3D block projections and prevent ghosting leaks [3]
+		// Height increased to 190 to allow correct 3D block projections and prevent ghosting leaks
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 190,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
 				face -> sideSupportsRedstone(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
@@ -72,7 +72,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"),
 				parentScreen, 
-				// Sided Filter: Only show Redstone Receivers in list [3]
+				// Sided Filter: Only show Redstone Receivers in list
 				block -> {
 					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 					if (level != null) {
@@ -81,7 +81,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 					return true;
 				},
 				newInv -> {
-					component.setActiveSidesMask(0); // Reset side selection mask [3]
+					component.setActiveSidesMask(0); // Reset side selection mask
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
 					}
@@ -89,7 +89,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 					sendSettingsUpdate();
 				});
 
-		// 1. "Requires All" Mode Cycle Button in top right of viewport with custom description tooltips [3]
+		// 1. "Requires All" Mode Cycle Button in top right of viewport with custom description tooltips
 		this.requiresAllBtn = CycleButton.<Boolean>builder(val -> val ? Component.literal("ALL") : Component.literal("ANY"))
 				.withValues(true, false)
 				.withInitialValue(component.isRequiresAll())
@@ -107,7 +107,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 				? Component.literal("ALL (AND): Every active side must simultaneously satisfy the comparison.") 
 				: Component.literal("ANY (OR): Only one active side needs to satisfy the comparison.")));
 
-		// 2. "While High" Interval Column [3]
+		// 2. "While High" Interval Column
 		this.highUnitBtn = CycleButton.<IntervalTriggerComponent.TimeUnit>builder(IntervalTriggerComponent.TimeUnit::getDisplayName)
 				.withValues(IntervalTriggerComponent.TimeUnit.values())
 				.withInitialValue(component.getHighTimeUnit())
@@ -121,7 +121,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		this.highIntervalSlider = new HighIntervalSlider(getX() + 15, getY() + 308, 120, 18, component, this);
 
-		// 3. "While Low" Interval Column [3]
+		// 3. "While Low" Interval Column
 		this.lowUnitBtn = CycleButton.<IntervalTriggerComponent.TimeUnit>builder(IntervalTriggerComponent.TimeUnit::getDisplayName)
 				.withValues(IntervalTriggerComponent.TimeUnit.values())
 				.withInitialValue(component.getLowTimeUnit())
@@ -166,6 +166,13 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
+		
+		// If targeting a cluster card, support only the card's active direction face
+		ConnectionBlock inv = getSelectedInventory();
+		if (inv != null && inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
 		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
 		if (flowCap != null) {
 			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);

@@ -1,26 +1,31 @@
 package dta.sfmflow.util;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
+import dta.sfmflow.api.capability.FlowCapabilityRegistry;
+import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.Nullable;
 
-import dta.sfmflow.api.capability.FlowCapabilityRegistry;
-import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
-
 /**
- * Declares scannable target inventory indices mapped to physical coordinates [3].
+ * Declares scannable target inventory indices mapped to physical coordinates.
  */
 public class ConnectionBlock implements IContainerSelection {
 	private Level level;
@@ -29,25 +34,48 @@ public class ConnectionBlock implements IContainerSelection {
 	private Set<ResourceLocation> types;
 	private int id;
 	private volatile boolean sleeping = false;
+	private Direction direction;
+
+	// Virtual slot tracking for Cable Cluster cards 
+	private int slotIndex = -1;
+	private ItemStack cardStack = ItemStack.EMPTY;
 
 	public record SidedCacheKey(ResourceLocation capId, @Nullable Direction side) {}
 
-	// Sided capability cache matrix to track and invalidate face settings independently [3]
 	private final Map<SidedCacheKey, BlockCapabilityCache<?, Direction>> capabilityCaches = new HashMap<>();
 
 	public ConnectionBlock(BlockPos blockPos, int cableDistance) {
+		this(blockPos, cableDistance, -1);
+	}
+
+	public ConnectionBlock(BlockPos blockPos, int cableDistance, int slotIndex) {
 		this.blockPos = blockPos;
 		this.cableDistance = cableDistance;
-		types = new HashSet<>();
+		this.slotIndex = slotIndex;
+		this.types = new HashSet<>();
+		this.cardStack = ItemStack.EMPTY;
 	}
 
 	public ConnectionBlock(Level level, BlockPos blockPos, int cableDistance) {
-		this(blockPos, cableDistance);
+		this(blockPos, cableDistance, -1);
 		this.level = level;
 	}
 
+	public ConnectionBlock(Level level, BlockPos blockPos, int cableDistance, int slotIndex, ItemStack cardStack) {
+		this(blockPos, cableDistance, slotIndex);
+		this.level = level;
+		this.cardStack = cardStack;
+	}
+	
+	public ConnectionBlock(Level level, BlockPos blockPos, int cableDistance, int slotIndex, ItemStack cardStack, @Nullable Direction direction) {
+	    this(blockPos, cableDistance, slotIndex);
+	    this.level = level;
+	    this.cardStack = cardStack;
+	    this.direction = direction; // Store the direction
+	}
+
 	/**
-	 * Copy constructor to create a thread-safe, isolated snapshot of a connection block [3].
+	 * Copy constructor to create a thread-safe, isolated snapshot of a connection block.
 	 */
 	public ConnectionBlock(ConnectionBlock other) {
 		this.level = other.level;
@@ -56,8 +84,15 @@ public class ConnectionBlock implements IContainerSelection {
 		this.types = other.types != null ? new HashSet<>(other.types) : new HashSet<>();
 		this.id = other.id;
 		this.sleeping = other.sleeping;
+		this.slotIndex = other.slotIndex;
+		this.cardStack = other.cardStack != null ? other.cardStack.copy() : ItemStack.EMPTY;
+		this.direction = other.direction;
 	}
 
+	public @Nullable Direction getDirection() {
+	    return direction;
+	}
+	
 	public BlockPos getBlockPos() {
 		return blockPos;
 	}
@@ -86,19 +121,18 @@ public class ConnectionBlock implements IContainerSelection {
 		return this.types;
 	}
 
-	/**
-	 * Registers a dynamically allocated BlockCapabilityCache under its capability
-	 * registry ID and side context [3].
-	 */
+	public int getSlotIndex() {
+		return slotIndex;
+	}
+
+	public ItemStack getCardStack() {
+		return cardStack;
+	}
+
 	public void registerCache(ResourceLocation capId, @Nullable Direction side, BlockCapabilityCache<?, Direction> cache) {
 		this.capabilityCaches.put(new SidedCacheKey(capId, side), cache);
 	}
 
-	/**
-	 * Safely retrieves an active capability handler, utilizing the dynamic caches
-	 * on demand with automatic single-threaded level lookups as an invalidation
-	 * fallback [3].
-	 */
 	@SuppressWarnings("unchecked")
 	public @Nullable <T> T getHandler(ResourceLocation capId, Class<T> clazz, @Nullable Direction side) {
 		if (this.sleeping) {
@@ -113,12 +147,10 @@ public class ConnectionBlock implements IContainerSelection {
 					return clazz.cast(handler);
 				}
 			} catch (IllegalStateException e) {
-				// Fallback dynamically if the cache is temporarily invalidated [3]
+				// Fallback dynamically if the cache is temporarily invalidated
 			}
 		}
 
-		// Live lookup fallback for dynamically loaded components and special capability
-		// bridges [3]
 		var flowCap = FlowCapabilityRegistry.get(capId);
 		if (flowCap != null && flowCap.getCapability() != null && this.level != null) {
 			Object handler = this.level.getCapability((BlockCapability<Object, Direction>) flowCap.getCapability(),
@@ -144,9 +176,35 @@ public class ConnectionBlock implements IContainerSelection {
 	}
 
 	/**
-	 * Resolves the localized display name of this block coordinate safely and
-	 * appends coordinates [3].
+	 * Generates a clean multi-line tooltip display.
 	 */
+	public List<Component> getMultiLineTooltip(Level level) {
+		List<Component> list = new ArrayList<>();
+
+		// Line 1: Block Name or Card Name [3]
+		Component blockName = Component.literal("Unknown Block");
+		if (this.slotIndex >= 0 && !this.cardStack.isEmpty()) {
+			blockName = this.cardStack.getHoverName();
+		} else if (level != null) {
+			BlockState state = level.getBlockState(this.blockPos);
+			if (!state.isAir()) {
+				blockName = state.getBlock().getName();
+			}
+		}
+		list.add(blockName.copy().withStyle(ChatFormatting.WHITE));
+
+		// Line 2: Position coordinates [3]
+		list.add(Component.literal("Position: " + this.blockPos.getX() + ", " + this.blockPos.getY() + ", " + this.blockPos.getZ())
+				.withStyle(ChatFormatting.GRAY));
+
+	    // Line 3: Use the stored direction field directly [3]
+	    if (this.direction != null) {
+	        list.add(Component.literal("Direction: " + this.direction.name().toUpperCase(Locale.ROOT))
+	                .withStyle(ChatFormatting.AQUA));
+	    }
+	    return list;
+	}
+
 	public Component getDisplayName(Level level) {
 		Component baseName;
 		if (level != null) {

@@ -18,7 +18,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Settings overlay enabling visual configuration of energy input and output blocks [3].
+ * Settings overlay enabling visual configuration of energy input and output blocks.
  */
 @OnlyIn(Dist.CLIENT)
 public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
@@ -40,7 +40,7 @@ public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
 						: null,
 				component.getId()));
 
-		// Height increased from 160 to 210 to prevent projection overflow [3]
+		// Height increased from 160 to 210 to prevent projection overflow
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 210,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
 				face -> sideSupportsEnergy(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
@@ -53,7 +53,7 @@ public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"),
 				parentScreen, newInv -> {
-					component.setActiveSidesMask(0); // Reset side selection mask to 0 [3]
+					component.setActiveSidesMask(0); // Reset side selection mask to 0
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
 					}
@@ -81,6 +81,13 @@ public class EnergyTransferSettingsOverlay extends NodeSettingsOverlay {
 		if (level == null || pos == null) {
 			return false;
 		}
+		
+		// If targeting a cluster card, support only the card's active direction face
+		ConnectionBlock inv = getSelectedInventory();
+		if (inv != null && inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
 		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
 		if (flowCap != null) {
 			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);

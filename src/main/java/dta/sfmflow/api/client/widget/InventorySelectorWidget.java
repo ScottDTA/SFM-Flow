@@ -23,7 +23,7 @@ import java.util.function.Predicate;
 
 /**
  * Reusable side-scrolling UI selector list allowing users to find, search, and
- * select target blocks matching a specific capability registry key [3].
+ * select target blocks matching a specific capability registry key.
  */
 @OnlyIn(Dist.CLIENT)
 public class InventorySelectorWidget extends AbstractFlowWidget {
@@ -50,7 +50,7 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 		this.onSelected = onSelected;
 		this.filter = filter;
 
-		// Initialize local search box [3]
+		// Initialize local search box
 		this.searchEdit = new EditBox(parentScreen.getFont(), getX(), getY() + 12, 260, 14,
 				Component.literal("Search"));
 		this.searchEdit.setHint(Component.literal("Search inventories..."));
@@ -64,7 +64,7 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 		List<ConnectionBlock> filtered = new ArrayList<>();
 		for (ConnectionBlock inv : list) {
-			// Pre-filter by our target capability type and dynamic block state filters [3]
+			// Pre-filter by our target capability type and dynamic block state filters
 			if (inv.getTypes().contains(capabilityType) && (this.filter == null || this.filter.test(inv))) {
 				String name = inv.getDisplayName(level).getString().toLowerCase(Locale.ROOT);
 				if (query.isEmpty() || name.contains(query)) {
@@ -83,12 +83,12 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
-				this.setFocused(child); // Fix: Set focused child on click so key events propagate [3]
+				this.setFocused(child); // Fix: Set focused child on click so key events propagate
 				return true;
 			}
 		}
 
-		// Check selection click on container block icons [3]
+		// Check selection click on container block icons
 		int listX = getX();
 		int listY = getY() + 30;
 
@@ -128,11 +128,11 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Render section header [3]
+		// Render section header
 		guiGraphics.drawString(parentScreen.getFont(), Component.literal("Search Inventories:"), getX(), getY(),
 				0xFF404040, false);
 
-		// Render the search box child [3]
+		// Render the search box child
 		for (GuiEventListener child : children) {
 			if (child instanceof AbstractFlowWidget widget) {
 				widget.visible = this.visible;
@@ -147,7 +147,7 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 		int listX = getX();
 		int listY = getY() + 30;
 
-		// Apply hardware scissors mask around selection row [3]
+		// Apply hardware scissors mask around selection row
 		guiGraphics.enableScissor(listX, listY, listX + 260, listY + 18);
 
 		for (int i = 0; i < filtered.size(); i++) {
@@ -160,19 +160,26 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			int border = isSelected ? 0xFF39FF14 : (hovered ? 0xFF8B8B8B : 0xFF434343);
 			guiGraphics.renderOutline(cardX, listY, 18, 18, border);
 
-			BlockState state = level.getBlockState(inv.getBlockPos());
-			ItemStack blockStack = new ItemStack(state.getBlock().asItem());
+			// Render the Card's icon instead of the Cluster block
+			ItemStack blockStack;
+			if (inv.getSlotIndex() >= 0 && !inv.getCardStack().isEmpty()) {
+				blockStack = inv.getCardStack();
+			} else {
+				BlockState state = level.getBlockState(inv.getBlockPos());
+				blockStack = new ItemStack(state.getBlock().asItem());
+			}
+
 			if (!blockStack.isEmpty()) {
 				guiGraphics.renderItem(blockStack, cardX + 1, listY + 1);
 			}
 		}
 
-		// Flush deferred item renders inside the scissor mask bounds [3]
+		// Flush deferred item renders inside the scissor mask bounds
 		guiGraphics.flush();
 
 		guiGraphics.disableScissor();
 
-		// Render horizontal scrollbar if elements exceed viewport boundaries [3]
+		// Render horizontal scrollbar if elements exceed viewport boundaries
 		int maxScrollX = Math.max(0, filtered.size() * 20 - 260);
 		if (maxScrollX > 0) {
 			int scrollbarY = listY + 20;
@@ -185,16 +192,17 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			guiGraphics.fill(thumbX, scrollbarY, thumbX + thumbWidth, scrollbarY + 2, 0xFF8B8B8B);
 		}
 
-		// Tooltip rendering pass for block icons [3]
-		if (mouseX >= listX && mouseX < listX + 260 && mouseY >= listY && mouseY < listY + 18) {
-			for (int i = 0; i < filtered.size(); i++) {
-				ConnectionBlock inv = filtered.get(i);
-				int cardX = listX + i * 20 - (int) scrollX;
-				if (mouseX >= cardX && mouseX < cardX + 18) {
-					guiGraphics.renderTooltip(parentScreen.getFont(), inv.getDisplayName(level), mouseX, mouseY);
+		// Tooltip rendering pass for block icons
+				if (mouseX >= listX && mouseX < listX + 260 && mouseY >= listY && mouseY < listY + 18) {
+					for (int i = 0; i < filtered.size(); i++) {
+						ConnectionBlock inv = filtered.get(i);
+						int cardX = listX + i * 20 - (int) scrollX;
+						if (mouseX >= cardX && mouseX < cardX + 18) {
+							// Draw multi-line tooltips using GuiGraphics component lists
+							guiGraphics.renderComponentTooltip(parentScreen.getFont(), inv.getMultiLineTooltip(level), mouseX, mouseY);
+						}
+					}
 				}
-			}
-		}
 	}
 
 	@Override

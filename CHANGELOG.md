@@ -1,7 +1,10 @@
 7-14-2026
 
 
+
 ### [Added]
+* Added detailed, multi-line tooltips inside the inventory selection panel that list the targeted container's name, coordinates, and active direction.
+* Added native card icon rendering in the inventory selection bar, displaying the exact card installed (e.g., Vacuum or Ejector Valve) rather than a generic Cable Cluster block.
 * Added the **Redstone Conditional** logic component, allowing you to branch flowchart execution depending on analog redstone signal strengths of connected blocks.
 * Added support for dual-output execution terminals (Output 0 for True, Output 1 for False) on the new Redstone Conditional component.
 * Added a settings panel allowing you to configure the evaluation mode between ALL (AND) and ANY (OR) active faces.
@@ -10,10 +13,13 @@
 * Added English localization entries for the new Redstone Conditional component.
 
 ### [Changed]
-* None.
+* Improved Cable Cluster integration by segmenting each slot card into its own logical inventory entry, allowing you to target specific cards inside a cluster independently.
+* Updated settings overlays to restrict 3D block preview face selections strictly to the face matching the targeted card's active directional side.
 
 ### [Fixed]
-* None.
+* Fixed an issue where changing card items or directional faces inside a Cable Cluster failed to notify the system, ensuring instant cable network rescans on modification.
+* Fixed Cable Cluster configurations (including card stacks, slot indices, and directions) resetting or failing to persist across world saves and reloads.
+* Fixed logical check leakages inside shared Cable Clusters by restricting transfer and conditional planners strictly to the targeted card's slot index.
 
 ### [Removed]
 * None.

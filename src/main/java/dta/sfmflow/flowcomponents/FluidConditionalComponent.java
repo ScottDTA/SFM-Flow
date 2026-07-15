@@ -167,7 +167,7 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 		this.hasInputNodes = true;
 		this.numInputs = 1;
 		this.hasOutputNodes = true;
-		this.numOutputs = 2; // 0 = True, 1 = False
+		this.numOutputs = 2; // Output 0 = True, Output 1 = False
 		for (int i = 0; i < 12; i++) {
 			this.filterItems.add(ItemStack.EMPTY);
 			this.filterLimits.add(-1);
@@ -310,9 +310,14 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 	}
 
 	@Override
+	public boolean renderAsFluid() {
+		return true; // Decoupled fluid rendering hook
+	}
+
+	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // True = Output 0, False = Output 1
+		int targetOutputIdx = isMet ? 0 : 1; // Output 0 = True, Output 1 = False
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -345,13 +350,20 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 			activeSides.add(null);
 		}
 
-		// Pull current fluids safely from the thread-safe snapshot
+		// Restrict tank index scans strictly to targeted cluster card
+		int allowedSlot = targetBlock.getSlotIndex();
+
+		// Gather all fluids safely from the thread-safe snapshot
 		List<FluidStack> inventoryFluids = new ArrayList<>();
 		for (Direction side : activeSides) {
 			var inv = context.getSnapshot().getFluidInventory(targetPos, side);
 			if (inv != null) {
 				for (var entry : inv.tanks().entrySet()) {
-					if (isSlotEnabled(side, entry.getKey())) {
+					int tankIdx = entry.getKey();
+					if (allowedSlot != -1 && tankIdx != allowedSlot) {
+						continue;
+					}
+					if (isSlotEnabled(side, tankIdx)) {
 						inventoryFluids.add(entry.getValue().stack());
 					}
 				}
@@ -381,7 +393,7 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 						targetQty = !filterFluid.isEmpty() ? filterFluid.getAmount() : 1000;
 					}
 
-					// If this filter item is a Variable Card, resolve its actual custom quantity
+					// If this filter item is a Variable Card, resolve its actual custom quantity 
 					if (filter.getItem() == ModItems.VARIABLE_CARD.get()) {
 						CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 						if (tag.contains("VariableId")) {
@@ -400,7 +412,7 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 			}
 		}
 
-		// Wildcard Check (Empty Filters / Empty Whitelist)
+		// Wildcard Check (Empty Filters / Empty Whitelist) 
 		if (!hasFilters) {
 			int totalCount = 0;
 			for (FluidStack stack : inventoryFluids) {
@@ -641,10 +653,5 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 			}
 			return total;
 		}
-	}
-	
-	@Override
-	public boolean renderAsFluid() {
-		return true;
 	}
 }

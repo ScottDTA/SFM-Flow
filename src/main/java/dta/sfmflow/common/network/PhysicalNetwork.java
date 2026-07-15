@@ -7,13 +7,16 @@ import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.util.ConnectionBlock;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 
@@ -49,7 +52,7 @@ public class PhysicalNetwork {
 	 * @param chunkPacked packed long representation
 	 */
 	public void handleChunkUnload(long chunkPacked) {
-		it.unimi.dsi.fastutil.ints.IntArrayList nodesInChunk = this.networkMap.getNodesInChunk(chunkPacked);
+		IntArrayList nodesInChunk = this.networkMap.getNodesInChunk(chunkPacked);
 		if (nodesInChunk != null) {
 			for (int i = 0; i < nodesInChunk.size(); i++) {
 				int nodeId = nodesInChunk.getInt(i);
@@ -93,8 +96,7 @@ public class PhysicalNetwork {
 	private void performScan(Level level, BlockPos startPos) {
 		long startTime = System.nanoTime();
 
-		// Cleanly unregister previously scanned cables to prevent stale dangling
-		// pointer leaks
+		// Cleanly unregister previously scanned cables to prevent stale dangling pointer leaks
 		for (BlockPos oldCable : this.scannedCables) {
 			CableNetworkRegistry.unregisterCable(level, oldCable);
 		}
@@ -125,7 +127,7 @@ public class PhysicalNetwork {
 
 				queue.add(new ScanNode(adjacent, 1));
 
-				// Evaluate any functional cable that has a block entity or redstone tag
+				// Evaluate any functional cable that has a block entity or redstone tag 
 				if (state.is(ModTags.REDSTONE_CABLES) || level.getBlockEntity(adjacent) != null) {
 					evaluateAndAddInventory(level, adjacent, state, 1, visited, true);
 				}
@@ -209,6 +211,57 @@ public class PhysicalNetwork {
 		}
 
 		BlockEntity be = level.getBlockEntity(pos);
+
+		// If the block is a Cable Cluster, index and add each active card independently
+		if (be instanceof CableClusterBlockEntity cluster) {
+			int numSlots = cluster.getNumSlots();
+			for (int slotIndex = 0; slotIndex < numSlots; slotIndex++) {
+				ItemStack card = cluster.getInventory().getStackInSlot(slotIndex);
+				if (card.isEmpty()) {
+					continue;
+				}
+
+				Set<ResourceLocation> cardCaps = new HashSet<>();
+				if (cluster.isItemCard(slotIndex)) {
+					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"));
+				} else if (cluster.isFluidCard(slotIndex)) {
+					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
+				}
+
+				// Map redstone emitter/receiver cards
+				if (card.is(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem()) ||
+						card.is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem())) {
+					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
+				}
+
+				if (!cardCaps.isEmpty()) {
+					Direction cardDir = cluster.getSlotDirection(slotIndex);
+					ConnectionBlock connection = new ConnectionBlock(level, pos, depth, slotIndex, card.copy(), cardDir);
+					connection.setTypes(cardCaps);
+					connection.setId(Objects.hash(pos, slotIndex));
+
+					if (level instanceof ServerLevel serverLevel) {
+						for (ResourceLocation capId : cardCaps) {
+							var flowCap = FlowCapabilityRegistry.get(capId);
+							if (flowCap != null && flowCap.getCapability() != null) {
+								var nullCache = BlockCapabilityCache.create(
+										(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, null);
+								connection.registerCache(capId, null, nullCache);
+
+								for (Direction dir : Direction.values()) {
+									var dirCache = BlockCapabilityCache.create(
+											(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, dir);
+									connection.registerCache(capId, dir, dirCache);
+								}
+							}
+						}
+					}
+					this.scannedInventories.add(connection);
+				}
+			}
+			return; // Skip adding the Cable Cluster block itself
+		}
+
 		Set<ResourceLocation> discoveredTypes = new HashSet<>();
 
 		// Query dynamically registered capabilities in our FlowCapabilityRegistry
@@ -229,7 +282,14 @@ public class PhysicalNetwork {
 		}
 
 		if (!discoveredTypes.isEmpty()) {
-			ConnectionBlock connection = new ConnectionBlock(level, pos, depth);
+			Direction blockDir = null;
+			if (state.hasProperty(BlockStateProperties.FACING)) {
+				blockDir = state.getValue(BlockStateProperties.FACING);
+			} else if (state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
+				blockDir = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+			}
+
+			ConnectionBlock connection = new ConnectionBlock(level, pos, depth, -1, ItemStack.EMPTY, blockDir);
 			connection.setTypes(discoveredTypes);
 
 			if (level instanceof ServerLevel serverLevel) {
@@ -238,7 +298,7 @@ public class PhysicalNetwork {
 				for (ResourceLocation capId : discoveredTypes) {
 					var flowCap = FlowCapabilityRegistry.get(capId);
 					if (flowCap != null && flowCap.getCapability() != null) {
-						// Register non-directional cache
+						// Register non-directional cache [3]
 						var nullCache = BlockCapabilityCache.create(
 								(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, null);
 						connection.registerCache(capId, null, nullCache);
@@ -254,8 +314,7 @@ public class PhysicalNetwork {
 				}
 			}
 
-			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent
-			// binding drift
+			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent binding drift
 			connection.setId(pos.hashCode());
 
 			this.scannedInventories.add(connection);
