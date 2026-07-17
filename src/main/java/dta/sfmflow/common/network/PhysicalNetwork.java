@@ -277,6 +277,13 @@ public class PhysicalNetwork {
 			discoveredTypes.add(redstoneCapId);
 			this.networkMap.indexCapability(redstoneCapId, posId);
 		}
+		
+		// Explicitly check for Sculk Trigger Cable blocks [3]
+				if (state.is(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get())) {
+					ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
+					discoveredTypes.add(sculkCapId);
+					this.networkMap.indexCapability(sculkCapId, posId);
+				}
 
 		if (!discoveredTypes.isEmpty()) {
 			Direction blockDir = null;

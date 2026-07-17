@@ -82,5 +82,18 @@ ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_VACUUM_VALVE_BLO
 				.pattern("DKD").pattern("HDH").define('K', ModBlocks.CABLE_CLUSTER_BLOCK.get())
 				.define('H', ModBlocks.HARDENED_CABLE_BLOCK.get()).define('D', Items.DIAMOND)
 				.unlockedBy("has_cluster", has(ModBlocks.CABLE_CLUSTER_BLOCK.get())).save(recipeOutput);
+		
+		// Sculk Trigger Cable shaped crafting recipe [3]
+				ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), 1)
+						.pattern("IAI")
+						.pattern("CSC")
+						.pattern("III")
+						.define('C', ModBlocks.CABLE_BLOCK.get())
+						.define('I', Items.IRON_INGOT)
+						.define('S', Blocks.SCULK_SENSOR) // Acoustic detection [3]
+						.define('A', Items.AMETHYST_SHARD) // Calibrated directional shielding [3]
+						.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get()))
+						.save(recipeOutput);
+		
 	}
 }

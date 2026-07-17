@@ -55,6 +55,12 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.fluid_conditional", "Fluid Conditional");
 		add("gui.sfmflow.energy_conditional", "Energy Conditional");
 		add("gui.sfmflow.redstone_conditional", "Redstone Conditional");
+		add("gui.sfmflow.splitter", "Splitter");
+		add("gui.sfmflow.collector", "Collector");
+		add("gui.sfmflow.sculk_trigger", "Sculk Trigger");
+		
+		add("block.sfmflow.sculk_trigger_cable_block", "Sculk Trigger Cable");
+		add("gui.sfmflow.sculk_trigger", "Sculk Trigger");
 		
 		add("gui.sfmflow.observer_trigger", "Observer Trigger");
 		
@@ -226,7 +232,11 @@ public class ModLanguageProvider extends LanguageProvider {
 
 		add("sfmflow.configuration.yellow", "Yellow");
 		add("sfmflow.configuration.yellow.button", "Yellow Settings");
-		add("sfmflow.configuration.yellow.tooltip", "Custom color overrides for the yellow mask.");
+		add("sfmflow.configuration.yellow.tooltip", "Custom color overrides for the yellow mask.");		
+		
+		add("sfmflow.configuration.maxChainedSplitters", "Max Chained Splitters");
+		add("sfmflow.configuration.maxChainedSplitters.tooltip", "The maximum number of consecutive Splitter components that can be chained together in a single execution path to prevent server budget starvation.");
+		add("gui.sfmflow.error.splitter_chain_limit", "Consecutive splitter limit exceeded! Max allowed chained splitters: %s");		
 
 		// Slot Layout entries
 		add("gui.sfmflow.error.slot_not_accessible", "Slot not accessible on selected side");

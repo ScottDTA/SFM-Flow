@@ -28,6 +28,7 @@ import dta.sfmflow.api.variable.ItemFilterVariable;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.common.network.PhysicalNetwork;
 import dta.sfmflow.common.network.PhysicalNetworkMap;
+import dta.sfmflow.common.network.SculkEventListener;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
@@ -271,6 +272,9 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
 			if (scanned) {
 				this.setChanged();
+				
+				// Rebuild sculk listener coordinates after a network rescan
+				SculkEventListener.rebuildManagerListeners(this);
 			}
 		}
 	}
@@ -311,6 +315,9 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			}
 			this.isTriggerCacheDirty = true; // Mark dirty on block load
 			updateInventories();
+			
+			// Register our sculk listeners upon load
+			SculkEventListener.rebuildManagerListeners(this);
 		}
 	}
 
@@ -344,12 +351,18 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void onChunkUnloaded() {
 		super.onChunkUnloaded();
 		ACTIVE_MANAGERS.remove(this);
+		
+		// Cleanly evict active listeners
+		SculkEventListener.rebuildManagerListeners(this);
 	}
 
 	@Override
 	public void setRemoved() {
 		super.setRemoved();
 		ACTIVE_MANAGERS.remove(this);
+		
+		// Cleanly evict active listeners
+		SculkEventListener.rebuildManagerListeners(this);
 	}
 
 	@Override

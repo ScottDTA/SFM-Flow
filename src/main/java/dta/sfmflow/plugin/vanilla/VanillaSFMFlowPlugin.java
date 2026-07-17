@@ -1,6 +1,7 @@
 package dta.sfmflow.plugin.vanilla;
 
 import dta.sfmflow.api.NodeCategory;
+import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.compat.MekanismCompat;
@@ -14,9 +15,11 @@ import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.block.FluidVacuumValveBlock;
 import dta.sfmflow.block.ItemVacuumValveBlock;
 import dta.sfmflow.block.ModBlocks;
+import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
@@ -24,6 +27,8 @@ import dta.sfmflow.flowcomponents.ItemConditionalComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
+import dta.sfmflow.flowcomponents.SculkTriggerComponent;
+import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
@@ -76,6 +81,9 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_CONDITIONAL;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_CONDITIONAL;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_CONDITIONAL;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> SPLITTER;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> COLLECTOR;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> SCULK_TRIGGER;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -85,6 +93,10 @@ public class VanillaSFMFlowPlugin {
 		registerChemicalCapability();
 		registerRedstoneCapability();
 		registerCauldronBridges();
+		
+		ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
+		FlowCapabilityRegistry.register(new FlowCapability<>(sculkCapId, null, "gui.sfmflow.type_sculk"));
+		
 
 		INTERVAL_TRIGGER = FlowComponentBuilder.create("interval_trigger", IntervalTriggerComponent::new)
 				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/interval_trigger_button.png")
@@ -162,6 +174,46 @@ public class VanillaSFMFlowPlugin {
 				.displayName("gui.sfmflow.redstone_conditional")
 				.codec(RedstoneConditionalComponent.CODEC)
 				.build(registry);
+		
+		SPLITTER = FlowComponentBuilder.create("splitter", SplitterComponent::new)
+				.category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/flow_control_button.png") // Reuses default flow control button
+				.displayName("gui.sfmflow.splitter")
+				.codec(SplitterComponent.CODEC)
+				.build(registry);
+		
+		COLLECTOR = FlowComponentBuilder.create("collector", CollectorComponent::new)
+				.category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/flow_control_button.png") // Reuses default flow control button
+				.displayName("gui.sfmflow.collector")
+				.codec(CollectorComponent.CODEC)
+				.build(registry);
+		
+		SCULK_TRIGGER = FlowComponentBuilder.create("sculk_trigger", SculkTriggerComponent::new)
+				.category(NodeCategory.TRIGGER)
+				.icon("textures/gui/menu_buttons/trigger_button.png") // Reuses default trigger button icon [3]
+				.displayName("gui.sfmflow.sculk_trigger")
+				.codec(SculkTriggerComponent.CODEC)
+				.build(registry);
+		
+		// Synchronizes Round-Robin indices from background worker sweeps back to main thread block entities [3]
+		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_sync"),
+				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+					if (params instanceof SplitterComponent.SplitterSyncParams task) {
+						for (ManagerBlockEntity manager : ManagerBlockEntity.getActiveManagers()) {
+							if (manager.getLevel() == level) {
+								AbstractFlowComponent comp = manager.getFlowComponents().get(task.componentId());
+								if (comp instanceof SplitterComponent splitter) {
+									splitter.setLastOutputIndex(task.nextIndex());
+									manager.setChanged();
+									return true;
+								}
+							}
+						}
+					}
+					return false;
+				});
+		
 		
 		
 	}

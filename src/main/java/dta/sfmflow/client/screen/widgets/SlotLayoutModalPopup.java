@@ -175,7 +175,7 @@ public class SlotLayoutModalPopup extends AbstractModalPopup {
 			}
 		}
 
-		// Dispatch the exact, verified capability ID over the packet handshake [3]
+		// Dispatch the exact, verified capability ID over the packet handshake
 		PacketDistributor.sendToServer(new RequestInventorySlotsPacket(this.blockPos, this.side, this.capabilityId));
 	}
 

@@ -2,11 +2,13 @@ package dta.sfmflow.plugin.vanilla;
 
 import dta.sfmflow.api.client.FlowOverlayRegistry;
 import dta.sfmflow.api.client.SideConfigPopupRegistry;
+import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.DataComponentOverlayRegistry;
 import dta.sfmflow.api.client.WorkspaceValidatorRegistry;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.CollectorSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnergyConditionalSettingsOverlay;
@@ -24,9 +26,12 @@ import dta.sfmflow.client.screen.widgets.RedstoneEmitterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.SculkTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
+import dta.sfmflow.client.screen.widgets.SplitterSettingsOverlay;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
@@ -36,6 +41,8 @@ import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneConditionalComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
+import dta.sfmflow.flowcomponents.SculkTriggerComponent;
+import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import net.minecraft.core.component.DataComponents;
@@ -44,7 +51,9 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
+import java.util.ArrayDeque;
 import java.util.List;
+import java.util.Queue;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -183,6 +192,29 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SPLITTER.get(), (screen, component) -> {
+			if (component instanceof SplitterComponent splitter) {
+				return new SplitterSettingsOverlay(screen, splitter);
+			}
+			return null;
+		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.COLLECTOR.get(), (screen, component) -> {
+			if (component instanceof CollectorComponent collector) {
+				return new CollectorSettingsOverlay(screen, collector);
+			}
+			return null;
+		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SCULK_TRIGGER.get(), (screen, component) -> {
+			if (component instanceof SculkTriggerComponent trigger) {
+				return new SculkTriggerSettingsOverlay(screen, trigger);
+			}
+			return null;
+		});
+
+
 
 		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
@@ -485,6 +517,89 @@ public class VanillaSFMFlowClientPlugin {
 						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
 							return Component.translatable("gui.sfmflow.error.unbound_inventory");
 						}
+						return null;
+					}
+				});
+		
+		// Splitter Validator with Chain-Limit Checks [3]
+				WorkspaceValidatorRegistry.register(SplitterComponent.class,
+						new WorkspaceValidatorRegistry.INodeValidator<SplitterComponent>() {
+							@Override
+							public boolean hasError(ManagerScreen screen, SplitterComponent component) {
+								int maxAllowed = ServerConfig.MAX_CHAINED_SPLITTERS.get();
+								return getChainedSplitterDepth(screen, component) > maxAllowed;
+							}
+
+							@Override
+							public @Nullable Component getErrorTooltip(ManagerScreen screen, SplitterComponent component) {
+								int maxAllowed = ServerConfig.MAX_CHAINED_SPLITTERS.get();
+								if (getChainedSplitterDepth(screen, component) > maxAllowed) {
+									return Component.translatable("gui.sfmflow.error.splitter_chain_limit", maxAllowed);
+								}
+								return null;
+							}
+
+							private int getChainedSplitterDepth(ManagerScreen screen, SplitterComponent component) {
+								var components = screen.getMenu().getManagerBlockEntity().getFlowComponents();
+								var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
+
+								int maxDepth = 1;
+								Queue<SplitterPathNode> queue = new ArrayDeque<>();
+								queue.add(new SplitterPathNode(component.getId(), 1));
+
+								while (!queue.isEmpty()) {
+									SplitterPathNode current = queue.poll();
+									if (current.depth() > maxDepth) {
+										maxDepth = current.depth();
+									}
+
+									for (var conn : connections) {
+										if (conn.getTargetComponentId().equals(current.id())) {
+											UUID parentId = conn.getSourceComponentId();
+											var parentComp = components.get(parentId);
+											if (parentComp instanceof SplitterComponent) {
+												queue.add(new SplitterPathNode(parentId, current.depth() + 1));
+											}
+										}
+									}
+								}
+								return maxDepth;
+							}
+
+							class SplitterPathNode {
+								final UUID id;
+								final int depth;
+								SplitterPathNode(UUID id, int depth) {
+									this.id = id;
+									this.depth = depth;
+								}
+								int depth() { return depth; }
+								UUID id() { return id; }
+							}
+						});
+		
+		WorkspaceValidatorRegistry.register(CollectorComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<CollectorComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, CollectorComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, CollectorComponent component) {
+						return null;
+					}
+				});
+		
+		WorkspaceValidatorRegistry.register(SculkTriggerComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<SculkTriggerComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, SculkTriggerComponent component) {
+						return false; // Structurally valid in all states [3]
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, SculkTriggerComponent component) {
 						return null;
 					}
 				});

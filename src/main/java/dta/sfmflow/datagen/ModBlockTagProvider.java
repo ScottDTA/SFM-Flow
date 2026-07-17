@@ -35,6 +35,7 @@ public class ModBlockTagProvider extends BlockTagsProvider {
 				ModBlocks.OBSERVER_CABLE_BLOCK.get(), ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get(),
 				ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get(), ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(),
 				ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), ModBlocks.CABLE_CLUSTER_BLOCK.get(),
+				ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(),
 				ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
 
 		tag(ModTags.REDSTONE_CABLES).add(ModBlocks.REDSTONE_EMITTER_BLOCK.get(),

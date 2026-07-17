@@ -17,6 +17,7 @@ public class ServerConfig {
 	public static final ModConfigSpec.IntValue MAX_NESTED_GROUP_DEPTH;
 	public static final ModConfigSpec.BooleanValue ENABLE_DEBUG_LOGGING;
 	public static final ModConfigSpec.IntValue NETWORK_SCAN_COOLDOWN;
+	public static final ModConfigSpec.IntValue MAX_CHAINED_SPLITTERS;
 
 	/**
 	 * Maximum time budget (in microseconds) per Manager Block per tick to execute transfer tasks [3].
@@ -38,7 +39,6 @@ public class ServerConfig {
 				.translation("sfmflow.configuration.maxCableLength")
 				.defineInRange("maxCableLength", 128, 16, 512);
 
-		// Restored the default canvas limit to 512 nodes to match the hardcoded 1.7.10 limit [3]
 		MAX_COMPONENT_AMOUNT = BUILDER.comment("The maximum number of flow control components/nodes that can be placed on a single Manager layout canvas.")
 				.translation("sfmflow.configuration.maxComponentAmount")
 				.defineInRange("maxComponentAmount", 512, 10, 2048);
@@ -50,6 +50,10 @@ public class ServerConfig {
 		MAX_INTERVAL_TICKS = BUILDER.comment("The absolute maximum duration (in ticks) allowed for Interval Triggers.")
 				.translation("sfmflow.configuration.maxIntervalTicks")
 				.defineInRange("maxIntervalTicks", 72000, 20, 1000000);
+		
+		MAX_CHAINED_SPLITTERS = BUILDER.comment("The maximum number of consecutive Splitter components that can be chained together in a single execution path to prevent server budget starvation.")
+				.translation("sfmflow.configuration.maxChainedSplitters")
+				.defineInRange("maxChainedSplitters", 4, 1, 16);
 
 		MAX_NESTED_GROUP_DEPTH = BUILDER.comment("Maximum depth of nested group folders")
 				.translation("sfmflow.configuration.maxNestedGroupDepth")

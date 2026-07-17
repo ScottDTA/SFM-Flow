@@ -28,6 +28,7 @@ public class FlowchartPlanningTask {
 	private final Queue<UUID> evaluationQueue = new ArrayDeque<>();
 	private int nodesTraversed = 0;
 	private boolean completed = false;
+	private UUID activePlanningId = null;
 
 	private final Map<UUID, Map<ResourceLocation, Object>> pipelineBuffers = new HashMap<>();
 
@@ -55,6 +56,15 @@ public class FlowchartPlanningTask {
 		@Override
 		public void enqueue(UUID componentId) {
 			if (componentId != null) {
+				// Automated Splitter Chain Resetter [3]
+				if (activePlanningId != null) {
+					AbstractFlowComponent current = components.get(activePlanningId);
+					if (!(current instanceof dta.sfmflow.flowcomponents.SplitterComponent)) {
+						// Reset depth of target node to 0 if the source is not a splitter
+						ResourceLocation chainDepthKey = ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_chain_depth");
+						setPipelineBuffer(componentId, chainDepthKey, 0);
+					}
+				}
 				evaluationQueue.add(componentId);
 			}
 		}
@@ -114,7 +124,9 @@ public class FlowchartPlanningTask {
 			AbstractFlowComponent current = components.get(currentId);
 			if (current != null) {
 				nodesTraversed++;
+				this.activePlanningId = currentId; // Set active planning ID [3]
 				current.plan(this.planningContext);
+				this.activePlanningId = null; // Clear active planning ID after planning [3]
 			}
 		}
 		if (evaluationQueue.isEmpty()) {

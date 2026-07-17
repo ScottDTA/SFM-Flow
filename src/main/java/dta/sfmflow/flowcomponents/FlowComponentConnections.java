@@ -60,5 +60,39 @@ public class FlowComponentConnections {
 		int inputIdx = tag.getInt("InputIdx");
 		return new FlowComponentConnections(sourceId, outputIdx, targetId, inputIdx);
 	}
+	
+	/**
+	 * Checks if adding a connection from sourceId to targetId would create a loop/cycle [3].
+	 */
+	public static boolean wouldCreateCycle(java.util.List<FlowComponentConnections> connections, UUID sourceId, UUID targetId) {
+		if (sourceId.equals(targetId)) {
+			return true;
+		}
+
+		java.util.Queue<UUID> queue = new java.util.ArrayDeque<>();
+		java.util.Set<UUID> visited = new java.util.HashSet<>();
+
+		queue.add(targetId);
+		visited.add(targetId);
+
+		while (!queue.isEmpty()) {
+			UUID current = queue.poll();
+			if (current.equals(sourceId)) {
+				return true;
+			}
+
+			for (FlowComponentConnections conn : connections) {
+				if (conn.getSourceComponentId().equals(current)) {
+					UUID next = conn.getTargetComponentId();
+					if (!visited.contains(next)) {
+						visited.add(next);
+						queue.add(next);
+					}
+				}
+			}
+		}
+
+		return false;
+	}
 
 }

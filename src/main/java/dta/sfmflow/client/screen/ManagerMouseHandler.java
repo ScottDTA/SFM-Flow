@@ -6,6 +6,7 @@ import java.util.UUID;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
+import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
@@ -311,6 +312,16 @@ public class ManagerMouseHandler {
 				int outIdx = this.activeWiringSource.getPinIndex();
 				UUID tgtId = targetInput.getContainer().getComponent().getId();
 				int inIdx = targetInput.getPinIndex();
+
+				// Block circular loops on the client-side immediately [3]
+				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
+				if (FlowComponentConnections.wouldCreateCycle(connections, srcId, tgtId)) {
+					// Play a subtle failure click sound [3]
+					net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
+							net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.5F));
+					this.activeWiringSource = null;
+					return true;
+				}
 
 				PacketDistributor.sendToServer(new CreateConnectionPacket(
 						screen.getMenu().getManagerBlockEntity().getBlockPos(), srcId, outIdx, tgtId, inIdx));

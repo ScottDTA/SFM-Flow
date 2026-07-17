@@ -1,4 +1,25 @@
-7-15-2026
+7-16-2026
+
+### [Added]
+* Added the **Splitter** logic node, permitting execution paths to be routed to all output pins simultaneously, in a repeating Round-Robin sequence, or randomly to a single branch.
+* Added the **Collector** logic node, allowing up to 5 execution lines to be cleanly merged back into a single flowchart path.
+* Added the **Sculk Trigger** and **Sculk Trigger Cable** block, allowing flowchart loops to trigger in response to in-world acoustic events (e.g., footsteps, block placements, or projectile impacts).
+* Added face-specific acoustic shielding (muting individual faces) and keyword filters (e.g. "step", "break") to customize the Sculk Trigger listening profile.
+* Added a loop detection shield to both the client and server networking pipelines to block circular connection wiring that could lock up the path planner.
+* Added a modular slot layout registration framework (`ISlotLayoutSubProvider`), introducing custom layout overlays for Mekanism Basic Fluid Tanks.
+
+### [Changed]
+* Re-engineered settings saving to dynamically prune obsolete connection wires if a node's input or output pin count contracts (e.g., resizing a Splitter/Collector).
+
+### [Fixed]
+* Fixed a potential lag bottleneck during environmental vibrations by registering active sculk cables in a flat, fast-lookup server event cache.
+* Fixed splitter chain recursion starvation by capping consecutive splitters to a customizable maximum threshold.
+
+### [Removed]
+* None.
+
+
+7-15-2026 0.5.10.alpha
 
 ### [Added]
 * Added support for capability-specific slot layouts, allowing blocks that possess both fluid tanks and item inventories to show unique slot configuration layouts for each capability.

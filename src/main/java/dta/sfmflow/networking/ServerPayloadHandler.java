@@ -6,6 +6,7 @@ import java.util.Locale;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
+import dta.sfmflow.common.network.SculkEventListener;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.item.ModItems;
@@ -105,7 +106,40 @@ public class ServerPayloadHandler {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				AbstractFlowComponent component = manager.getFlowComponents().get(data.componentId());
 				if (component != null) {
+					// 1. Record the previous input/output counts before loading settings
+					int prevInputs = component.getNumInputs();
+					int prevOutputs = component.getNumOutputs();
+
 					component.loadData(data.settings());
+
+					// 2. Resolve the new input/output counts
+					int newInputs = component.getNumInputs();
+					int newOutputs = component.getNumOutputs();
+
+					boolean connectionsModified = false;
+
+					// 3. Prune invalid output connections if the output count shrunk
+					if (newOutputs < prevOutputs) {
+						int finalNewOutputs = newOutputs;
+						boolean removed = manager.getFlowConnections().removeIf(conn -> 
+							conn.getSourceComponentId().equals(component.getId()) && conn.getOutputNodeIndex() >= finalNewOutputs
+						);
+						if (removed) {
+							connectionsModified = true;
+						}
+					}
+
+					// 4. Prune invalid input connections if the input count shrunk [3]
+					if (newInputs < prevInputs) {
+						int finalNewInputs = newInputs;
+						boolean removed = manager.getFlowConnections().removeIf(conn -> 
+							conn.getTargetComponentId().equals(component.getId()) && conn.getInputNodeIndex() >= finalNewInputs
+						);
+						if (removed) {
+							connectionsModified = true;
+						}
+					}
+
 					manager.setDataDirty(true);
 					manager.setChanged();
 
@@ -119,6 +153,22 @@ public class ServerPayloadHandler {
 
 					manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), data.componentId(),
 							SyncComponentDeltaPacket.DeltaType.SETTINGS, data.settings()));
+					
+					// Rebuild sculk listener bounds on edits
+					SculkEventListener.rebuildManagerListeners(manager);
+
+					// 5. If we pruned any dangling connections, broadcast a full connection sync to clients
+					if (connectionsModified) {
+						CompoundTag connTag = new CompoundTag();
+						ListTag listTag = new ListTag();
+						for (var conn : manager.getFlowConnections()) {
+							CompoundTag cTag = new CompoundTag();
+							conn.save(cTag);
+							listTag.add(cTag);
+						}
+						connTag.put("connections", listTag);
+						manager.broadcastConnectionsUpdate(new SyncConnectionsPacket(manager.getBlockPos(), connTag));
+					}
 				}
 			}
 		});
@@ -137,6 +187,21 @@ public class ServerPayloadHandler {
 		context.enqueueWork(() -> {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				var connections = manager.getFlowConnections();
+
+				// Cycle Detection Shield: Block loop creation on the server [3]
+				if (FlowComponentConnections.wouldCreateCycle(connections, data.sourceId(), data.targetId())) {
+					// Send a sync packet to reset client connection state [3]
+					CompoundTag dataTag = new CompoundTag();
+					ListTag listTag = new ListTag();
+					for (var conn : connections) {
+						CompoundTag connTag = new CompoundTag();
+						conn.save(connTag);
+						listTag.add(connTag);
+					}
+					dataTag.put("connections", listTag);
+					manager.broadcastConnectionsUpdate(new SyncConnectionsPacket(manager.getBlockPos(), dataTag));
+					return;
+				}
 
 				connections.removeIf(conn -> (conn.getSourceComponentId().equals(data.sourceId())
 						&& conn.getOutputNodeIndex() == data.outputIdx())

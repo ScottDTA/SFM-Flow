@@ -3,6 +3,7 @@ package dta.sfmflow.block.entity;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.common.network.SculkEventListener;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import net.minecraft.nbt.CompoundTag;
@@ -11,7 +12,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.UUID;
 
 /**
- * Common, stateless helper consolidating flowchart canvas modification commands [3].
+ * Common, stateless helper consolidating flowchart canvas modification commands.
  */
 public final class CanvasActionHandler {
 
@@ -34,6 +35,9 @@ public final class CanvasActionHandler {
 
 		manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), componentId,
 				SyncComponentDeltaPacket.DeltaType.REMOVE, new CompoundTag()));
+		
+		// Rebuild sculk listeners on node deletions
+		SculkEventListener.rebuildManagerListeners(manager);
 	}
 
 	private static void handleCopy(ManagerBlockEntity manager, UUID componentId) {

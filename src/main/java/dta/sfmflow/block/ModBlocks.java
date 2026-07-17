@@ -70,6 +70,10 @@ public class ModBlocks {
 			"advanced_cable_cluster_block",
 			() -> new CableClusterBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+	
+	public static final DeferredBlock<Block> SCULK_TRIGGER_CABLE_BLOCK = registerBlock("sculk_trigger_cable_block",
+			() -> new SculkTriggerCableBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
 	private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
 		DeferredBlock<T> toReturn = BLOCKS.register(name, block);
