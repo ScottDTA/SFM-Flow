@@ -1,13 +1,19 @@
 7-18-2026
 
-
-
 ### [Added]
+* Added `AbstractTargetSettingsOverlay` and `AbstractFilterableTargetSettingsOverlay` client API classes to consolidate 3D block previews, target selectors, and 12-slot ghost item grids.
+* Added `AbstractTransferComponent` and `AbstractFilterableTransferComponent` common API classes to unify targeted slot configurations, whitelist states, and side configurations across all item, fluid, and energy transfer components.
+* Promoted base classes `AbstractModalPopup` and `NodeSettingsOverlay` to the public client-only API package (`dta.sfmflow.api.client.widget`), allowing add-on developers to design and register custom overlay panels and popups cleanly.
 * Added `AbstractConditionalComponent` and `AbstractFilterableConditionalComponent` public API classes to unify and consolidate block targeting, directional face, whitelist, and slot-exclusion configurations for all conditional logic nodes.
 * Added the `IRedstoneSidedConfigurable` public API interface, permitting any custom redstone logic or trigger component to use standard sided threshold configuration popups.
 * Added the **Snapshot Profile** system, which analyzes your active flowchart and restricts off-thread inventory snapshotting strictly to the blocks and capabilities being used.
 
 ### [Changed]
+* Refactored Item, Fluid, and Energy transfer settings overlays to inherit from the consolidated target settings overlay classes, eliminating redundant coordinate setups and saving routines.
+* Refactored Item, Fluid, and Energy transfer nodes to extend the new base hierarchies, successfully eliminating hundreds of lines of duplicate boilerplate variables and setters.
+* Simplified NBT saving and loading on all transfer components to inherit properties directly from parent class handlers.
+* Re-engineered the UI command counter inside the Manager block screen to query the actual size of the flowchart map dynamically, preventing numerical sync anomalies on the client.
+* Secured face-toggle interactions inside conditional nodes to guard against null directional inputs.
 * Refactored the Energy, Fluid, and Item Conditional components to inherit from the new consolidated base classes, drastically reducing duplicate code.
 * Simplified settings saving and loading routines on conditional nodes by delegating common property serialization to parent class handlers.
 * Hardened NBT loading routines for redstone trigger comparison operators, conditional operators, and splitter execution modes to support case-insensitive evaluations of saved values.
@@ -20,6 +26,7 @@
 * Simplified variable card definitions by migrating from MapCodecs to standard Codecs.
 
 ### [Fixed]
+* Fixed potential coordinate and variable desyncs when loading complex layouts by standardizing inherited NBT serialization patterns.
 * Fixed potential configuration loading bugs on older layout files by ensuring that saved enum string properties parse correctly regardless of capitalization.
 * Fixed potential loading bugs on older layout configurations by implementing strict, case-insensitive string parsing fallback maps for all component operator enums.
 * Fixed major server garbage collection (GC) lag spikes and tick-rate drops during larger network scans or frequent trigger checks.

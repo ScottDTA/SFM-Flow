@@ -3,6 +3,7 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.client.event.RegisterDropdownLinksEvent;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
+import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import net.minecraft.client.gui.GuiGraphics;

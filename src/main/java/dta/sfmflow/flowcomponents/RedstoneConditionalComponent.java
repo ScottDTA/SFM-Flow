@@ -23,6 +23,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 
 import java.util.ArrayList;
@@ -239,5 +240,13 @@ public class RedstoneConditionalComponent extends AbstractConditionalComponent i
 				}
 			}
 		}
+	}
+	
+	@Override
+	public Component getName() {
+		if (getCustomName() != null && !getCustomName().isEmpty()) {
+			return Component.literal(getCustomName());
+		}
+		return Component.translatable("gui.sfmflow.redstone_conditional");
 	}
 }

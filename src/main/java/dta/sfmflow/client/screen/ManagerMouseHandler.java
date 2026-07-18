@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
+import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.widgets.*;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;

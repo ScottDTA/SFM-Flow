@@ -1,9 +1,9 @@
 package dta.sfmflow.api.client;
 
+import dta.sfmflow.api.client.widget.AbstractModalPopup;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.component.ISlotConfigurable;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.client.screen.widgets.AbstractModalPopup;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

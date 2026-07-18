@@ -1,75 +1,36 @@
 package dta.sfmflow.client.screen.widgets;
 
-import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
-import dta.sfmflow.api.client.widget.InventorySelectorWidget;
 import dta.sfmflow.block.ModBlocks;
-
-import java.util.Locale;
-
+import dta.sfmflow.api.client.widget.AbstractTargetSettingsOverlay;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
-import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.network.PacketDistributor;
+import java.util.Locale;
 
+/**
+ * Settings overlay enabling visual configuration of Sculk Triggers.
+ */
 @OnlyIn(Dist.CLIENT)
-public class SculkTriggerSettingsOverlay extends NodeSettingsOverlay {
-	private final InventorySelectorWidget selectorWidget;
-	private final BlockPreview3DWidget previewWidget;
+public class SculkTriggerSettingsOverlay extends AbstractTargetSettingsOverlay {
 	private final RadiusSlider radiusSlider;
 	private final CooldownSlider cooldownSlider;
 
 	public SculkTriggerSettingsOverlay(ManagerScreen parentScreen, SculkTriggerComponent component) {
-		super(parentScreen, component);
-		this.width = 300;
-		this.height = 360;
-		this.setX((parentScreen.width - 300) / 2);
-		this.setY(parentScreen.getOverlayTargetY(this.height));
-
-		parentScreen.getMenu().setActiveComponent(component);
-		PacketDistributor.sendToServer(new SetActiveFilterComponentPacket(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId()));
-
-		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 150,
-				() -> getSelectedCable() != null ? getSelectedInventoryPos() : null, component, face -> true,
-				parentScreen, () -> {
-					parentScreen.getMenu().getManagerBlockEntity().setChanged();
-					sendSettingsUpdate();
-				});
-
-		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
-				ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk"), parentScreen, block -> {
-					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
-					if (level != null) {
-						return level.getBlockState(block.getBlockPos()).is(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get());
-					}
-					return true;
-				}, newInv -> {
-					component.setActiveSidesMask(63);
-					if (this.previewWidget != null) {
-						this.previewWidget.updateHighlightState();
-					}
-					parentScreen.getMenu().getManagerBlockEntity().setChanged();
-					sendSettingsUpdate();
-				});
+		super(parentScreen, component, ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk"), 360);
 
 		this.radiusSlider = new RadiusSlider(getX() + 20, getY() + 242, 260, 18, component, this);
-
 		this.cooldownSlider = new CooldownSlider(getX() + 20, getY() + 286, 260, 18, component, this);
 
-		this.children.add(this.previewWidget);
-		this.children.add(this.selectorWidget);
 		this.children.add(new ApiWidgetAdapter<>(this.radiusSlider));
 		this.children.add(new ApiWidgetAdapter<>(this.cooldownSlider));
 
@@ -79,29 +40,19 @@ public class SculkTriggerSettingsOverlay extends NodeSettingsOverlay {
 				Component.literal("Trigger Cooldown Configuration"), 0.75F, false, () -> 0xFF404040));
 	}
 
-	private ConnectionBlock getSelectedCable() {
-		int selectedId = ((SculkTriggerComponent) component).getInventoryId();
-		if (selectedId != -1) {
-			for (ConnectionBlock block : parentScreen.getMenu().getManagerBlockEntity().getInventories()) {
-				if (block.getId() == selectedId) {
-					return block;
-				}
-			}
+	@Override
+	protected boolean onInventoryFilter(ConnectionBlock block) {
+		// Sided Filter: Only show Sculk Trigger Cables in our selection list
+		Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
+		if (level != null) {
+			return level.getBlockState(block.getBlockPos()).is(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get());
 		}
-		return null;
-	}
-
-	private BlockPos getSelectedInventoryPos() {
-		ConnectionBlock inv = getSelectedCable();
-		return inv != null ? inv.getBlockPos() : null;
+		return true;
 	}
 
 	@Override
-	public void closeAndSave() {
-		parentScreen.getMenu().setActiveComponent(null);
-		PacketDistributor.sendToServer(
-				new SetActiveFilterComponentPacket(parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), null));
-		super.closeAndSave();
+	protected void onInventorySelected(ConnectionBlock newInv) {
+		((SculkTriggerComponent) component).setActiveSidesMask(63); // Default to all faces active on select
 	}
 
 	@OnlyIn(Dist.CLIENT)
@@ -148,7 +99,6 @@ public class SculkTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		@Override
 		public void playDownSound(SoundManager soundManager) {
-			// Silent scrolling
 		}
 	}
 
@@ -198,7 +148,6 @@ public class SculkTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		@Override
 		public void playDownSound(SoundManager soundManager) {
-			// Silent scrolling
 		}
 	}
 }

@@ -1,5 +1,6 @@
 package dta.sfmflow.client.screen.widgets;
 
+import dta.sfmflow.api.client.widget.AbstractModalPopup;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

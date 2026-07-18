@@ -1,7 +1,6 @@
-package dta.sfmflow.client.screen.widgets;
+package dta.sfmflow.api.client.widget;
 
 import dta.sfmflow.api.client.NineSliceUtil;
-import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;

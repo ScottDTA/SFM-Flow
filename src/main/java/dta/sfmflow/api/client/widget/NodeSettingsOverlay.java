@@ -1,10 +1,9 @@
-package dta.sfmflow.client.screen.widgets;
+package dta.sfmflow.api.client.widget;
 
 import org.jetbrains.annotations.Nullable;
 
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.client.NineSliceUtil;
-import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.client.screen.ManagerScreen;
@@ -28,7 +27,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  */
 @OnlyIn(Dist.CLIENT)
 public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
-	protected final ManagerScreen parentScreen;
+	public final ManagerScreen parentScreen;
 	protected final AbstractFlowComponent component;
 
 	private GuiEventListener focusedChild = null;

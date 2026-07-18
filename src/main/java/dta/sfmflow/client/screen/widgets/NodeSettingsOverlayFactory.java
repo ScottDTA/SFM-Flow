@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.client.FlowOverlayRegistry;
+import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.client.screen.ManagerScreen;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;

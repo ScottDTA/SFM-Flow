@@ -2,10 +2,11 @@ package dta.sfmflow.api.client;
 
 import java.util.HashMap;
 import java.util.Map;
+
+import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.client.screen.widgets.NodeSettingsOverlay;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 

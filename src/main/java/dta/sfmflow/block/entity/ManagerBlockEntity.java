@@ -82,7 +82,6 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private Flowchart flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 	protected final ContainerData data;
-	private int commandCount = 0;
 	private boolean needsRefresh = false;
 	private boolean isFirstTick = true;
 
@@ -129,15 +128,18 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public ManagerBlockEntity(BlockPos pos, BlockState blockState) {
 		super(ModBlockEntities.MANAGER_BE.get(), pos, blockState);
 
+		// Synchronize the size of our live components map dynamically [3]
 		data = new ContainerData() {
 			@Override
 			public int get(int index) {
-				return ManagerBlockEntity.this.commandCount;
+				return ManagerBlockEntity.this.getFlowComponents() != null 
+						? ManagerBlockEntity.this.getFlowComponents().size() 
+						: 0;
 			}
 
 			@Override
 			public void set(int index, int value) {
-				ManagerBlockEntity.this.commandCount = value;
+				// No-op: server state is the single source of truth for component counts [3]
 			}
 
 			@Override
@@ -422,7 +424,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			SFMFlow.LOGGER.error("Failed to load external flowchart data for manager: {}", this.managerId, e);
 			this.flowchart = new Flowchart(new HashMap<>(), new ArrayList<>());
 		}
-		this.commandCount = this.flowchart.components().size();
 		this.loadedExternal = true;
 	}
 
@@ -507,7 +508,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			this.isDataDirty = true;
 			this.isProfileDirty = true;
 			this.setChanged();
-			commandCount = flowchart.components().size();
 
 			CompoundTag tag = new CompoundTag();
 			newComponent.saveData(tag);
@@ -670,7 +670,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			}
 		}
 
-		commandCount = flowchart != null ? flowchart.components().size() : 0;
 		this.isTriggerCacheDirty = true;
 		this.isProfileDirty = true;
 		this.cachedFlowchartNbt = null; // Clear cached NBT on reload [3]

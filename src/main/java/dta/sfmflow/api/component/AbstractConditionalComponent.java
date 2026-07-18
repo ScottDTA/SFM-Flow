@@ -35,7 +35,9 @@ public abstract class AbstractConditionalComponent extends AbstractFlowComponent
 
 	@Override
 	public void toggleSide(Direction dir) {
-		activeSidesMask ^= (1 << dir.ordinal());
+		if (dir != null) {
+			activeSidesMask ^= (1 << dir.ordinal());
+		}
 	}
 
 	public int getActiveSidesMask() {

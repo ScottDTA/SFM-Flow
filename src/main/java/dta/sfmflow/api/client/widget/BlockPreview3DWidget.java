@@ -7,7 +7,6 @@ import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.Preview3DRenderer;
 import dta.sfmflow.client.render.SceneProjectionHelper; // Import added [3]
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.client.screen.widgets.AbstractModalPopup;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;

@@ -66,7 +66,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 	private transient long lastFrameTime = 0L;
 
 	public VariableDrawerWidget(ManagerScreen parentScreen, int x, int y, int width, int height) {
-		super(x, y, width, height, Component.literal("Variables Drawer"));
+		super(isDrawerOpen ? x : x - width, y, width, height, Component.literal("Variables Drawer"));
 		this.parentScreen = parentScreen;
 
 		this.searchEdit = new EditBox(parentScreen.getFont(), getX() + 4, getY() + 6, width - 11, 12,
@@ -215,15 +215,15 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 				HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT);
 
 		guiGraphics.pose().pushPose();
-		int textWidth = parentScreen.getFont().width("Item Vars");
+		int textWidth = parentScreen.getFont().width("Variables");
 		int fontHeight = parentScreen.getFont().lineHeight;
 
-		float textX = (getX() + width) + (HANDLE_TEX_WIDTH + fontHeight) / 2.0F;
+		float textX = (getX() + width - 1) + (HANDLE_TEX_WIDTH + fontHeight) / 2.0F;
 		float textY = (getY() - 1) + (HANDLE_TEX_HEIGHT - textWidth) / 2.0F;
 
 		guiGraphics.pose().translate(textX, textY, 0.0F);
 		guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(90.0F));
-		guiGraphics.drawString(parentScreen.getFont(), "Item/Fluid Vars", 0, 0, 0xFF404040, false);
+		guiGraphics.drawString(parentScreen.getFont(), "Variables", 0, 0, 0xFF404040, false);
 		guiGraphics.pose().popPose();
 
 		this.searchEdit.setX(getX() + 4);

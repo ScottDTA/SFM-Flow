@@ -1,6 +1,7 @@
 package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
+import dta.sfmflow.api.client.widget.AbstractModalPopup;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;

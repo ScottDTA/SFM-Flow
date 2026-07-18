@@ -1,6 +1,7 @@
 package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.layout.SlotLayout;
+import dta.sfmflow.api.client.widget.AbstractModalPopup;
 import dta.sfmflow.api.client.layout.SlotEntry;
 import dta.sfmflow.api.client.layout.LayoutKey;
 import dta.sfmflow.SFMFlow;

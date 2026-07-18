@@ -20,6 +20,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.item.ItemStack;
@@ -399,5 +400,13 @@ public class FluidConditionalComponent extends AbstractFilterableConditionalComp
 			}
 			return total;
 		}
+	}
+	
+	@Override
+	public Component getName() {
+		if (getCustomName() != null && !getCustomName().isEmpty()) {
+			return Component.literal(getCustomName());
+		}
+		return Component.translatable("gui.sfmflow.fluid_conditional");
 	}
 }

@@ -1,7 +1,7 @@
 package dta.sfmflow.api.client;
 
+import dta.sfmflow.api.client.widget.AbstractModalPopup;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.client.screen.widgets.AbstractModalPopup;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;

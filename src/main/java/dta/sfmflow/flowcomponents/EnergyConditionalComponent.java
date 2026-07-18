@@ -16,6 +16,7 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.util.StringRepresentable;
 
@@ -196,5 +197,13 @@ public class EnergyConditionalComponent extends AbstractConditionalComponent {
 		if (compoundTag.contains("threshold")) {
 			this.threshold = compoundTag.getInt("threshold");
 		}
+	}
+	
+	@Override
+	public Component getName() {
+		if (getCustomName() != null && !getCustomName().isEmpty()) {
+			return Component.literal(getCustomName());
+		}
+		return Component.translatable("gui.sfmflow.energy_conditional");
 	}
 }

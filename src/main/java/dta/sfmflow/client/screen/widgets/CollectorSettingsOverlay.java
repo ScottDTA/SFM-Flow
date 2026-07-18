@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
+import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.CollectorComponent;
 import net.minecraft.client.gui.components.AbstractSliderButton;
