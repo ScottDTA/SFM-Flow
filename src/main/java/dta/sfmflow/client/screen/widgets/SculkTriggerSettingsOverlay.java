@@ -10,13 +10,11 @@ import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
-import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -96,13 +94,6 @@ public class SculkTriggerSettingsOverlay extends NodeSettingsOverlay {
 	private BlockPos getSelectedInventoryPos() {
 		ConnectionBlock inv = getSelectedCable();
 		return inv != null ? inv.getBlockPos() : null;
-	}
-
-	private void sendSettingsUpdate() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
 	}
 
 	@Override

@@ -4,16 +4,13 @@ import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.SplitterComponent;
-import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.network.PacketDistributor;
 
 @OnlyIn(Dist.CLIENT)
 public class SplitterSettingsOverlay extends NodeSettingsOverlay {
@@ -44,16 +41,8 @@ public class SplitterSettingsOverlay extends NodeSettingsOverlay {
 		this.children.add(new ApiWidgetAdapter<>(this.modeBtn));
 		this.children.add(new ApiWidgetAdapter<>(this.outputsSlider));
 
-		// Symmetrical visual headers [3]
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 20, getY() + 32, 200, 10,
 				Component.literal("Execution Splitter Mode"), 0.75F, false, () -> 0xFF404040));
-	}
-
-	private void sendSettingsUpdate() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
 	}
 
 	@OnlyIn(Dist.CLIENT)

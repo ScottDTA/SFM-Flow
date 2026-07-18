@@ -264,7 +264,7 @@ public class RedstoneEmitterComponent extends AbstractFlowComponent implements I
 
 		ListTag opsList = new ListTag();
 		for (RedstoneOp op : operators)
-			opsList.add(StringTag.valueOf(op.name()));
+			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX [3]
 		compoundTag.put("operators", opsList);
 
 		ListTag plsList = new ListTag();
@@ -317,9 +317,16 @@ public class RedstoneEmitterComponent extends AbstractFlowComponent implements I
 			ListTag list = compoundTag.getList("operators", Tag.TAG_STRING);
 			for (int i = 0; i < 6; i++) {
 				if (i < list.size()) {
-					try {
-						this.operators[i] = RedstoneOp.valueOf(list.getString(i).toUpperCase(Locale.ROOT));
-					} catch (IllegalArgumentException ignored) {
+					String val = list.getString(i);
+					RedstoneOp resolved = null;
+					for (RedstoneOp op : RedstoneOp.values()) {
+						if (op.name().equalsIgnoreCase(val) || op.getSerializedName().equalsIgnoreCase(val)) {
+							resolved = op;
+							break;
+						}
+					}
+					if (resolved != null) {
+						this.operators[i] = resolved;
 					}
 				}
 			}

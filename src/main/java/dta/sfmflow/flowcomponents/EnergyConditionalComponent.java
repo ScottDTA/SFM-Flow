@@ -203,7 +203,7 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 		super.saveData(compoundTag);
 		compoundTag.putInt("inventoryId", this.inventoryId);
 		compoundTag.putInt("activeSidesMask", this.activeSidesMask);
-		compoundTag.putString("operator", this.operator.name());
+		compoundTag.putString("operator", this.operator.getSerializedName()); // FIX [3]
 		compoundTag.putInt("threshold", this.threshold);
 		return compoundTag;
 	}
@@ -230,9 +230,13 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 			this.activeSidesMask = compoundTag.getInt("activeSidesMask");
 		}
 		if (compoundTag.contains("operator")) {
-			try {
-				this.operator = ConditionOperator.valueOf(compoundTag.getString("operator"));
-			} catch (IllegalArgumentException ignored) {}
+			String val = compoundTag.getString("operator");
+			for (ConditionOperator op : ConditionOperator.values()) {
+				if (op.name().equalsIgnoreCase(val) || op.getSerializedName().equalsIgnoreCase(val)) {
+					this.operator = op;
+					break;
+				}
+			}
 		}
 		if (compoundTag.contains("threshold")) {
 			this.threshold = compoundTag.getInt("threshold");

@@ -1,21 +1,25 @@
 7-18-2026
 
 
-
 ### [Added]
+* Added the `IRedstoneSidedConfigurable` public API interface, permitting any custom redstone logic or trigger component to use standard sided threshold configuration popups.
 * Added the **Snapshot Profile** system, which analyzes your active flowchart and restricts off-thread inventory snapshotting strictly to the blocks and capabilities being used.
 
 ### [Changed]
+* Consolidated the separate trigger and conditional redstone face popup menus into a single, highly reusable polymorphic config menu (`RedstoneSideConfigModalPopup`).
+* Re-engineered settings configuration panels by migrating block coordination searches, capability presence checks, and packet serialization routines to standardized base helpers in `NodeSettingsOverlay`.
+* Hardened NBT save/load structures on all logical nodes, triggers, and splitters to use case-insensitive, serialized name checks, safeguarding against data-driven config file corruption.
 * Re-engineered the `ManagerBlockEntity` to cache compiled flowchart structures and snapshot profiles, completely avoiding redundant, CPU-heavy NBT serialization on every trigger check when no layout edits are made.
 * Optimized the `PhysicalNetworkMap` coordinate tracker to map packed long coordinates directly to primitive integer IDs, eliminating object allocations during position lookups.
 * Re-engineered the `PhysicalNetwork` pathfinding scanner to use double-buffered primitive layer swaps and mutable block positions, making network scans nearly garbage-free.
 * Simplified variable card definitions by migrating from MapCodecs to standard Codecs.
 
 ### [Fixed]
+* Fixed potential loading bugs on older layout configurations by implementing strict, case-insensitive string parsing fallback maps for all component operator enums.
 * Fixed major server garbage collection (GC) lag spikes and tick-rate drops during larger network scans or frequent trigger checks.
 
 ### [Removed]
-* None.
+* Removed the deprecated `RedstoneConditionalSideConfigModalPopup` class, replacing its functionality with the consolidated polymorphic modal popup.
 
 
 7-17-2026

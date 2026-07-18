@@ -15,17 +15,17 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Concrete settings overlay mapped specifically to configure Interval Trigger
- * execution periods [3]. Configured with standard, uncolored widgets and silent
- * slider actions [3].
+ * execution periods. Configured with standard, uncolored widgets and silent
+ * slider actions.
  */
 @OnlyIn(Dist.CLIENT)
 public class IntervalTriggerSettingsOverlay extends NodeSettingsOverlay {
 	/**
 	 * Instantiates stacked unit cycles and speed control sliders inside the modal
-	 * overlay [3].
+	 * overlay.
 	 *
-	 * @param parentScreen active manager screen panel [3]
-	 * @param component    the logical interval trigger component data model [3]
+	 * @param parentScreen active manager screen panel
+	 * @param component    the logical interval trigger component data model
 	 */
 	public IntervalTriggerSettingsOverlay(ManagerScreen parentScreen, IntervalTriggerComponent component) {
 		super(parentScreen, component);
@@ -135,13 +135,13 @@ public class IntervalTriggerSettingsOverlay extends NodeSettingsOverlay {
 		}
 
 		/**
-		 * Disables UI click sounds specifically on the slider for a smoother feel [3].
+		 * Disables UI click sounds specifically on the slider for a smoother feel.
 		 *
-		 * @param soundManager system sound manager [3]
+		 * @param soundManager system sound manager
 		 */
 		@Override
 		public void playDownSound(SoundManager soundManager) {
-			// No-op: Removes default UI clicking noise during drag or click [3]
+			// No-op: Removes default UI clicking noise during drag or click
 		}
 	}
 }

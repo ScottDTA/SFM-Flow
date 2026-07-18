@@ -5,10 +5,8 @@ import dta.sfmflow.api.client.widget.InventorySelectorWidget;
 import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
-import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.util.ConnectionBlock;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -82,28 +80,6 @@ public class ObserverTriggerSettingsOverlay extends NodeSettingsOverlay {
 
 		this.children.add(this.previewWidget);
 		this.children.add(this.selectorWidget);
-	}
-
-	private ConnectionBlock getSelectedInventory() {
-		int selectedId = ((ObserverTriggerComponent) component).getInventoryId();
-		if (selectedId != -1) {
-			for (ConnectionBlock block : parentScreen.getMenu().getManagerBlockEntity().getInventories()) {
-				if (block.getId() == selectedId) {
-					return block;
-				}
-			}
-		}
-		return null;
-	}
-
-	private void sendSettingsUpdate() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
-						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
-						: null,
-				component.getId(), nbt));
 	}
 
 	@Override

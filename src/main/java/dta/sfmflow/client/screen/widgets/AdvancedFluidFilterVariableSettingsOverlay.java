@@ -148,13 +148,6 @@ public class AdvancedFluidFilterVariableSettingsOverlay extends NodeSettingsOver
 		MenuSlotRepositioner.setSlotPosition(slot, slotX - parentScreen.getLeftPos(), slotY - parentScreen.getTopPos());
 	}
 
-	private void sendSettingsUpdate() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
-	}
-
 	@Override
 	public void setX(int x) {
 		super.setX(x);

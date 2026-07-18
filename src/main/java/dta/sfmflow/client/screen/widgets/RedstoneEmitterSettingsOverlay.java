@@ -3,15 +3,9 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
 import dta.sfmflow.api.client.widget.InventorySelectorWidget;
 import dta.sfmflow.block.ModBlocks;
-import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
-import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
-import dta.sfmflow.util.ConnectionBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
@@ -29,7 +23,7 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 	public RedstoneEmitterSettingsOverlay(ManagerScreen parentScreen, RedstoneEmitterComponent component) {
 		super(parentScreen, component);
 		this.width = 300;
-		this.height = 360; // Standardized to 360
+		this.height = 360;
 		this.setX((parentScreen.width - 300) / 2);
 		this.setY(parentScreen.getOverlayTargetY(this.height));
 
@@ -42,8 +36,12 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 190,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
-				face -> sideSupportsRedstone(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
-						getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, face),
+						face -> sideSupportsCapability(
+								parentScreen.getMenu().getManagerBlockEntity().getLevel(),
+								getSelectedInventory(),
+								face,
+								ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone")
+						), 
 				parentScreen, () -> {
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
@@ -52,7 +50,7 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 		this.selectorWidget = new InventorySelectorWidget(getX() + 20, getY() + 28, component,
 				ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"),
 				parentScreen, 
-				// Sided Filter: Only show Redstone Emitter Blocks in selection menu
+				
 				block -> {
 					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 					if (level != null) {
@@ -61,7 +59,7 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 					return true;
 				},
 				newInv -> {
-					component.setActiveSidesMask(0); // Reset side selection mask
+					component.setActiveSidesMask(0); 
 					if (this.previewWidget != null) {
 						this.previewWidget.updateHighlightState();
 					}
@@ -71,46 +69,6 @@ public class RedstoneEmitterSettingsOverlay extends NodeSettingsOverlay {
 
 		this.children.add(this.previewWidget);
 		this.children.add(this.selectorWidget);
-	}
-
-	private ConnectionBlock getSelectedInventory() {
-		int selectedId = ((RedstoneEmitterComponent) component).getInventoryId();
-		if (selectedId != -1) {
-			for (ConnectionBlock block : parentScreen.getMenu().getManagerBlockEntity().getInventories()) {
-				if (block.getId() == selectedId) {
-					return block;
-				}
-			}
-		}
-		return null;
-	}
-
-	private boolean sideSupportsRedstone(Level level, BlockPos pos, Direction side) {
-		if (level == null || pos == null) {
-			return false;
-		}
-		
-		// If targeting a cluster card, support only the card's active direction face
-		ConnectionBlock inv = getSelectedInventory();
-		if (inv != null && inv.getSlotIndex() >= 0) {
-			return inv.getDirection() == side;
-		}
-		
-		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
-		if (flowCap != null) {
-			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);
-		}
-		return false;
-	}
-
-	private void sendSettingsUpdate() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
-						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
-						: null,
-				component.getId(), nbt));
 	}
 
 	@Override

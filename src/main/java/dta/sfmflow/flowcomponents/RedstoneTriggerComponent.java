@@ -4,10 +4,10 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.AbstractTriggerComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IInventoryTarget;
+import dta.sfmflow.api.component.IRedstoneSidedConfigurable;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
@@ -35,13 +35,12 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Persists and evaluates custom, side-specific analog threshold conditions across four outputs [3].
+ * Persists and evaluates custom, side-specific analog threshold conditions across four outputs.
  */
-public class RedstoneTriggerComponent extends AbstractTriggerComponent implements IInventoryTarget, ISideConfigurable {
+public class RedstoneTriggerComponent extends AbstractTriggerComponent implements IInventoryTarget, ISideConfigurable, IRedstoneSidedConfigurable {
 
 	public enum Operator implements StringRepresentable {
 		GREATER_THAN("greater_than", ">"),
@@ -144,7 +143,7 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 		super(uuid);
 		this.hasInputNodes = false;
 		this.hasOutputNodes = true;
-		this.numOutputs = 4; // Exposes exactly 4 outputs [3]
+		this.numOutputs = 4; // Exposes exactly 4 outputs
 	}
 
 	@Override
@@ -392,7 +391,7 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 
 		ListTag opsList = new ListTag();
 		for (Operator op : operators) {
-			opsList.add(StringTag.valueOf(op.name()));
+			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX: Use getSerializedName() [3]
 		}
 		compoundTag.put("operators", opsList);
 
@@ -474,9 +473,17 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 			ListTag list = compoundTag.getList("operators", Tag.TAG_STRING);
 			for (int i = 0; i < 6; i++) {
 				if (i < list.size()) {
-					try {
-						this.operators[i] = Operator.valueOf(list.getString(i).toUpperCase(Locale.ROOT));
-					} catch (IllegalArgumentException ignored) {}
+					String val = list.getString(i);
+					Operator resolved = null;
+					for (Operator op : Operator.values()) {
+						if (op.name().equalsIgnoreCase(val) || op.getSerializedName().equalsIgnoreCase(val)) {
+							resolved = op;
+							break;
+						}
+					}
+					if (resolved != null) {
+						this.operators[i] = resolved;
+					}
 				}
 			}
 		}

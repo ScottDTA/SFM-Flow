@@ -7,6 +7,7 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IInventoryTarget;
+import dta.sfmflow.api.component.IRedstoneSidedConfigurable;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
@@ -30,14 +31,13 @@ import net.minecraft.resources.RegistryOps;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 /**
  * Conditional logic node that checks Redstone signal levels of targeted blocks off-thread.
  * Supports per-side analog thresholds, logic operations, and ALL/ANY evaluation toggles.
  */
-public class RedstoneConditionalComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable {
+public class RedstoneConditionalComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable, IRedstoneSidedConfigurable {
 
 	public static final MapCodec<RedstoneConditionalComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 			.group(BaseProperties.CODEC.fieldOf("base").forGetter(RedstoneConditionalComponent::getBaseProperties),
@@ -223,7 +223,7 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 
 		ListTag opsList = new ListTag();
 		for (RedstoneTriggerComponent.Operator op : operators) {
-			opsList.add(StringTag.valueOf(op.name()));
+			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX [3]
 		}
 		compoundTag.put("operators", opsList);
 
@@ -269,9 +269,17 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 			ListTag list = compoundTag.getList("operators", Tag.TAG_STRING);
 			for (int i = 0; i < 6; i++) {
 				if (i < list.size()) {
-					try {
-						this.operators[i] = RedstoneTriggerComponent.Operator.valueOf(list.getString(i).toUpperCase(Locale.ROOT));
-					} catch (IllegalArgumentException ignored) {}
+					String val = list.getString(i);
+					RedstoneTriggerComponent.Operator resolved = null;
+					for (RedstoneTriggerComponent.Operator op : RedstoneTriggerComponent.Operator.values()) {
+						if (op.name().equalsIgnoreCase(val) || op.getSerializedName().equalsIgnoreCase(val)) {
+							resolved = op;
+							break;
+						}
+					}
+					if (resolved != null) {
+						this.operators[i] = resolved;
+					}
 				}
 			}
 		}

@@ -1,21 +1,30 @@
 package dta.sfmflow.client.screen.widgets;
 
+import org.jetbrains.annotations.Nullable;
+
+import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.client.NineSliceUtil;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
+import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Base abstract modal popup container centering symmetrically within the top
- * canvas viewport [3]. Intercepts inputs, aligns container focus maps, and
- * bubbles events directly to children [3].
+ * canvas viewport. Intercepts inputs, aligns container focus maps, and
+ * bubbles events directly to children.
  */
 @OnlyIn(Dist.CLIENT)
 public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
@@ -26,10 +35,10 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 
 	/**
 	 * Symmetrically instantiates and positions the NodeSettingsOverlay modal in the
-	 * top viewport [3].
+	 * top viewport.
 	 *
-	 * @param parentScreen the screen displaying the overlay [3]
-	 * @param component    the flow component being configured [3]
+	 * @param parentScreen the screen displaying the overlay 
+	 * @param component    the flow component being configured 
 	 */
 	public NodeSettingsOverlay(ManagerScreen parentScreen, AbstractFlowComponent component) {
 		super((parentScreen.width - 240) / 2, parentScreen.getOverlayTargetY(180), 240, 180,
@@ -40,7 +49,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 
 	/**
 	 * Safely dismisses the modal configuration screen and returns focus to the
-	 * clean canvas [3].
+	 * clean canvas.
 	 */
 	public void closeAndSave() {
 		this.parentScreen.setActiveSettingsOverlay(null);
@@ -48,7 +57,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 
 	/**
 	 * Encodes component modifications onto NBT, sends a save packet to the server,
-	 * and closes [3].
+	 * and closes.
 	 */
 	public void saveAndClose() {
 		CompoundTag nbt = new CompoundTag();
@@ -60,14 +69,14 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x; // Fix inversion: absolute child tracking translation [3]
+		int dif = this.getX() - x; // Fix inversion: absolute child tracking translation
 		super.setX(x);
 		updateChildrenXPositions(dif);
 	}
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y; // Fix inversion: absolute child tracking translation [3]
+		int dif = this.getY() - y; // Fix inversion: absolute child tracking translation
 		super.setY(y);
 		updateChildrenYPositions(dif);
 	}
@@ -75,7 +84,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (keyCode == 256) { // GLFW_KEY_ESCAPE
-			closeAndSave(); // Esc key guarantees clean escape and bypasses local focused locks [3]
+			closeAndSave(); // Esc key guarantees clean escape and bypasses local focused locks
 			return true;
 		}
 		for (GuiEventListener child : children) {
@@ -87,12 +96,11 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	}
 
 	/**
-	 * Overridden to bubble character typing events to active, focused sub-children
-	 * [3].
+	 * Overridden to bubble character typing events to active, focused sub-children.
 	 *
-	 * @param codePoint the unicode character code [3]
-	 * @param modifiers typing keyboard modifiers [3]
-	 * @return true if the character is consumed [3]
+	 * @param codePoint the unicode character code 
+	 * @param modifiers typing keyboard modifiers 
+	 * @return true if the character is consumed 
 	 */
 	@Override
 	public boolean charTyped(char codePoint, int modifiers) {
@@ -117,8 +125,8 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
 				this.focusedChild = child;
-				this.setFocused(child); // Align container-focus mapping cleanly [3]
-				this.setDragging(true); // Force active dragging state [3]
+				this.setFocused(child); // Align container-focus mapping cleanly 
+				this.setDragging(true); // Force active dragging state 
 				return true;
 			}
 		}
@@ -130,9 +138,9 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 		boolean handled = false;
 		if (this.focusedChild != null) {
 			handled = this.focusedChild.mouseReleased(mouseX, mouseY, button);
-			this.focusedChild = null; // Clear focused widget candidate [3]
+			this.focusedChild = null; // Clear focused widget candidate 
 		}
-		this.setDragging(false); // Reset dragging state [3]
+		this.setDragging(false); // Reset dragging state 
 		return handled || super.mouseReleased(mouseX, mouseY, button);
 	}
 
@@ -164,7 +172,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 
         for (GuiEventListener child : children) {
             if (child instanceof AbstractFlowWidget widget) {
-                // Fix: Evaluate individual child visibilities instead of overwriting them [3]
+                // Fix: Evaluate individual child visibilities instead of overwriting them 
                 if (widget.visible) {
                     widget.active = this.active;
                     widget.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -182,5 +190,55 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 
     protected void renderOverlayBackground(GuiGraphics guiGraphics) {
 		NineSliceUtil.drawDefault(guiGraphics, getX(), getY(), width, height);
+	}
+    
+    /**
+	 * Consolidated helper to retrieve the selected ConnectionBlock for targeted components.
+	 */
+	@Nullable
+	protected ConnectionBlock getSelectedInventory() {
+		if (component instanceof IInventoryTarget target) {
+			int selectedId = target.getInventoryId();
+			if (selectedId != -1) {
+				for (ConnectionBlock block : parentScreen.getMenu().getManagerBlockEntity().getInventories()) {
+					if (block.getId() == selectedId) {
+						return block;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Consolidated helper to evaluate if a block face dynamically supports a capability.
+	 * Accommodates special-handling for active directions on custom cluster cards.
+	 */
+	protected boolean sideSupportsCapability(Level level, @Nullable ConnectionBlock inv, @Nullable Direction side, ResourceLocation capabilityId) {
+		if (level == null || inv == null || side == null) {
+			return false;
+		}
+		BlockPos pos = inv.getBlockPos();
+		
+		// If targeting a cluster card, support only the card's active direction face
+		if (inv.getSlotIndex() >= 0) {
+			return inv.getDirection() == side;
+		}
+		
+		var flowCap = FlowCapabilityRegistry.get(capabilityId);
+		if (flowCap != null) {
+			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);
+		}
+		return false;
+	}
+
+	/**
+	 * Consolidated helper to serialize and push component updates to the server.
+	 */
+	protected void sendSettingsUpdate() {
+		CompoundTag nbt = new CompoundTag();
+		component.saveData(nbt);
+		PacketDistributor.sendToServer(new SaveComponentSettings(
+				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
 	}
 }

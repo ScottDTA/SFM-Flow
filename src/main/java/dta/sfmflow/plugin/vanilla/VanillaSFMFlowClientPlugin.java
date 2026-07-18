@@ -21,7 +21,6 @@ import dta.sfmflow.client.screen.widgets.ItemConditionalSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ObserverTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneConditionalSettingsOverlay;
-import dta.sfmflow.client.screen.widgets.RedstoneConditionalSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.RedstoneEmitterSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
@@ -239,9 +238,8 @@ public class VanillaSFMFlowClientPlugin {
 			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
 		});
 		
-		// Register custom sideconfig popup modal for the Redstone Conditional
 		SideConfigPopupRegistry.register(RedstoneConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
-			return new RedstoneConditionalSideConfigModalPopup(screen, (RedstoneConditionalComponent) sideModel, face, pos, onChanged);
+			return new RedstoneSideConfigModalPopup(screen, (RedstoneConditionalComponent) sideModel, face, pos, onChanged);
 		});
 		
 		SideConfigPopupRegistry.register(SculkTriggerComponent.class, (screen, sideModel, face, pos, onChanged) -> {

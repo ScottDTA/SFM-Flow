@@ -2,6 +2,7 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
+import dta.sfmflow.api.component.IRedstoneSidedConfigurable;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
@@ -22,24 +23,23 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * Side-specific config popup allowing users to set customized comparison thresholds per block face [3].
+ * Consolidated, polymorphic side-specific config popup for sided redstone thresholds [3].
  */
 @OnlyIn(Dist.CLIENT)
 public class RedstoneSideConfigModalPopup extends AbstractModalPopup {
-	private final RedstoneTriggerComponent component;
+	private final IRedstoneSidedConfigurable component;
 	private final Direction side;
 	private final Runnable onChanged;
 
 	private final CycleButton<RedstoneTriggerComponent.Operator> operatorButton;
 	private final ThresholdSlider thresholdSlider;
 
-	public RedstoneSideConfigModalPopup(ManagerScreen parentScreen, RedstoneTriggerComponent component, Direction side, BlockPos pos, Runnable onChanged) {
+	public RedstoneSideConfigModalPopup(ManagerScreen parentScreen, IRedstoneSidedConfigurable component, Direction side, BlockPos pos, Runnable onChanged) {
 		super(parentScreen, 140, 100, Component.literal("Sided Redstone"));
 		this.component = component;
 		this.side = side;
 		this.onChanged = onChanged;
 
-		// 1. Comparison Operator Cycle Button [3]
 		this.operatorButton = CycleButton.<RedstoneTriggerComponent.Operator>builder(op -> Component.literal(op.getSymbol()))
 				.withValues(RedstoneTriggerComponent.Operator.values())
 				.withInitialValue(component.getOperator(side))
@@ -49,7 +49,6 @@ public class RedstoneSideConfigModalPopup extends AbstractModalPopup {
 					this.onChanged.run();
 				});
 
-		// 2. Sided Threshold Slider (0-15 analog limits) [3]
 		this.thresholdSlider = new ThresholdSlider(getX() + 15, getY() + 44, 110, 18, component, side, onChanged);
 
 		this.children.add(new ApiWidgetAdapter<>(this.operatorButton));
@@ -58,12 +57,10 @@ public class RedstoneSideConfigModalPopup extends AbstractModalPopup {
 
 	private void saveAndClose() {
 		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
+		((dta.sfmflow.api.component.AbstractFlowComponent) component).saveData(nbt);
 		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().get(component.getId()) != null
-						? parentScreen.getMenu().getManagerBlockEntity().getBlockPos()
-						: null,
-				component.getId(), nbt));
+				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), 
+				((dta.sfmflow.api.component.AbstractFlowComponent) component).getId(), nbt));
 		close();
 	}
 
@@ -126,11 +123,11 @@ public class RedstoneSideConfigModalPopup extends AbstractModalPopup {
 
 	@OnlyIn(Dist.CLIENT)
 	private static class ThresholdSlider extends AbstractSliderButton {
-		private final RedstoneTriggerComponent component;
+		private final IRedstoneSidedConfigurable component;
 		private final Direction side;
 		private final Runnable onChanged;
 
-		public ThresholdSlider(int x, int y, int width, int height, RedstoneTriggerComponent component, Direction side, Runnable onChanged) {
+		public ThresholdSlider(int x, int y, int width, int height, IRedstoneSidedConfigurable component, Direction side, Runnable onChanged) {
 			super(x, y, width, height, Component.empty(), (double) component.getThreshold(side) / 15.0);
 			this.component = component;
 			this.side = side;

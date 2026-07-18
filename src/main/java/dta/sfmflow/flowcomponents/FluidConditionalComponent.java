@@ -481,8 +481,8 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 		}
 		compoundTag.put("filterLimits", limitsList);
 
-		compoundTag.putString("matchMode", this.matchMode.name());
-		compoundTag.putString("operator", this.operator.name());
+		compoundTag.putString("matchMode", this.matchMode.getSerializedName()); // FIX [3]
+		compoundTag.putString("operator", this.operator.getSerializedName());   // FIX [3]
 
 		return compoundTag;
 	}
@@ -577,17 +577,25 @@ public class FluidConditionalComponent extends AbstractFlowComponent
 			}
 		}
 		if (compoundTag.contains("matchMode")) {
-			try {
-				this.matchMode = MatchMode.valueOf(compoundTag.getString("matchMode"));
-			} catch (IllegalArgumentException ignored) {}
+			String val = compoundTag.getString("matchMode");
+			for (MatchMode m : MatchMode.values()) {
+				if (m.name().equalsIgnoreCase(val) || m.getSerializedName().equalsIgnoreCase(val)) {
+					this.matchMode = m;
+					break;
+				}
+			}
 		}
 		if (compoundTag.contains("operator")) {
-			try {
-				this.operator = ConditionOperator.valueOf(compoundTag.getString("operator"));
-			} catch (IllegalArgumentException ignored) {}
+			String val = compoundTag.getString("operator");
+			for (ConditionOperator op : ConditionOperator.values()) {
+				if (op.name().equalsIgnoreCase(val) || op.getSerializedName().equalsIgnoreCase(val)) {
+					this.operator = op;
+					break;
+				}
+			}
 		}
 	}
-
+	
 	@Override
 	public Component getName() {
 		if (this.getCustomName() != null && !this.getCustomName().isEmpty()) {

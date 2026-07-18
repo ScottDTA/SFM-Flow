@@ -156,7 +156,7 @@ public class SplitterComponent extends AbstractFlowComponent {
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-		compoundTag.putString("splitterMode", this.splitterMode.name());
+		compoundTag.putString("splitterMode", this.splitterMode.getSerializedName()); // FIX [3]
 		compoundTag.putInt("numOutputs", this.numOutputs);
 		compoundTag.putInt("lastOutputIndex", this.lastOutputIndex);
 		return compoundTag;
@@ -177,9 +177,13 @@ public class SplitterComponent extends AbstractFlowComponent {
 				});
 
 		if (compoundTag.contains("splitterMode")) {
-			try {
-				this.splitterMode = SplitterMode.valueOf(compoundTag.getString("splitterMode"));
-			} catch (IllegalArgumentException ignored) {}
+			String val = compoundTag.getString("splitterMode");
+			for (SplitterMode m : SplitterMode.values()) {
+				if (m.name().equalsIgnoreCase(val) || m.getSerializedName().equalsIgnoreCase(val)) {
+					this.splitterMode = m;
+					break;
+				}
+			}
 		}
 		if (compoundTag.contains("numOutputs")) {
 			this.numOutputs = compoundTag.getInt("numOutputs");

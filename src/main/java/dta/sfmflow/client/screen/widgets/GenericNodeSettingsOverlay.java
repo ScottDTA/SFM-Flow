@@ -8,7 +8,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Standard visual settings fallback popup for components with zero
- * configurations [3].
+ * configurations.
  */
 @OnlyIn(Dist.CLIENT)
 public class GenericNodeSettingsOverlay extends NodeSettingsOverlay {

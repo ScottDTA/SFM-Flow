@@ -2,21 +2,18 @@ package dta.sfmflow.client.screen.widgets;
 
 import dta.sfmflow.api.client.widget.BlockPreview3DWidget;
 import dta.sfmflow.api.client.widget.InventorySelectorWidget;
+import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.api.client.widget.FlowWidgetText;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
-import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
-import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -48,7 +45,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 	public RedstoneTriggerSettingsOverlay(ManagerScreen parentScreen, RedstoneTriggerComponent component) {
 		super(parentScreen, component);
 		this.width = 300;
-		this.height = 360; // Expanded to 360 to prevent viewport clip desyncs
+		this.height = 360;
 		this.setX((parentScreen.width - 300) / 2);
 		this.setY(parentScreen.getOverlayTargetY(this.height));
 
@@ -59,11 +56,14 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 						: null,
 				component.getId()));
 
-		// Height increased to 190 to allow correct 3D block projections and prevent ghosting leaks
 		this.previewWidget = new BlockPreview3DWidget(getX() + 25, getY() + 78, 250, 190,
 				() -> getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, component,
-				face -> sideSupportsRedstone(parentScreen.getMenu().getManagerBlockEntity().getLevel(),
-						getSelectedInventory() != null ? getSelectedInventory().getBlockPos() : null, face),
+						face -> sideSupportsCapability(
+								parentScreen.getMenu().getManagerBlockEntity().getLevel(),
+								getSelectedInventory(),
+								face,
+								ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone")
+						), 
 				parentScreen, () -> {
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
@@ -76,7 +76,7 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 				block -> {
 					Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
 					if (level != null) {
-						return level.getBlockState(block.getBlockPos()).is(dta.sfmflow.block.ModBlocks.REDSTONE_RECEIVER_BLOCK.get());
+						return level.getBlockState(block.getBlockPos()).is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get());
 					}
 					return true;
 				},
@@ -143,41 +143,10 @@ public class RedstoneTriggerSettingsOverlay extends NodeSettingsOverlay {
 		this.children.add(new ApiWidgetAdapter<>(this.lowUnitBtn));
 		this.children.add(new ApiWidgetAdapter<>(this.lowIntervalSlider));
 
-		// Symmetrical headers [3]
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 15, getY() + 274, 120, 10,
 				Component.literal("While High Interval"), 0.75F, false, () -> 0xFF404040));
 		this.children.add(new FlowWidgetText(parentScreen.getFont(), getX() + 160, getY() + 274, 120, 10,
 				Component.literal("While Low Interval"), 0.75F, false, () -> 0xFF404040));
-	}
-
-	private ConnectionBlock getSelectedInventory() {
-		int selectedId = ((RedstoneTriggerComponent) component).getInventoryId();
-		if (selectedId != -1) {
-			for (ConnectionBlock block : parentScreen.getMenu().getManagerBlockEntity().getInventories()) {
-				if (block.getId() == selectedId) {
-					return block;
-				}
-			}
-		}
-		return null;
-	}
-
-	private boolean sideSupportsRedstone(Level level, BlockPos pos, Direction side) {
-		if (level == null || pos == null) {
-			return false;
-		}
-		
-		// If targeting a cluster card, support only the card's active direction face
-		ConnectionBlock inv = getSelectedInventory();
-		if (inv != null && inv.getSlotIndex() >= 0) {
-			return inv.getDirection() == side;
-		}
-		
-		var flowCap = FlowCapabilityRegistry.get(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
-		if (flowCap != null) {
-			return flowCap.isPresent(level, pos, level.getBlockState(pos), level.getBlockEntity(pos), side);
-		}
-		return false;
 	}
 
 	public void sendSettingsUpdate() {
