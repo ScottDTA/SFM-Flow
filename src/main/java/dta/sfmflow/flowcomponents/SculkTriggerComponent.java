@@ -22,50 +22,74 @@ import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.event.VanillaGameEvent;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
- * Acoustic sculk trigger node that fires flowchart branches based on environmental vibrations.
- * Targeted and bound specifically to a Sculk Trigger Cable block on the network [3].
+ * Acoustic sculk trigger node that fires flowchart branches based on
+ * environmental vibrations. Targeted and bound specifically to a Sculk Trigger
+ * Cable block on the network. Employs zero-garbage in-memory Set lookups for
+ * high-performance tick rates. Supports configurable cooldown delay timers to
+ * protect network performance.
  */
 public class SculkTriggerComponent extends AbstractTriggerComponent implements IInventoryTarget, ISideConfigurable {
+
+	public static final Codec<Map<Direction, List<ResourceLocation>>> SIDE_FILTERS_MAP_CODEC = Codec
+			.unboundedMap(Direction.CODEC, ResourceLocation.CODEC.listOf());
 
 	public static final MapCodec<SculkTriggerComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 			.group(BaseProperties.CODEC.fieldOf("base").forGetter(SculkTriggerComponent::getBaseProperties),
 					Codec.INT.optionalFieldOf("inventoryId", -1).forGetter(SculkTriggerComponent::getInventoryId),
-					Codec.INT.optionalFieldOf("activeSidesMask", 63).forGetter(SculkTriggerComponent::getActiveSidesMask),
-					Codec.STRING.listOf().optionalFieldOf("matchedEvents", List.of()).forGetter(SculkTriggerComponent::getMatchedEvents),
-					Codec.INT.optionalFieldOf("radius", 8).forGetter(SculkTriggerComponent::getRadius))
-			.apply(instance, (baseProps, invId, sidesMask, events, rad) -> {
+					Codec.INT.optionalFieldOf("activeSidesMask", 63)
+							.forGetter(SculkTriggerComponent::getActiveSidesMask),
+					SIDE_FILTERS_MAP_CODEC.optionalFieldOf("sideFilters", Map.of())
+							.forGetter(SculkTriggerComponent::getSideFiltersMap),
+					Codec.INT.optionalFieldOf("radius", 8).forGetter(SculkTriggerComponent::getRadius),
+					Codec.INT.optionalFieldOf("cooldownTicks", 20).forGetter(SculkTriggerComponent::getCooldownTicks))
+			.apply(instance, (baseProps, invId, sidesMask, filtersMap, rad, cooldown) -> {
 				SculkTriggerComponent comp = new SculkTriggerComponent(baseProps.id());
 				comp.setBaseProperties(baseProps);
 				comp.inventoryId = invId;
 				comp.activeSidesMask = sidesMask;
-				comp.matchedEvents.clear();
-				comp.matchedEvents.addAll(events);
+				for (var entry : filtersMap.entrySet()) {
+					Direction dir = entry.getKey();
+					comp.sideFilters[dir.ordinal()].addAll(entry.getValue());
+				}
 				comp.radius = rad;
+				comp.cooldownTicks = cooldown;
 				return comp;
 			}));
 
 	private int inventoryId = -1;
-	private int activeSidesMask = 63; // Defaults to 63 (all 6 faces enabled) [3]
-	private final List<String> matchedEvents = new ArrayList<>();
-	private int radius = 8; // Standard sculk sensor radius [3]
+	private int activeSidesMask = 63;
 
-	private transient boolean triggeredThisTick = false;
+	@SuppressWarnings("unchecked")
+	private final Set<ResourceLocation>[] sideFilters = new Set[6];
+	private int radius = 8;
+	private int cooldownTicks = 20;
+
+	private transient volatile boolean triggeredThisTick = false;
+	private transient long lastTriggeredTime = 0L;
 
 	public SculkTriggerComponent(UUID uuid) {
 		super(uuid);
 		this.hasInputNodes = false;
+		this.numInputs = 0;
 		this.hasOutputNodes = true;
-		this.numOutputs = 1; // Single execute output path [3]
+		this.numOutputs = 1;
+		for (int i = 0; i < 6; i++) {
+			this.sideFilters[i] = new HashSet<>();
+		}
 	}
 
 	@Override
@@ -91,8 +115,32 @@ public class SculkTriggerComponent extends AbstractTriggerComponent implements I
 		this.activeSidesMask = mask;
 	}
 
-	public List<String> getMatchedEvents() {
-		return matchedEvents;
+	public boolean hasEventFilter(Direction side, ResourceLocation loc) {
+		return this.sideFilters[side.ordinal()].contains(loc);
+	}
+
+	public void toggleEventFilter(Direction side, ResourceLocation loc) {
+		Set<ResourceLocation> set = this.sideFilters[side.ordinal()];
+		if (set.contains(loc)) {
+			set.remove(loc);
+		} else {
+			set.add(loc);
+		}
+	}
+
+	public boolean isFilterEmpty(Direction side) {
+		return this.sideFilters[side.ordinal()].isEmpty();
+	}
+
+	public Map<Direction, List<ResourceLocation>> getSideFiltersMap() {
+		Map<Direction, List<ResourceLocation>> map = new HashMap<>();
+		for (Direction dir : Direction.values()) {
+			Set<ResourceLocation> set = sideFilters[dir.ordinal()];
+			if (!set.isEmpty()) {
+				map.put(dir, new ArrayList<>(set));
+			}
+		}
+		return map;
 	}
 
 	public int getRadius() {
@@ -103,6 +151,14 @@ public class SculkTriggerComponent extends AbstractTriggerComponent implements I
 		this.radius = radius;
 	}
 
+	public int getCooldownTicks() {
+		return cooldownTicks;
+	}
+
+	public void setCooldownTicks(int val) {
+		this.cooldownTicks = val;
+	}
+
 	public boolean isSideActive(Direction dir) {
 		return (activeSidesMask & (1 << dir.ordinal())) != 0;
 	}
@@ -111,56 +167,42 @@ public class SculkTriggerComponent extends AbstractTriggerComponent implements I
 		activeSidesMask ^= (1 << dir.ordinal());
 	}
 
-	public void onGameEvent(BlockPos targetPos, VanillaGameEvent event, BlockPos eventPos) {
-		// 1. Verify radius bounds calculated relative to our bound Sculk Trigger Cable block [3]
+	public void onGameEvent(BlockPos targetPos, VanillaGameEvent event, BlockPos eventPos, Direction hitSide) {
+
 		double distSq = targetPos.distSqr(eventPos);
 		if (distSq > this.radius * this.radius) {
 			return;
 		}
 
-		// 2. Dynamic Directional Acoustic Shielding (Block events originating from muted faces) [3]
-		if (distSq > 0.0) {
-			double dx = eventPos.getX() - targetPos.getX();
-			double dy = eventPos.getY() - targetPos.getY();
-			double dz = eventPos.getZ() - targetPos.getZ();
-
-			Direction primaryDir = Direction.getNearest(dx, dy, dz);
-			if (!isSideActive(primaryDir)) {
-				return; // Face is muted/shielded [3]!
-			}
+		if (!isSideActive(hitSide)) {
+			return;
 		}
 
-		// 3. String-based Registry Keyword Filter (Acts as wildcard if list is empty) [3]
-		ResourceLocation eventLoc = BuiltInRegistries.GAME_EVENT.getKey(event.getVanillaEvent().value());
+		ResourceLocation eventLoc = event.getVanillaEvent().unwrapKey().map(ResourceKey::location).orElse(null);
 		if (eventLoc == null) {
 			return;
 		}
 
-		String eventStr = eventLoc.toString(); // e.g. "minecraft:step"
-		boolean matches = false;
+		Set<ResourceLocation> filters = this.sideFilters[hitSide.ordinal()];
 
-		if (this.matchedEvents.isEmpty()) {
-			matches = true;
-		} else {
-			for (String filter : this.matchedEvents) {
-				if (eventStr.toLowerCase(Locale.ROOT).contains(filter.toLowerCase(Locale.ROOT))) {
-					matches = true;
-					break;
-				}
-			}
-		}
-
-		if (matches) {
+		if (filters.isEmpty() || filters.contains(eventLoc)) {
 			this.triggeredThisTick = true;
 		}
 	}
 
 	@Override
 	public boolean evaluateTrigger(Level level, BlockPos pos, long gameTime) {
+		if (gameTime - lastTriggeredTime < cooldownTicks && lastTriggeredTime != 0L) {
+			this.triggeredThisTick = false;
+			return false;
+		}
+
 		if (this.triggeredThisTick) {
-			this.triggeredThisTick = false; // Reset the state [3]
+			this.triggeredThisTick = false;
+			this.lastTriggeredTime = gameTime;
 			return true;
 		}
+
 		return false;
 	}
 
@@ -179,12 +221,18 @@ public class SculkTriggerComponent extends AbstractTriggerComponent implements I
 		compoundTag.putInt("inventoryId", this.inventoryId);
 		compoundTag.putInt("activeSidesMask", this.activeSidesMask);
 		compoundTag.putInt("radius", this.radius);
+		compoundTag.putInt("cooldownTicks", this.cooldownTicks);
 
-		ListTag list = new ListTag();
-		for (String event : this.matchedEvents) {
-			list.add(StringTag.valueOf(event));
+		CompoundTag filtersTag = new CompoundTag();
+		for (Direction dir : Direction.values()) {
+			ListTag sideList = new ListTag();
+			for (ResourceLocation loc : this.sideFilters[dir.ordinal()]) {
+				sideList.add(StringTag.valueOf(loc.toString()));
+			}
+			filtersTag.put(dir.getSerializedName(), sideList);
 		}
-		compoundTag.put("matchedEvents", list);
+		compoundTag.put("sideFilters", filtersTag);
+
 		return compoundTag;
 	}
 
@@ -198,10 +246,13 @@ public class SculkTriggerComponent extends AbstractTriggerComponent implements I
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
 					this.inventoryId = decoded.getInventoryId();
-					this.activeSidesMask = decoded.getActiveSidesMask();
+					this.activeSidesMask = decoded.activeSidesMask;
 					this.radius = decoded.getRadius();
-					this.matchedEvents.clear();
-					this.matchedEvents.addAll(decoded.getMatchedEvents());
+					this.cooldownTicks = decoded.getCooldownTicks();
+					for (int i = 0; i < 6; i++) {
+						this.sideFilters[i].clear();
+						this.sideFilters[i].addAll(decoded.sideFilters[i]);
+					}
 				});
 
 		if (compoundTag.contains("inventoryId")) {
@@ -213,11 +264,24 @@ public class SculkTriggerComponent extends AbstractTriggerComponent implements I
 		if (compoundTag.contains("radius")) {
 			this.radius = compoundTag.getInt("radius");
 		}
-		if (compoundTag.contains("matchedEvents")) {
-			ListTag list = compoundTag.getList("matchedEvents", Tag.TAG_STRING);
-			this.matchedEvents.clear();
-			for (int i = 0; i < list.size(); i++) {
-				this.matchedEvents.add(list.getString(i));
+		if (compoundTag.contains("cooldownTicks")) {
+			this.cooldownTicks = compoundTag.getInt("cooldownTicks");
+		}
+		if (compoundTag.contains("sideFilters")) {
+			CompoundTag filtersTag = compoundTag.getCompound("sideFilters");
+			for (Direction dir : Direction.values()) {
+				Set<ResourceLocation> set = this.sideFilters[dir.ordinal()];
+				set.clear();
+				String key = dir.getSerializedName();
+				if (filtersTag.contains(key)) {
+					ListTag list = filtersTag.getList(key, Tag.TAG_STRING);
+					for (int i = 0; i < list.size(); i++) {
+						ResourceLocation loc = ResourceLocation.tryParse(list.getString(i));
+						if (loc != null) {
+							set.add(loc);
+						}
+					}
+				}
 			}
 		}
 	}

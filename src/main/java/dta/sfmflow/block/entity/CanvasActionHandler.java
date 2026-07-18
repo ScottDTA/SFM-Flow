@@ -36,8 +36,7 @@ public final class CanvasActionHandler {
 		manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), componentId,
 				SyncComponentDeltaPacket.DeltaType.REMOVE, new CompoundTag()));
 		
-		// Rebuild sculk listeners on node deletions
-		SculkEventListener.rebuildManagerListeners(manager);
+		manager.rebuildListeners();
 	}
 
 	private static void handleCopy(ManagerBlockEntity manager, UUID componentId) {

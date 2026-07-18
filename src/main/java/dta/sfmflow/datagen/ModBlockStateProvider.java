@@ -97,18 +97,19 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		faceOnModel.element().from(0, 0, 0).to(16, 16, 16).face(Direction.UP).uvs(0, 0, 16, 16).texture("#face")
 				.cullface(Direction.UP).end();
 		
-		// Configured the Sculk Trigger Cable block model using standard, solid cube_all geometry 
 		BlockModelBuilder sculkCableModel = models().withExistingParent("block/sculk_trigger_cable_block", "minecraft:block/calibrated_sculk_sensor_inactive")
 		        // Re-skin the structural base blocks to your mod's custom cable texture
-		        .texture("sides", modLoc("block/cable_block"))  // Overrides the outer perimeter walls of the base
-		        .texture("bottom", modLoc("block/cable_block")) // Overrides the underside floor texture of the base
+		        .texture("side", modLoc("block/cable_block"))  //  "side": "block/sculk_sensor_side"
+		        .texture("bottom", modLoc("block/cable_block")) // "bottom": "block/sculk_sensor_bottom"
 
 		        // Preserve the authentic vanilla sculk asset mappings for everything else
-		        .texture("sculk", mcLoc("block/sculk"))                        // Keeps the base's inner sculk growth natural
-		        .texture("speckles", mcLoc("block/sculk_sensor_speckles"))     // Retains the dynamic catalyst/sensor speckle dots
-		        .texture("tendrils", mcLoc("block/sculk_sensor_tendrils"))     // Keeps the authentic, animated sensory tendril models
-		        .texture("amethyst", mcLoc("block/amethyst_block"))            // Standard amethyst node texturing
-		        .texture("side_input", mcLoc("block/calibrated_sculk_sensor_input_side")); // Retains the crisp calibrated signal path face
+		        .texture("top", mcLoc("block/calibrated_sculk_sensor_top"))    // "top": "block/calibrated_sculk_sensor_top"
+		        .texture("particle", mcLoc("block/sculk_sensor_bottom"))     // "particle": "block/sculk_sensor_bottom"
+		        .texture("tendrils", mcLoc("block/sculk_sensor_tendril_inactive"))     // "tendrils": "block/sculk_sensor_tendril_inactive"
+		        .texture("amethyst", mcLoc("block/calibrated_sculk_sensor_amethyst"))           //  "amethyst": "block/calibrated_sculk_sensor_amethyst"
+		        .texture("calibrated_side", mcLoc("block/calibrated_sculk_sensor_input_side"))
+		        .renderType("cutout"); // "calibrated_side": "block/calibrated_sculk_sensor_input_side"
+		
 
 		simpleBlock(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), sculkCableModel);
 		simpleBlockItem(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), sculkCableModel);

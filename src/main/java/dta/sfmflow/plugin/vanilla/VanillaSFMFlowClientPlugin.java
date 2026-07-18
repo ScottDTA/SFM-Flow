@@ -27,6 +27,7 @@ import dta.sfmflow.client.screen.widgets.RedstoneEmitterSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SculkTriggerSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.SculkTriggerSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 import dta.sfmflow.client.screen.widgets.SplitterSettingsOverlay;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
@@ -241,6 +242,10 @@ public class VanillaSFMFlowClientPlugin {
 		// Register custom sideconfig popup modal for the Redstone Conditional
 		SideConfigPopupRegistry.register(RedstoneConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new RedstoneConditionalSideConfigModalPopup(screen, (RedstoneConditionalComponent) sideModel, face, pos, onChanged);
+		});
+		
+		SideConfigPopupRegistry.register(SculkTriggerComponent.class, (screen, sideModel, face, pos, onChanged) -> {
+			return new SculkTriggerSideConfigModalPopup(screen, (SculkTriggerComponent) sideModel, face, pos, onChanged);
 		});
 		
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);

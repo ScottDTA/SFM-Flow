@@ -20,6 +20,9 @@ import dta.sfmflow.api.action.CanvasAction;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.AbstractTriggerComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.event.PreFlowchartPlanningEvent;
+import dta.sfmflow.api.event.RebuildManagerListenersEvent;
+import dta.sfmflow.api.event.TaskExecutionEvent;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.api.flowchart.Flowchart;
 import dta.sfmflow.api.logging.FlowLogger;
@@ -65,6 +68,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
@@ -217,11 +221,21 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			long startTime = System.nanoTime();
 
 			this.executionBuffer.pollAndExecuteThrottled(task -> {
+				var preEvent = new TaskExecutionEvent.Pre(this, task);
+				NeoForge.EVENT_BUS.post(preEvent);
+				
+				if (preEvent.isCanceled()) {
+					return;
+				}
 				var executor = FlowCapabilityRegistry.getTransfer(task.getCapabilityId());
 				if (executor != null) {
-					executor.execute(pLevel, task.getSourcePos(), task.getSourceSide(), task.getTargetPos(),
+					boolean executed = executor.execute(pLevel, task.getSourcePos(), task.getSourceSide(), task.getTargetPos(),
 							task.getTargetSide(), task.getTaskParams());
 					tasksRan[0]++;
+					if (executed) {
+						NeoForge.EVENT_BUS.post(new TaskExecutionEvent.Post(this, task));
+					}	
+					
 				}
 			}, maxTimeNs);
 
@@ -254,10 +268,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					// Codecs
 					var registries = pLevel.registryAccess();
 					var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
-					Tag flowchartNbt = Flowchart.CODEC.encodeStart(ops, this.flowchart).resultOrPartial(
+					CompoundTag flowchartNbt = (CompoundTag) Flowchart.CODEC.encodeStart(ops, this.flowchart).resultOrPartial(
 							err -> SFMFlow.LOGGER.error("Failed to clone flowchart state for planning: {}", err))
 							.orElse(new CompoundTag());
 
+					NeoForge.EVENT_BUS.post(new PreFlowchartPlanningEvent(this, snapshot, flowchartNbt, activeTriggers));
+					
+					
 					// 2. Submit task using decentralized thread-safe parameters and callbacks
 					FlowExecutionKernel.submitTask(this.executionBuffer, this::incrementBreakerTrips, snapshot,
 							flowchartNbt, registries, activeTriggers, () -> this.planningActive.set(false));
@@ -272,9 +289,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			boolean scanned = this.physicalNetwork.tickCheckAndScan(pLevel, pBlockPos);
 			if (scanned) {
 				this.setChanged();
-				
-				// Rebuild sculk listener coordinates after a network rescan
-				SculkEventListener.rebuildManagerListeners(this);
+				this.rebuildListeners();
 			}
 		}
 	}
@@ -316,8 +331,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			this.isTriggerCacheDirty = true; // Mark dirty on block load
 			updateInventories();
 			
-			// Register our sculk listeners upon load
-			SculkEventListener.rebuildManagerListeners(this);
+			this.rebuildListeners();
 		}
 	}
 
@@ -351,9 +365,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void onChunkUnloaded() {
 		super.onChunkUnloaded();
 		ACTIVE_MANAGERS.remove(this);
-		
-		// Cleanly evict active listeners
-		SculkEventListener.rebuildManagerListeners(this);
+
+		this.rebuildListeners();
 	}
 
 	@Override
@@ -361,8 +374,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		super.setRemoved();
 		ACTIVE_MANAGERS.remove(this);
 		
-		// Cleanly evict active listeners
-		SculkEventListener.rebuildManagerListeners(this);
+		this.rebuildListeners();
 	}
 
 	@Override
@@ -666,5 +678,21 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		if (dirty) {
 			this.isTriggerCacheDirty = true; // Mark dirty on edits
 		}
+	}
+	
+	/**
+	 * Rebuilds all vanilla sculk listeners and posts the public NeoForge event
+	 * to allow addon developers to register/update their custom triggers.
+	 */
+	public void rebuildListeners() {
+		if (this.level == null || this.level.isClientSide()) {
+			return;
+		}
+		
+		// 1. Rebuild vanilla sculk listeners [3]
+		SculkEventListener.rebuildManagerListeners(this);
+
+		// 2. Post the public event hook to the NeoForge event bus [3]
+		NeoForge.EVENT_BUS.post(new RebuildManagerListenersEvent(this));
 	}
 }

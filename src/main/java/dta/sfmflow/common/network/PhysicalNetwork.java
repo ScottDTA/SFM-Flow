@@ -2,9 +2,11 @@ package dta.sfmflow.common.network;
 
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
+import dta.sfmflow.api.event.ManagerNetworkScanEvent;
 import dta.sfmflow.api.logging.FlowLogger;
 import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
+import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.util.ConnectionBlock;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -19,6 +21,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
+import net.neoforged.neoforge.common.NeoForge;
 
 import java.util.*;
 
@@ -96,7 +99,8 @@ public class PhysicalNetwork {
 	private void performScan(Level level, BlockPos startPos) {
 		long startTime = System.nanoTime();
 
-		// Cleanly unregister previously scanned cables to prevent stale dangling pointer leaks [3]
+		// Cleanly unregister previously scanned cables to prevent stale dangling
+		// pointer leaks
 		for (BlockPos oldCable : this.scannedCables) {
 			CableNetworkRegistry.unregisterCable(level, oldCable);
 		}
@@ -114,8 +118,8 @@ public class PhysicalNetwork {
 		for (Direction dir : Direction.values()) {
 			BlockPos adjacent = startPos.relative(dir);
 			BlockState state = level.getBlockState(adjacent);
-			
-			// Only allow conductive cables/clusters to extend the pathfinding search [3]
+
+			// Only allow conductive cables/clusters to extend the pathfinding search
 			if (canConductNetwork(level, adjacent, state)) {
 				int adjacentId = this.networkMap.getOrAddNode(adjacent);
 				visited.set(adjacentId);
@@ -152,7 +156,7 @@ public class PhysicalNetwork {
 
 				BlockState state = level.getBlockState(neighbor);
 
-				// Only allow conductive cables/clusters to extend the pathfinding search [3]
+				// Only allow conductive cables/clusters to extend the pathfinding search
 				if (canConductNetwork(level, neighbor, state)) {
 					int newNeighborId = this.networkMap.getOrAddNode(neighbor);
 					visited.set(newNeighborId);
@@ -166,6 +170,11 @@ public class PhysicalNetwork {
 			}
 		}
 
+		BlockEntity startBe = level.getBlockEntity(startPos);
+		if (startBe instanceof ManagerBlockEntity manager) {
+			NeoForge.EVENT_BUS.post(new ManagerNetworkScanEvent(manager, this.scannedInventories));
+		}
+
 		this.isDirty = false;
 		this.lastScanTime = level.getGameTime();
 
@@ -177,7 +186,8 @@ public class PhysicalNetwork {
 	}
 
 	/**
-	 * Helper determining if a block is a conductive medium that can extend the network pathfinding search.
+	 * Helper determining if a block is a conductive medium that can extend the
+	 * network pathfinding search.
 	 */
 	private boolean canConductNetwork(Level level, BlockPos pos, BlockState state) {
 		if (state.is(ModTags.CONDUCTIVE_CABLES)) {
@@ -226,14 +236,15 @@ public class PhysicalNetwork {
 				}
 
 				// Map redstone emitter/receiver cards
-				if (card.is(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem()) ||
-						card.is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem())) {
+				if (card.is(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem())
+						|| card.is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem())) {
 					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
 				}
 
 				if (!cardCaps.isEmpty()) {
 					Direction cardDir = cluster.getSlotDirection(slotIndex);
-					ConnectionBlock connection = new ConnectionBlock(level, pos, depth, slotIndex, card.copy(), cardDir);
+					ConnectionBlock connection = new ConnectionBlock(level, pos, depth, slotIndex, card.copy(),
+							cardDir);
 					connection.setTypes(cardCaps);
 					connection.setId(Objects.hash(pos, slotIndex));
 
@@ -242,12 +253,14 @@ public class PhysicalNetwork {
 							var flowCap = FlowCapabilityRegistry.get(capId);
 							if (flowCap != null && flowCap.getCapability() != null) {
 								var nullCache = BlockCapabilityCache.create(
-										(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, null);
+										(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos,
+										null);
 								connection.registerCache(capId, null, nullCache);
 
 								for (Direction dir : Direction.values()) {
 									var dirCache = BlockCapabilityCache.create(
-											(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, dir);
+											(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel,
+											pos, dir);
 									connection.registerCache(capId, dir, dirCache);
 								}
 							}
@@ -277,13 +290,13 @@ public class PhysicalNetwork {
 			discoveredTypes.add(redstoneCapId);
 			this.networkMap.indexCapability(redstoneCapId, posId);
 		}
-		
+
 		// Explicitly check for Sculk Trigger Cable blocks [3]
-				if (state.is(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get())) {
-					ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
-					discoveredTypes.add(sculkCapId);
-					this.networkMap.indexCapability(sculkCapId, posId);
-				}
+		if (state.is(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get())) {
+			ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
+			discoveredTypes.add(sculkCapId);
+			this.networkMap.indexCapability(sculkCapId, posId);
+		}
 
 		if (!discoveredTypes.isEmpty()) {
 			Direction blockDir = null;
@@ -318,7 +331,8 @@ public class PhysicalNetwork {
 				}
 			}
 
-			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent binding drift
+			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent
+			// binding drift
 			connection.setId(pos.hashCode());
 
 			this.scannedInventories.add(connection);

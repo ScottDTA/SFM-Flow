@@ -1,3 +1,21 @@
+7-17-2026
+
+### [Added]
+* Added a public **Event API** posted on the NeoForge event bus, allowing other mods to inject virtual inventories during scans, modify snapshotted logic off-thread, register custom block listeners, and cancellably block transfer tasks (e.g., for region claim protection).
+* Added a dedicated sided configuration modal popup (`SculkTriggerSideConfigModalPopup`) for the Sculk Trigger, presenting an interactive, alphabetically sorted checklist of all vanilla acoustic vibration events.
+* Added side-specific acoustic event filters on the Sculk Trigger, enabling distinct vibration configurations to be mapped to individual block faces.
+* Added a trigger cooldown slider to the Sculk Trigger settings panel to limit vibration detection rates and preserve server tick budgets.
+
+### [Changed]
+* Re-engineered environmental vibration detection to calculate the exact direction the sound hit the block, filtering acoustic checks strictly against that face's configuration.
+* Consolidated trigger registration and cleanup sweeps under a unified listener rebuilding method inside `ManagerBlockEntity` that fires the new event bus hook automatically.
+
+### [Fixed]
+* Fixed visual transparency and model occlusion bugs on the Sculk Trigger Cable block.
+
+### [Removed]
+* None.
+
 7-16-2026
 
 ### [Added]
@@ -14,9 +32,6 @@
 ### [Fixed]
 * Fixed a potential lag bottleneck during environmental vibrations by registering active sculk cables in a flat, fast-lookup server event cache.
 * Fixed splitter chain recursion starvation by capping consecutive splitters to a customizable maximum threshold.
-
-### [Removed]
-* None.
 
 
 7-15-2026 0.5.10.alpha

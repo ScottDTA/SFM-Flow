@@ -57,7 +57,6 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.redstone_conditional", "Redstone Conditional");
 		add("gui.sfmflow.splitter", "Splitter");
 		add("gui.sfmflow.collector", "Collector");
-		add("gui.sfmflow.sculk_trigger", "Sculk Trigger");
 		
 		add("block.sfmflow.sculk_trigger_cable_block", "Sculk Trigger Cable");
 		add("gui.sfmflow.sculk_trigger", "Sculk Trigger");

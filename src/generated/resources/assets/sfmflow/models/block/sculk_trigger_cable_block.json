@@ -1,0 +1,13 @@
+{
+  "parent": "minecraft:block/calibrated_sculk_sensor_inactive",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "amethyst": "minecraft:block/calibrated_sculk_sensor_amethyst",
+    "bottom": "sfmflow:block/cable_block",
+    "calibrated_side": "minecraft:block/calibrated_sculk_sensor_input_side",
+    "particle": "minecraft:block/sculk_sensor_bottom",
+    "side": "sfmflow:block/cable_block",
+    "tendrils": "minecraft:block/sculk_sensor_tendril_inactive",
+    "top": "minecraft:block/calibrated_sculk_sensor_top"
+  }
+}

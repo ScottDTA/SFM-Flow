@@ -40,7 +40,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * Client-only event subscriber and bootstrappery driver [3].
+ * Client-only event subscriber and bootstrappery driver.
  */
 @OnlyIn(Dist.CLIENT)
 public class SFMFlowClient {
@@ -50,11 +50,11 @@ public class SFMFlowClient {
 
 	/**
 	 * Safely registers all client-side event listeners and extension points on the
-	 * physical client [3]. Called explicitly inside the main mod constructor
-	 * context [3].
+	 * physical client. Called explicitly inside the main mod constructor
+	 * context.
 	 *
-	 * @param modEventBus  the Mod-scoped event bus [3]
-	 * @param modContainer the current mod container [3]
+	 * @param modEventBus  the Mod-scoped event bus
+	 * @param modContainer the current mod container
 	 */
 	public static void initialize(IEventBus modEventBus, ModContainer modContainer) {
 		modEventBus.addListener(SFMFlowClient::registerScreens);
@@ -105,7 +105,7 @@ public class SFMFlowClient {
 
 		event.enqueueWork(() -> {
 			// Register vanilla client properties directly, completely avoiding static
-			// plugin lists [3]
+			// plugin lists
 			new VanillaSFMFlowClientPlugin().registerClientProperties();
 
 			VariableCardItem.setTooltipDataResolver(stack -> {
@@ -116,7 +116,7 @@ public class SFMFlowClient {
 						return new Object[] { advancedVar.getFilterStack(), advancedVar.isUseQuantity(),
 								advancedVar.getQuantity(), advancedVar.getFilterColor() };
 					}
-					// Added tooltip support for fluid variables [3]
+					// Added tooltip support for fluid variables
 					if (comp instanceof AdvancedFluidFilterVariableComponent advancedVar) {
 						return new Object[] { advancedVar.getFilterFluid(), advancedVar.isUseQuantity(),
 								advancedVar.getQuantity(), advancedVar.getFilterColor() };
@@ -170,4 +170,5 @@ public class SFMFlowClient {
 	private static void registerKeyMappings(RegisterKeyMappingsEvent event) {
 		HighlightManager.registerKeyMappings(event);
 	}
+
 }

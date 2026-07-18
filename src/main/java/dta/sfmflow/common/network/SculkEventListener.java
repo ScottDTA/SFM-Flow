@@ -5,6 +5,7 @@ import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -35,12 +36,26 @@ public final class SculkEventListener {
 		Vec3 pos = event.getEventPosition();
 		BlockPos eventPos = BlockPos.containing(pos);
 
-		// Single flat loop over registered acoustic nodes
+		// Single flat loop over registered acoustic nodes [3]
 		for (ActiveSculkListener listener : ACTIVE_SCULK_LISTENERS) {
 			if (listener.manager().getLevel() == level && !listener.manager().isRemoved()) {
-				// Fast fail-safe: Check if the event occurred within standard 16-block sculk boundaries
-				if (eventPos.closerThan(listener.cablePos(), 16.0)) {
-					listener.component().onGameEvent(listener.cablePos(), event, eventPos);
+				BlockPos cablePos = listener.cablePos();
+				
+				// Fast fail-safe: Check if the event occurred within standard 16-block boundaries
+				if (eventPos.closerThan(cablePos, 16.0)) {
+					// 1. Calculate the offset vector from the center of the cable to the sound source
+					Vec3 cableCenter = Vec3.atCenterOf(cablePos);
+					Vec3 deltaVector = pos.subtract(cableCenter);
+					
+					// 2. Identify the dominant direction the sound hit the block from
+					Direction hitSide = Direction.getNearest(
+							deltaVector.x, 
+							deltaVector.y, 
+							deltaVector.z
+					);
+
+					// 3. Delegate the side information to our component's evaluation logic
+					listener.component().onGameEvent(cablePos, event, eventPos, hitSide);
 				}
 			}
 		}

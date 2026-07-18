@@ -154,8 +154,7 @@ public class ServerPayloadHandler {
 					manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), data.componentId(),
 							SyncComponentDeltaPacket.DeltaType.SETTINGS, data.settings()));
 					
-					// Rebuild sculk listener bounds on edits
-					SculkEventListener.rebuildManagerListeners(manager);
+					manager.rebuildListeners();
 
 					// 5. If we pruned any dangling connections, broadcast a full connection sync to clients
 					if (connectionsModified) {

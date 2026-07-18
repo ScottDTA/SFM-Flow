@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "C": {
+      "item": "sfmflow:cable_block"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "S": {
+      "item": "minecraft:sculk_sensor"
+    }
+  },
+  "pattern": [
+    "IAI",
+    "CSC",
+    "III"
+  ],
+  "result": {
+    "count": 1,
+    "id": "sfmflow:sculk_trigger_cable_block"
+  }
+}

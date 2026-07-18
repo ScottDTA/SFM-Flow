@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "sfmflow:block/sculk_trigger_cable_block"
+    }
+  }
+}
