@@ -1,11 +1,16 @@
 7-18-2026
 
 
+
 ### [Added]
+* Added `AbstractConditionalComponent` and `AbstractFilterableConditionalComponent` public API classes to unify and consolidate block targeting, directional face, whitelist, and slot-exclusion configurations for all conditional logic nodes.
 * Added the `IRedstoneSidedConfigurable` public API interface, permitting any custom redstone logic or trigger component to use standard sided threshold configuration popups.
 * Added the **Snapshot Profile** system, which analyzes your active flowchart and restricts off-thread inventory snapshotting strictly to the blocks and capabilities being used.
 
 ### [Changed]
+* Refactored the Energy, Fluid, and Item Conditional components to inherit from the new consolidated base classes, drastically reducing duplicate code.
+* Simplified settings saving and loading routines on conditional nodes by delegating common property serialization to parent class handlers.
+* Hardened NBT loading routines for redstone trigger comparison operators, conditional operators, and splitter execution modes to support case-insensitive evaluations of saved values.
 * Consolidated the separate trigger and conditional redstone face popup menus into a single, highly reusable polymorphic config menu (`RedstoneSideConfigModalPopup`).
 * Re-engineered settings configuration panels by migrating block coordination searches, capability presence checks, and packet serialization routines to standardized base helpers in `NodeSettingsOverlay`.
 * Hardened NBT save/load structures on all logical nodes, triggers, and splitters to use case-insensitive, serialized name checks, safeguarding against data-driven config file corruption.
@@ -15,6 +20,7 @@
 * Simplified variable card definitions by migrating from MapCodecs to standard Codecs.
 
 ### [Fixed]
+* Fixed potential configuration loading bugs on older layout files by ensuring that saved enum string properties parse correctly regardless of capitalization.
 * Fixed potential loading bugs on older layout configurations by implementing strict, case-insensitive string parsing fallback maps for all component operator enums.
 * Fixed major server garbage collection (GC) lag spikes and tick-rate drops during larger network scans or frequent trigger checks.
 

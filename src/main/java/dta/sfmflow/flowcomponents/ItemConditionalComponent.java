@@ -5,12 +5,8 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.component.AbstractFilterableConditionalComponent;
 import dta.sfmflow.api.component.FlowComponentType;
-import dta.sfmflow.api.component.IFilterable;
-import dta.sfmflow.api.component.IInventoryTarget;
-import dta.sfmflow.api.component.ISideConfigurable;
-import dta.sfmflow.api.component.ISlotConfigurable;
-import dta.sfmflow.api.component.IGhostSlotAware;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
@@ -40,14 +36,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import javax.annotation.Nullable;
-
 /**
  * Conditional logic node that checks the contents of targeted inventories off-thread.
- * Routes execution along either True (Output 0) or False (Output 1) paths.
  */
-public class ItemConditionalComponent extends AbstractFlowComponent
-		implements IFilterable, IInventoryTarget, ISideConfigurable, IGhostSlotAware, ISlotConfigurable {
+public class ItemConditionalComponent extends AbstractFilterableConditionalComponent {
 
 	public enum MatchMode implements StringRepresentable {
 		MATCH_ALL("match_all"),
@@ -147,129 +139,16 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 				return comp;
 			}));
 
-	private int inventoryId = -1;
-	private int activeSidesMask = 0;
-	private final List<Long> enabledSlotsMasks = new ArrayList<>(List.of(-1L, -1L, -1L, -1L, -1L, -1L));
-
-	private UUID boundGroupVariableId = null;
-	private UUID boundFilterVariableId = null;
-
-	private boolean whitelist = true;
-	private final List<ItemStack> filterItems = new ArrayList<>();
-	private final List<Integer> filterLimits = new ArrayList<>();
-
 	private MatchMode matchMode = MatchMode.MATCH_ANY;
 	private ConditionOperator operator = ConditionOperator.GREATER_OR_EQUAL;
 
 	public ItemConditionalComponent(UUID uuid) {
 		super(uuid);
-		this.hasInputNodes = true;
-		this.numInputs = 1;
-		this.hasOutputNodes = true;
-		this.numOutputs = 2; // Output 0 = True, Output 1 = False
-		for (int i = 0; i < 12; i++) {
-			this.filterItems.add(ItemStack.EMPTY);
-			this.filterLimits.add(-1);
-		}
 	}
 
 	@Override
 	public FlowComponentType getType() {
 		return VanillaSFMFlowPlugin.ITEM_CONDITIONAL.get();
-	}
-
-	public List<Long> getEnabledSlotsMasks() {
-		return this.enabledSlotsMasks;
-	}
-
-	public long getEnabledSlotsMask(Direction dir) {
-		if (dir == null) return -1L;
-		int idx = dir.ordinal();
-		if (idx >= 0 && idx < enabledSlotsMasks.size()) {
-			return enabledSlotsMasks.get(idx);
-		}
-		return -1L;
-	}
-
-	public void setEnabledSlotsMask(Direction dir, long mask) {
-		if (dir == null) return;
-		int idx = dir.ordinal();
-		while (enabledSlotsMasks.size() <= idx) {
-			enabledSlotsMasks.add(-1L);
-		}
-		enabledSlotsMasks.set(idx, mask);
-	}
-
-	public boolean isSlotEnabled(Direction dir, int slot) {
-		if (dir == null) return true;
-		if (slot < 0 || slot >= 64) return true;
-		long mask = getEnabledSlotsMask(dir);
-		return (mask & (1L << slot)) != 0;
-	}
-
-	public void toggleSlot(Direction dir, int slot) {
-		if (dir == null) return;
-		if (slot < 0 || slot >= 64) return;
-		long mask = getEnabledSlotsMask(dir);
-		mask ^= (1L << slot);
-		setEnabledSlotsMask(dir, mask);
-	}
-
-	public int getInventoryId() {
-		return inventoryId;
-	}
-
-	public void setInventoryId(int inventoryId) {
-		this.inventoryId = inventoryId;
-	}
-
-	public boolean isSideActive(Direction dir) {
-		return (activeSidesMask & (1 << dir.ordinal())) != 0;
-	}
-
-	public void toggleSide(Direction dir) {
-		activeSidesMask ^= (1 << dir.ordinal());
-	}
-
-	public int getActiveSidesMask() {
-		return activeSidesMask;
-	}
-
-	public void setActiveSidesMask(int mask) {
-		this.activeSidesMask = mask;
-	}
-
-	public @Nullable UUID getBoundGroupVariableId() {
-		return boundGroupVariableId;
-	}
-
-	public void setBoundGroupVariableId(@Nullable UUID id) {
-		this.boundGroupVariableId = id;
-	}
-
-	public @Nullable UUID getBoundFilterVariableId() {
-		return boundFilterVariableId;
-	}
-
-	public void setBoundFilterVariableId(@Nullable UUID id) {
-		this.boundFilterVariableId = id;
-	}
-
-	public boolean isWhitelist() {
-		return whitelist;
-	}
-
-	public void setWhitelist(boolean whitelist) {
-		this.whitelist = whitelist;
-	}
-
-	public List<ItemStack> getFilterItems() {
-		return filterItems;
-	}
-
-	@Override
-	public List<Integer> getFilterLimits() {
-		return filterLimits;
 	}
 
 	public MatchMode getMatchMode() {
@@ -289,29 +168,9 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 	}
 
 	@Override
-	public ItemStack getGhostStack(int index) {
-		if (index >= 0 && index < this.filterItems.size()) {
-			return this.filterItems.get(index);
-		}
-		return ItemStack.EMPTY;
-	}
-
-	@Override
-	public void setGhostStack(int index, ItemStack stack) {
-		if (index >= 0 && index < this.filterItems.size()) {
-			this.filterItems.set(index, stack == null ? ItemStack.EMPTY : stack);
-		}
-	}
-
-	@Override
-	public int getGhostSlotCount() {
-		return 12;
-	}
-
-	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // Output 0 = True, Output 1 = False
+		int targetOutputIdx = isMet ? 0 : 1; 
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -344,10 +203,8 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 			activeSides.add(null);
 		}
 
-		// Restrict slot indexing strictly to the targeted cluster card
 		int allowedSlot = targetBlock.getSlotIndex();
 
-		// Pull current items safely from the thread-safe snapshot
 		List<ItemStack> inventoryItems = new ArrayList<>();
 		for (Direction side : activeSides) {
 			var inv = context.getSnapshot().getInventory(targetPos, side);
@@ -384,7 +241,6 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 					int targetQty = i < this.filterLimits.size() ? this.filterLimits.get(i) : 1;
 					if (targetQty <= 0) targetQty = 1;
 
-					// If this filter item is a Variable Card, resolve its actual custom quantity 
 					if (filter.getItem() == ModItems.VARIABLE_CARD.get()) {
 						CompoundTag tag = filter.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
 						if (tag.contains("VariableId")) {
@@ -403,7 +259,6 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 			}
 		}
 
-		// Wildcard Check (Empty Filters / Empty Whitelist) 
 		if (!hasFilters) {
 			int totalCount = 0;
 			for (ItemStack stack : inventoryItems) {
@@ -415,7 +270,6 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 			return this.operator.compare(totalCount, targetQty);
 		}
 
-		// Whitelist Evaluation
 		if (this.matchMode == MatchMode.MATCH_ALL) {
 			for (FilterRule rule : rules) {
 				int count = rule.countMatches(context, inventoryItems);
@@ -472,8 +326,8 @@ public class ItemConditionalComponent extends AbstractFlowComponent
 		}
 		compoundTag.put("filterLimits", limitsList);
 
-		compoundTag.putString("matchMode", this.matchMode.getSerializedName()); // FIX [3]
-		compoundTag.putString("operator", this.operator.getSerializedName());   // FIX [3]
+		compoundTag.putString("matchMode", this.matchMode.getSerializedName()); 
+		compoundTag.putString("operator", this.operator.getSerializedName());   
 
 		return compoundTag;
 	}

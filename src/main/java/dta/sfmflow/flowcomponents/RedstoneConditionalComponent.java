@@ -4,11 +4,9 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.component.AbstractConditionalComponent;
 import dta.sfmflow.api.component.FlowComponentType;
-import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.IRedstoneSidedConfigurable;
-import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
@@ -25,7 +23,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NumericTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 
 import java.util.ArrayList;
@@ -35,9 +32,8 @@ import java.util.UUID;
 
 /**
  * Conditional logic node that checks Redstone signal levels of targeted blocks off-thread.
- * Supports per-side analog thresholds, logic operations, and ALL/ANY evaluation toggles.
  */
-public class RedstoneConditionalComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable, IRedstoneSidedConfigurable {
+public class RedstoneConditionalComponent extends AbstractConditionalComponent implements IRedstoneSidedConfigurable {
 
 	public static final MapCodec<RedstoneConditionalComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 			.group(BaseProperties.CODEC.fieldOf("base").forGetter(RedstoneConditionalComponent::getBaseProperties),
@@ -59,8 +55,6 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 				return comp;
 			}));
 
-	private int inventoryId = -1;
-	private int activeSidesMask = 0;
 	private boolean requiresAll = false;
 
 	private final int[] thresholds = new int[6];
@@ -71,43 +65,11 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 
 	public RedstoneConditionalComponent(UUID uuid) {
 		super(uuid);
-		this.hasInputNodes = true;
-		this.numInputs = 1;
-		this.hasOutputNodes = true;
-		this.numOutputs = 2; // Output 0 = True, Output 1 = False
 	}
 
 	@Override
 	public FlowComponentType getType() {
 		return VanillaSFMFlowPlugin.REDSTONE_CONDITIONAL.get();
-	}
-
-	@Override
-	public int getInventoryId() {
-		return inventoryId;
-	}
-
-	@Override
-	public void setInventoryId(int inventoryId) {
-		this.inventoryId = inventoryId;
-	}
-
-	@Override
-	public boolean isSideActive(Direction dir) {
-		return (activeSidesMask & (1 << dir.ordinal())) != 0;
-	}
-
-	@Override
-	public void toggleSide(Direction dir) {
-		activeSidesMask ^= (1 << dir.ordinal());
-	}
-
-	public int getActiveSidesMask() {
-		return activeSidesMask;
-	}
-
-	public void setActiveSidesMask(int mask) {
-		this.activeSidesMask = mask;
 	}
 
 	public boolean isRequiresAll() {
@@ -149,7 +111,7 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // True = Output 0, False = Output 1
+		int targetOutputIdx = isMet ? 0 : 1; // True = Output 0, False = Output 1 [3]
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -211,8 +173,6 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-		compoundTag.putInt("inventoryId", this.inventoryId);
-		compoundTag.putInt("activeSidesMask", this.activeSidesMask);
 		compoundTag.putBoolean("requiresAll", this.requiresAll);
 
 		ListTag threshsList = new ListTag();
@@ -223,7 +183,7 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 
 		ListTag opsList = new ListTag();
 		for (RedstoneTriggerComponent.Operator op : operators) {
-			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX [3]
+			opsList.add(StringTag.valueOf(op.getSerializedName())); // Case-safety fix [3]
 		}
 		compoundTag.put("operators", opsList);
 
@@ -248,12 +208,8 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 					}
 				});
 
-		if (compoundTag.contains("inventoryId")) {
-			this.inventoryId = compoundTag.getInt("inventoryId");
-		}
-		if (compoundTag.contains("activeSidesMask")) {
-			this.activeSidesMask = compoundTag.getInt("activeSidesMask");
-		}
+		super.loadData(compoundTag); // Load parent class fields [3]
+
 		if (compoundTag.contains("requiresAll")) {
 			this.requiresAll = compoundTag.getBoolean("requiresAll");
 		}
@@ -283,23 +239,5 @@ public class RedstoneConditionalComponent extends AbstractFlowComponent implemen
 				}
 			}
 		}
-	}
-
-	@Override
-	public Component getName() {
-		if (this.getCustomName() != null && !this.getCustomName().isEmpty()) {
-			return Component.literal(this.getCustomName());
-		}
-		return Component.translatable("gui.sfmflow.redstone_conditional");
-	}
-
-	@Override
-	public Component getInputNodeTooltip(int index) {
-		return Component.literal("Execute Input");
-	}
-
-	@Override
-	public Component getOutputNodeTooltip(int index) {
-		return index == 0 ? Component.literal("True Output") : Component.literal("False Output");
 	}
 }

@@ -4,10 +4,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.SFMFlow;
-import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.api.component.AbstractConditionalComponent;
 import dta.sfmflow.api.component.FlowComponentType;
-import dta.sfmflow.api.component.IInventoryTarget;
-import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import dta.sfmflow.util.ConnectionBlock;
@@ -18,7 +16,6 @@ import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.util.StringRepresentable;
 
@@ -29,7 +26,7 @@ import java.util.UUID;
 /**
  * Conditional logic node that checks the Forge Energy (FE) levels of targeted blocks off-thread [3].
  */
-public class EnergyConditionalComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable {
+public class EnergyConditionalComponent extends AbstractConditionalComponent {
 
 	public enum ConditionOperator implements StringRepresentable {
 		GREATER_OR_EQUAL("greater_or_equal", ">="),
@@ -86,51 +83,16 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 				return comp;
 			}));
 
-	private int inventoryId = -1;
-	private int activeSidesMask = 0;
-
 	private ConditionOperator operator = ConditionOperator.GREATER_OR_EQUAL;
 	private int threshold = 0;
 
 	public EnergyConditionalComponent(UUID uuid) {
 		super(uuid);
-		this.hasInputNodes = true;
-		this.numInputs = 1;
-		this.hasOutputNodes = true;
-		this.numOutputs = 2; // Output 0 = True, Output 1 = False [3]
 	}
 
 	@Override
 	public FlowComponentType getType() {
 		return VanillaSFMFlowPlugin.ENERGY_CONDITIONAL.get();
-	}
-
-	@Override
-	public int getInventoryId() {
-		return inventoryId;
-	}
-
-	@Override
-	public void setInventoryId(int inventoryId) {
-		this.inventoryId = inventoryId;
-	}
-
-	@Override
-	public boolean isSideActive(Direction dir) {
-		return (activeSidesMask & (1 << dir.ordinal())) != 0;
-	}
-
-	@Override
-	public void toggleSide(Direction dir) {
-		activeSidesMask ^= (1 << dir.ordinal());
-	}
-
-	public int getActiveSidesMask() {
-		return activeSidesMask;
-	}
-
-	public void setActiveSidesMask(int mask) {
-		this.activeSidesMask = mask;
 	}
 
 	public ConditionOperator getOperator() {
@@ -152,7 +114,7 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // True = Output 0, False = Output 1 [3]
+		int targetOutputIdx = isMet ? 0 : 1; // Output 0 = True, Output 1 = False [3]
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -185,7 +147,6 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 			activeSides.add(null);
 		}
 
-		// Since block energy is typically shared, matching any valid face's storage is sufficient
 		for (Direction side : activeSides) {
 			var snap = context.getSnapshot().getEnergy(targetPos, side);
 			if (snap != null) {
@@ -201,9 +162,7 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-		compoundTag.putInt("inventoryId", this.inventoryId);
-		compoundTag.putInt("activeSidesMask", this.activeSidesMask);
-		compoundTag.putString("operator", this.operator.getSerializedName()); // FIX [3]
+		compoundTag.putString("operator", this.operator.getSerializedName()); // Case-safety fix [3]
 		compoundTag.putInt("threshold", this.threshold);
 		return compoundTag;
 	}
@@ -223,12 +182,8 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 					this.threshold = decoded.getThreshold();
 				});
 
-		if (compoundTag.contains("inventoryId")) {
-			this.inventoryId = compoundTag.getInt("inventoryId");
-		}
-		if (compoundTag.contains("activeSidesMask")) {
-			this.activeSidesMask = compoundTag.getInt("activeSidesMask");
-		}
+		super.loadData(compoundTag); // Load parent class fields [3]
+
 		if (compoundTag.contains("operator")) {
 			String val = compoundTag.getString("operator");
 			for (ConditionOperator op : ConditionOperator.values()) {
@@ -241,23 +196,5 @@ public class EnergyConditionalComponent extends AbstractFlowComponent implements
 		if (compoundTag.contains("threshold")) {
 			this.threshold = compoundTag.getInt("threshold");
 		}
-	}
-
-	@Override
-	public Component getName() {
-		if (this.getCustomName() != null && !this.getCustomName().isEmpty()) {
-			return Component.literal(this.getCustomName());
-		}
-		return Component.translatable("gui.sfmflow.energy_conditional");
-	}
-
-	@Override
-	public Component getInputNodeTooltip(int index) {
-		return Component.literal("Execute Input");
-	}
-
-	@Override
-	public Component getOutputNodeTooltip(int index) {
-		return index == 0 ? Component.literal("True Output") : Component.literal("False Output");
 	}
 }

@@ -31,7 +31,6 @@ import net.minecraft.util.StringRepresentable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -243,7 +242,7 @@ public class RedstoneEmitterComponent extends AbstractFlowComponent implements I
 			}
 		}
 
-		// Propagate upstream down the output execution pin [3]
+		// Propagate upstream down the output execution pin
 		for (var conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId())) {
 				context.enqueue(conn.getTargetComponentId());
@@ -264,7 +263,7 @@ public class RedstoneEmitterComponent extends AbstractFlowComponent implements I
 
 		ListTag opsList = new ListTag();
 		for (RedstoneOp op : operators)
-			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX [3]
+			opsList.add(StringTag.valueOf(op.getSerializedName()));
 		compoundTag.put("operators", opsList);
 
 		ListTag plsList = new ListTag();

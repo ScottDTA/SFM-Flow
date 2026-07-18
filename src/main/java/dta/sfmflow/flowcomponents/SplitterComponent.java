@@ -27,7 +27,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Logical flowchart node that splits execution paths based on ALL, ROUND_ROBIN, or RANDOM triggers [3].
+ * Logical flowchart node that splits execution paths based on ALL, ROUND_ROBIN, or RANDOM triggers.
  */
 public class SplitterComponent extends AbstractFlowComponent {
 
@@ -72,7 +72,7 @@ public class SplitterComponent extends AbstractFlowComponent {
 		this.hasInputNodes = true;
 		this.numInputs = 1;
 		this.hasOutputNodes = true;
-		this.numOutputs = 2; // Default to 2 outputs [3]
+		this.numOutputs = 2;
 	}
 
 	@Override
@@ -106,17 +106,17 @@ public class SplitterComponent extends AbstractFlowComponent {
 
 	@Override
 	public void plan(FlowchartPlanningContext context) {
-		// 1. Resolve and increment the splitter chain depth [3]
+		// 1. Resolve and increment the splitter chain depth
 		ResourceLocation chainDepthKey = ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_chain_depth");
 		Integer currentDepthObj = (Integer) context.getPipelineBuffer(this.getId(), chainDepthKey);
 		int currentDepth = currentDepthObj != null ? currentDepthObj : 0;
 		int nextDepth = currentDepth + 1;
 
-		// 2. Perform the server-side budget safety check [3]
+		// 2. Perform the server-side budget safety check
 		if (nextDepth > ServerConfig.MAX_CHAINED_SPLITTERS.get()) {
 			FlowLogger.execution("Circuit breaker: Splitter chain depth limit exceeded at %s (%d > %d). Suppressing downstream executions.",
 					this.getId(), nextDepth, ServerConfig.MAX_CHAINED_SPLITTERS.get());
-			return; // Stop propagating execution downstream [3]
+			return; // Stop propagating execution downstream
 		}
 
 		List<Integer> targets = new ArrayList<>();
@@ -127,10 +127,10 @@ public class SplitterComponent extends AbstractFlowComponent {
 			}
 		} else if (this.splitterMode == SplitterMode.ROUND_ROBIN) {
 			int next = (this.lastOutputIndex + 1) % this.numOutputs;
-			this.lastOutputIndex = next; // Update locally on the worker clone [3]
+			this.lastOutputIndex = next; // Update locally on the worker clone
 			targets.add(next);
 
-			// Queue a thread-safe deferred state synchronization back to the main server thread [3]
+			// Queue a thread-safe deferred state synchronization back to the main server thread
 			context.tryWriteTask(
 					ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_sync"),
 					BlockPos.ZERO, 0, null, BlockPos.ZERO, 0, null,
@@ -141,12 +141,12 @@ public class SplitterComponent extends AbstractFlowComponent {
 			targets.add(randIdx);
 		}
 
-		// 3. Propagate the chain depth to downstream targets [3]
+		// 3. Propagate the chain depth to downstream targets
 		for (int outputIdx : targets) {
 			for (FlowComponentConnections conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == outputIdx) {
 					UUID targetId = conn.getTargetComponentId();
-					context.setPipelineBuffer(targetId, chainDepthKey, nextDepth); // Propagate depth [3]
+					context.setPipelineBuffer(targetId, chainDepthKey, nextDepth);
 					context.enqueue(targetId);
 				}
 			}
@@ -156,7 +156,7 @@ public class SplitterComponent extends AbstractFlowComponent {
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-		compoundTag.putString("splitterMode", this.splitterMode.getSerializedName()); // FIX [3]
+		compoundTag.putString("splitterMode", this.splitterMode.getSerializedName());
 		compoundTag.putInt("numOutputs", this.numOutputs);
 		compoundTag.putInt("lastOutputIndex", this.lastOutputIndex);
 		return compoundTag;
@@ -212,7 +212,7 @@ public class SplitterComponent extends AbstractFlowComponent {
 	}
 
 	/**
-	 * Packet parameters payload record for off-thread state synchronization [3].
+	 * Packet parameters payload record for off-thread state synchronization.
 	 */
 	public record SplitterSyncParams(UUID componentId, int nextIndex) {}
 }

@@ -143,7 +143,7 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 		super(uuid);
 		this.hasInputNodes = false;
 		this.hasOutputNodes = true;
-		this.numOutputs = 4; // Exposes exactly 4 outputs
+		this.numOutputs = 4; 
 	}
 
 	@Override
@@ -316,7 +316,7 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 		boolean currentMet = isConditionMet(currentSignals, checkedSides);
 		boolean previousMet = isConditionMet(previousSignals, checkedSides);
 
-		// Throttling Level-triggered conditions based on individual timing configurations [3]
+		// Throttling Level-triggered conditions based on individual timing configurations 
 		boolean highTriggered = currentMet && (gameTime - lastHighExecutedTick >= getHighTotalTicks() || lastHighExecutedTick == 0L);
 		boolean lowTriggered = !currentMet && (gameTime - lastLowExecutedTick >= getLowTotalTicks() || lastLowExecutedTick == 0L);
 		boolean highPulse = currentMet && !previousMet;
@@ -364,7 +364,7 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId())) {
 				int outputIdx = conn.getOutputNodeIndex();
-				// Selectively enqueue target logic nodes depending on the active evaluated outputs [3]
+				// Selectively enqueue target logic nodes depending on the active evaluated outputs
 				if (outputIdx >= 0 && outputIdx < 4 && activeOutputs[outputIdx]) {
 					context.enqueue(conn.getTargetComponentId());
 				}
@@ -391,7 +391,7 @@ public class RedstoneTriggerComponent extends AbstractTriggerComponent implement
 
 		ListTag opsList = new ListTag();
 		for (Operator op : operators) {
-			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX: Use getSerializedName() [3]
+			opsList.add(StringTag.valueOf(op.getSerializedName())); // FIX: Use getSerializedName()
 		}
 		compoundTag.put("operators", opsList);
 
