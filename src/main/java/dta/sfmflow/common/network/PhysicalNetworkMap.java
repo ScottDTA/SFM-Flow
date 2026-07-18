@@ -2,8 +2,8 @@ package dta.sfmflow.common.network;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
@@ -14,40 +14,44 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Backing graph map that converts coordinates to primitive ID sequences [3].
- * Guarantees garbage-free traversal bounds by decoupling BlockPos objects [3].
- * Upgraded to track spatial chunk groups, sleeping nodes, and capability lists
- * [3].
+ * Backing graph map that converts coordinates to primitive ID sequences.
+ * Upgraded to use primitive Long-keyed mappings for memory and CPU efficiency.
+ * Tracks spatial chunk groups, sleeping nodes, and capability lists.
  */
 public class PhysicalNetworkMap {
 	private final Int2ObjectOpenHashMap<BlockPos> idToPos = new Int2ObjectOpenHashMap<>();
-	private final Object2IntOpenHashMap<BlockPos> posToId = new Object2IntOpenHashMap<>();
+	private final Long2IntOpenHashMap posToId = new Long2IntOpenHashMap();
 	private final Int2ObjectOpenHashMap<IntArrayList> adjacencyList = new Int2ObjectOpenHashMap<>();
 	private int nextNodeId = 0;
 
-	// Spatial Chunk-Boundary Groupings [3]
+	// Spatial Chunk-Boundary Groupings
 	private final Long2ObjectOpenHashMap<IntArrayList> chunkToNodeGroup = new Long2ObjectOpenHashMap<>();
 	private final BitSet sleepingNodes = new BitSet();
 
-	// Multi-Capability Sorting Indices [3]
+	// Multi-Capability Sorting Indices
 	private final Map<ResourceLocation, IntArrayList> capabilityIndices = new HashMap<>();
 
 	/**
-	 * Initializes the PhysicalNetworkMap [3].
+	 * Initializes the PhysicalNetworkMap.
 	 */
 	public PhysicalNetworkMap() {
 		this.posToId.defaultReturnValue(-1); // Safety bounds: represent unassigned positions
 	}
 
 	public int getOrAddNode(BlockPos pos) {
-		int id = posToId.getInt(pos);
+		return getOrAddNode(pos.asLong());
+	}
+
+	public int getOrAddNode(long packed) {
+		int id = posToId.get(packed);
 		if (id == -1) {
 			id = nextNodeId++;
-			posToId.put(pos, id);
+			posToId.put(packed, id);
+			BlockPos pos = BlockPos.of(packed);
 			idToPos.put(id, pos);
 			adjacencyList.put(id, new IntArrayList());
 
-			// Track spatial chunk coordinate grouping [3]
+			// Track spatial chunk coordinate grouping
 			long chunkKey = ChunkPos.asLong(pos);
 			this.chunkToNodeGroup.computeIfAbsent(chunkKey, k -> new IntArrayList()).add(id);
 		}
@@ -55,7 +59,11 @@ public class PhysicalNetworkMap {
 	}
 
 	public int getNodeId(BlockPos pos) {
-		return posToId.getInt(pos);
+		return posToId.get(pos.asLong());
+	}
+
+	public int getNodeId(long packed) {
+		return posToId.get(packed);
 	}
 
 	public BlockPos getPos(int id) {
@@ -78,31 +86,31 @@ public class PhysicalNetworkMap {
 	}
 
 	/**
-	 * Registers a node ID under its scanned capability classification list [3].
+	 * Registers a node ID under its scanned capability classification list.
 	 *
-	 * @param type the capability classification ResourceLocation [3]
-	 * @param id   the registered node ID [3]
+	 * @param type the capability classification ResourceLocation
+	 * @param id   the registered node ID
 	 */
 	public void indexCapability(ResourceLocation type, int id) {
 		capabilityIndices.computeIfAbsent(type, k -> new IntArrayList()).add(id);
 	}
 
 	/**
-	 * Retrieves all registered node IDs matching a target capability classification
-	 * [3].
+	 * Retrieves all registered node IDs matching a target capability
+	 * classification.
 	 *
-	 * @param type capability classification ResourceLocation [3]
-	 * @return primitive list of node IDs [3]
+	 * @param type capability classification ResourceLocation
+	 * @return primitive list of node IDs
 	 */
 	public IntArrayList getNodesWithCapability(ResourceLocation type) {
 		return capabilityIndices.getOrDefault(type, new IntArrayList());
 	}
 
 	/**
-	 * Configures the sleeping state for a specific node ID [3].
+	 * Configures the sleeping state for a specific node ID.
 	 *
-	 * @param id       node ID target [3]
-	 * @param sleeping true to suspend the node during chunk unloads [3]
+	 * @param id       node ID target
+	 * @param sleeping true to suspend the node during chunk unloads
 	 */
 	public void setNodeSleeping(int id, boolean sleeping) {
 		if (sleeping) {
@@ -113,10 +121,10 @@ public class PhysicalNetworkMap {
 	}
 
 	/**
-	 * Checks if a specific node ID is currently flagged as sleeping [3].
+	 * Checks if a specific node ID is currently flagged as sleeping.
 	 *
-	 * @param id node ID query [3]
-	 * @return true if sleeping [3]
+	 * @param id node ID query
+	 * @return true if sleeping
 	 */
 	public boolean isNodeSleeping(int id) {
 		return sleepingNodes.get(id);
@@ -124,10 +132,10 @@ public class PhysicalNetworkMap {
 
 	/**
 	 * Retrieves all registered node IDs residing inside a specific packed chunk
-	 * coordinate [3].
+	 * coordinate.
 	 *
-	 * @param chunkPacked packed long representation [3]
-	 * @return primitive list of node IDs [3]
+	 * @param chunkPacked packed long representation
+	 * @return primitive list of node IDs
 	 */
 	public IntArrayList getNodesInChunk(long chunkPacked) {
 		return chunkToNodeGroup.get(chunkPacked);
@@ -136,7 +144,7 @@ public class PhysicalNetworkMap {
 	public void removeNode(int id) {
 		BlockPos pos = idToPos.remove(id);
 		if (pos != null) {
-			posToId.removeInt(pos);
+			posToId.remove(pos.asLong());
 			long chunkKey = ChunkPos.asLong(pos);
 			IntArrayList chunkGroup = chunkToNodeGroup.get(chunkKey);
 			if (chunkGroup != null) {

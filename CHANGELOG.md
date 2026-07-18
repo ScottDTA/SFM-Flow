@@ -1,3 +1,23 @@
+7-18-2026
+
+
+
+### [Added]
+* Added the **Snapshot Profile** system, which analyzes your active flowchart and restricts off-thread inventory snapshotting strictly to the blocks and capabilities being used.
+
+### [Changed]
+* Re-engineered the `ManagerBlockEntity` to cache compiled flowchart structures and snapshot profiles, completely avoiding redundant, CPU-heavy NBT serialization on every trigger check when no layout edits are made.
+* Optimized the `PhysicalNetworkMap` coordinate tracker to map packed long coordinates directly to primitive integer IDs, eliminating object allocations during position lookups.
+* Re-engineered the `PhysicalNetwork` pathfinding scanner to use double-buffered primitive layer swaps and mutable block positions, making network scans nearly garbage-free.
+* Simplified variable card definitions by migrating from MapCodecs to standard Codecs.
+
+### [Fixed]
+* Fixed major server garbage collection (GC) lag spikes and tick-rate drops during larger network scans or frequent trigger checks.
+
+### [Removed]
+* None.
+
+
 7-17-2026
 
 ### [Added]
@@ -12,9 +32,6 @@
 
 ### [Fixed]
 * Fixed visual transparency and model occlusion bugs on the Sculk Trigger Cable block.
-
-### [Removed]
-* None.
 
 7-16-2026
 

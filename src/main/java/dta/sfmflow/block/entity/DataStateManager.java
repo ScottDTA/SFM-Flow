@@ -23,22 +23,24 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * High-performance data manager handling synchronous, compressed disk saving
- * of flowchart layout configurations and variable states [3].
+ * High-performance data manager handling synchronous, compressed disk saving of
+ * flowchart layout configurations and variable states.
  */
 public final class DataStateManager {
 
-	private DataStateManager() {}
+	private DataStateManager() {
+	}
 
 	/**
-	 * Synchronously encodes and saves the active flowchart properties to a compressed file [3].
+	 * Synchronously encodes and saves the active flowchart properties to a
+	 * compressed file.
 	 *
-	 * @param server      the active MinecraftServer context [3]
-	 * @param managerId   the unique ID of the target manager [3]
-	 * @param flowchart   the current flowchart data layout [3]
-	 * @param groupVars   the active inventory group variable list [3]
-	 * @param filterVars  the active item filter variable list [3]
-	 * @param registries  the level registry access provider [3]
+	 * @param server     the active MinecraftServer context 
+	 * @param managerId  the unique ID of the target manager 
+	 * @param flowchart  the current flowchart data layout 
+	 * @param groupVars  the active inventory group variable list 
+	 * @param filterVars the active item filter variable list 
+	 * @param registries the level registry access provider 
 	 */
 	public static void saveSync(MinecraftServer server, UUID managerId, Flowchart flowchart,
 			List<InventoryGroupVariable> groupVars, List<ItemFilterVariable> filterVars,
@@ -58,11 +60,11 @@ public final class DataStateManager {
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
 					.ifPresent(nbt -> dataTag.put("flowchart", nbt));
 
-			InventoryGroupVariable.CODEC.codec().listOf().encodeStart(ops, groupVars)
+			InventoryGroupVariable.CODEC.listOf().encodeStart(ops, groupVars)
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
 					.ifPresent(nbt -> dataTag.put("GroupVariables", nbt));
 
-			ItemFilterVariable.CODEC.codec().listOf().encodeStart(ops, filterVars)
+			ItemFilterVariable.CODEC.listOf().encodeStart(ops, filterVars)
 					.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode filter variables: {}", err))
 					.ifPresent(nbt -> dataTag.put("FilterVariables", nbt));
 
@@ -76,7 +78,8 @@ public final class DataStateManager {
 	}
 
 	/**
-	 * Synchronously loads compressed flowchart and variables data on block initialization [3].
+	 * Synchronously loads compressed flowchart and variables data on block
+	 * initialization.
 	 */
 	public static LoadedData loadSync(MinecraftServer server, UUID managerId, HolderLookup.Provider registries) {
 		if (server == null || managerId == null) {
@@ -99,20 +102,20 @@ public final class DataStateManager {
 					Flowchart flowchart = null;
 					if (dataTag.contains("flowchart")) {
 						flowchart = Flowchart.CODEC.parse(ops, dataTag.get("flowchart"))
-                                .resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
-                                .orElse(null);
+								.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode flowchart map: {}", err))
+								.orElse(null);
 					}
 
 					List<InventoryGroupVariable> groupVars = new ArrayList<>();
 					if (dataTag.contains("GroupVariables")) {
-						InventoryGroupVariable.CODEC.codec().listOf().parse(ops, dataTag.get("GroupVariables"))
+						InventoryGroupVariable.CODEC.listOf().parse(ops, dataTag.get("GroupVariables"))
 								.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode group variables: {}", err))
 								.ifPresent(groupVars::addAll);
 					}
 
 					List<ItemFilterVariable> filterVars = new ArrayList<>();
 					if (dataTag.contains("FilterVariables")) {
-						ItemFilterVariable.CODEC.codec().listOf().parse(ops, dataTag.get("FilterVariables"))
+						ItemFilterVariable.CODEC.listOf().parse(ops, dataTag.get("FilterVariables"))
 								.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to decode filter variables: {}", err))
 								.ifPresent(filterVars::addAll);
 					}
@@ -149,7 +152,8 @@ public final class DataStateManager {
 	public record LoadedData(Flowchart flowchart, List<InventoryGroupVariable> groupVariables,
 			List<ItemFilterVariable> filterVariables) {
 		public static LoadedData empty() {
-			return new LoadedData(new Flowchart(new HashMap<>(), new ArrayList<>()), new ArrayList<>(), new ArrayList<>());
+			return new LoadedData(new Flowchart(new HashMap<>(), new ArrayList<>()), new ArrayList<>(),
+					new ArrayList<>());
 		}
 	}
 }

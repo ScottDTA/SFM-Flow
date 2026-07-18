@@ -23,16 +23,20 @@ import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.common.NeoForge;
 
-import java.util.*;
+import java.util.BitSet;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Manages topological scanning and target inventory indices. Extracted to
- * cleanly separate physical networks from logical operations. Upgraded to index
- * capability nodes and cache BlockCapabilityCache handlers safely.
+ * Manages topological scanning and target inventory indices. Upgraded with a
+ * layered primitive BFS and packed coordinate map to run garbage-free.
  */
 public class PhysicalNetwork {
 	private final Set<BlockPos> scannedCables = new HashSet<>();
-	private final List<ConnectionBlock> scannedInventories = new java.util.concurrent.CopyOnWriteArrayList<>();
+	private final List<ConnectionBlock> scannedInventories = new CopyOnWriteArrayList<>();
 	private final PhysicalNetworkMap networkMap = new PhysicalNetworkMap();
 	private long lastScanTime = 0L;
 	private boolean isDirty = true;
@@ -109,65 +113,83 @@ public class PhysicalNetwork {
 		this.networkMap.clear();
 
 		BitSet visited = new BitSet();
-		Queue<ScanNode> queue = new ArrayDeque<>();
 
-		int startId = this.networkMap.getOrAddNode(startPos);
+		// Use fastutil primitive IntArrayList to perform double-buffered layered BFS
+		IntArrayList currentLayer = new IntArrayList();
+		IntArrayList nextLayer = new IntArrayList();
+
+		long startPosPacked = startPos.asLong();
+		int startId = this.networkMap.getOrAddNode(startPosPacked);
 		visited.set(startId);
+
+		BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
 
 		// Seed BFS queue with starting neighbors
 		for (Direction dir : Direction.values()) {
-			BlockPos adjacent = startPos.relative(dir);
-			BlockState state = level.getBlockState(adjacent);
+			mutablePos.set(startPos).move(dir);
+			long adjacentPacked = mutablePos.asLong();
+			BlockState state = level.getBlockState(mutablePos);
 
 			// Only allow conductive cables/clusters to extend the pathfinding search
-			if (canConductNetwork(level, adjacent, state)) {
-				int adjacentId = this.networkMap.getOrAddNode(adjacent);
+			if (canConductNetwork(level, mutablePos, state)) {
+				int adjacentId = this.networkMap.getOrAddNode(adjacentPacked);
 				visited.set(adjacentId);
 				this.networkMap.addEdge(startId, adjacentId);
-				CableNetworkRegistry.registerCable(level, adjacent, startPos);
 
-				queue.add(new ScanNode(adjacent, 1));
+				currentLayer.add(adjacentId);
 			} else if (!state.is(ModBlocks.MANAGER_BLOCK.get())) {
-				evaluateAndAddInventory(level, adjacent, state, 1, visited, false);
+				evaluateAndAddInventory(level, mutablePos.immutable(), state, 1, visited, false);
 			}
 		}
 
 		int maxDepth = ServerConfig.MAX_CABLE_LENGTH.get();
 		int maxInventories = ServerConfig.MAX_CONNECTED_INVENTORIES.get();
+		int depth = 1;
 
-		while (!queue.isEmpty()) {
-			ScanNode current = queue.poll();
-			this.scannedCables.add(current.pos());
-			int currentId = this.networkMap.getNodeId(current.pos());
-			CableNetworkRegistry.registerCable(level, current.pos(), startPos);
+		while (!currentLayer.isEmpty() && depth < maxDepth) {
+			for (int i = 0; i < currentLayer.size(); i++) {
+				int currentId = currentLayer.getInt(i);
+				BlockPos currentPos = this.networkMap.getPos(currentId);
+				this.scannedCables.add(currentPos);
 
-			if (current.depth() >= maxDepth) {
-				continue;
+				for (Direction dir : Direction.values()) {
+					mutablePos.set(currentPos).move(dir);
+					long neighborPacked = mutablePos.asLong();
+
+					int neighborId = this.networkMap.getNodeId(neighborPacked);
+
+					if (neighborId != -1 && visited.get(neighborId)) {
+						this.networkMap.addEdge(currentId, neighborId);
+						continue;
+					}
+
+					BlockState state = level.getBlockState(mutablePos);
+
+					// Only allow conductive cables/clusters to extend the pathfinding search
+					if (canConductNetwork(level, mutablePos, state)) {
+						int newNeighborId = this.networkMap.getOrAddNode(neighborPacked);
+						visited.set(newNeighborId);
+						this.networkMap.addEdge(currentId, newNeighborId);
+
+						nextLayer.add(newNeighborId);
+					} else if (this.scannedInventories.size() < maxInventories
+							&& !state.is(ModBlocks.MANAGER_BLOCK.get())) {
+						evaluateAndAddInventory(level, mutablePos.immutable(), state, depth + 1, visited, false);
+					}
+				}
 			}
 
-			for (Direction dir : Direction.values()) {
-				BlockPos neighbor = current.pos().relative(dir);
-				int neighborId = this.networkMap.getNodeId(neighbor);
+			// Swap layers for the next depth sweep [3]
+			currentLayer.clear();
+			currentLayer.addAll(nextLayer);
+			nextLayer.clear();
+			depth++;
+		}
 
-				if (neighborId != -1 && visited.get(neighborId)) {
-					this.networkMap.addEdge(currentId, neighborId);
-					continue;
-				}
-
-				BlockState state = level.getBlockState(neighbor);
-
-				// Only allow conductive cables/clusters to extend the pathfinding search
-				if (canConductNetwork(level, neighbor, state)) {
-					int newNeighborId = this.networkMap.getOrAddNode(neighbor);
-					visited.set(newNeighborId);
-					this.networkMap.addEdge(currentId, newNeighborId);
-
-					queue.add(new ScanNode(neighbor, current.depth() + 1));
-				} else if (this.scannedInventories.size() < maxInventories
-						&& !state.is(ModBlocks.MANAGER_BLOCK.get())) {
-					evaluateAndAddInventory(level, neighbor, state, current.depth() + 1, visited, false);
-				}
-			}
+		// Batch register all mapped cables in one loop after queue processing completes
+		// [3]
+		for (BlockPos cablePos : this.scannedCables) {
+			CableNetworkRegistry.registerCable(level, cablePos, startPos);
 		}
 
 		BlockEntity startBe = level.getBlockEntity(startPos);
