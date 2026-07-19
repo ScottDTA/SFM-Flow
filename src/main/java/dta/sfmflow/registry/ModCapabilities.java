@@ -78,5 +78,17 @@ public class ModCapabilities {
 
 		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.CABLE_CLUSTER_BE.get(),
 				(be, side) -> be.getFluidHandler(side));
+		
+		event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, ModBlockEntities.CABLE_CLUSTER_BE.get(),
+				(be, side) -> be.getEnergyHandler(side));
+		
+		event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ModBlockEntities.ITEM_RELAY_BE.get(),
+				(be, side) -> be.getItemHandler(side));
+		
+		event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.FLUID_RELAY_BE.get(),
+				(be, side) -> be.getFluidHandler(side));
+		
+		event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, ModBlockEntities.ENERGY_RELAY_BE.get(),
+				(be, side) -> be.getEnergyHandler(side));
 	}
 }

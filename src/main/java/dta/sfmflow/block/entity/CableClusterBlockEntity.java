@@ -2,6 +2,7 @@ package dta.sfmflow.block.entity;
 
 import dta.sfmflow.api.capability.CableClusterBehaviorRegistry;
 import dta.sfmflow.api.capability.ClusterCardBehavior;
+import dta.sfmflow.api.capability.ClusterCardCapabilityRegistry;
 import dta.sfmflow.block.CableBlock;
 import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.registry.ModTags;
@@ -18,6 +19,7 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -27,6 +29,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -34,14 +39,14 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
  * Backing BlockEntity logic running cluster card proxy sweeps, pre-allocated
- * directional capability routing, staggered logic executions, and adjacent pipe
- * cache flush notifications.
+ * directional capability routing, and adjacent pipe cache flush notifications.
  */
 public class CableClusterBlockEntity extends BlockEntity implements MenuProvider {
 	private final int numSlots;
@@ -89,7 +94,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 				CableClusterBlockEntity.this.setChanged();
 				CableClusterBlockEntity.this.notifyNeighbors();
 
-				// Flag the nearby cable networks as dirty to force a topology rescan
 				if (CableClusterBlockEntity.this.level != null && !CableClusterBlockEntity.this.level.isClientSide()) {
 					CableBlock.markNearbyNetworksDirty(CableClusterBlockEntity.this.level,
 							CableClusterBlockEntity.this.worldPosition);
@@ -123,6 +127,26 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			this.directionalFluidProxies[dir.ordinal()] = new ClusterFluidHandlerProxy(this, dir);
 		}
 	}
+	
+	/**
+	 * Public API helper allowing addon developers to query the installed cards
+	 * for any custom block capabilities dynamically.
+	 */
+	public <T> @Nullable T getCapabilityFromCards(net.neoforged.neoforge.capabilities.BlockCapability<T, Direction> capability, @Nullable Direction side) {
+		if (side == null || this.level == null) {
+			return null;
+		}
+		for (int i = 0; i < numSlots; i++) {
+			ItemStack stack = inventory.getStackInSlot(i);
+			if (!stack.isEmpty()) {
+				T handler = ClusterCardCapabilityRegistry.getCapability(capability, this.level, this.worldPosition, side, i, this);
+				if (handler != null) {
+					return handler;
+				}
+			}
+		}
+		return null;
+	}
 
 	public void notifyNeighbors() {
 		if (this.level != null && !this.level.isClientSide()) {
@@ -136,6 +160,18 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 
 	public ItemStackHandler getInventory() {
 		return inventory;
+	}
+	
+	/**
+	 * Checks if the slot contains an active directional card.
+	 * Returns false for empty slots or omni-directional cards (such as Relays or Redstone sensors).
+	 */
+	public boolean isSlotDirectional(int slot) {
+		ItemStack stack = this.inventory.getStackInSlot(slot);
+		if (stack.isEmpty()) {
+			return false;
+		}
+		return stack.is(ModTags.DIRECTIONAL_CLUSTER_CARDS);
 	}
 
 	@Nullable
@@ -155,7 +191,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 					this.setChanged();
 					this.notifyNeighbors();
 
-					// Flag the nearby cable networks as dirty to force a topology rescan
 					if (this.level != null && !this.level.isClientSide()) {
 						CableBlock.markNearbyNetworksDirty(this.level, this.worldPosition);
 					}
@@ -164,10 +199,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		}
 	}
 
-	/**
-	 * Determines if a specific directional value is valid and unconflicted for a
-	 * slot card.
-	 */
 	public boolean isDirectionValid(int slot, @Nullable Direction dir) {
 		if (dir == null)
 			return true;
@@ -175,8 +206,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		if (stack.isEmpty())
 			return true;
 
-		// Query extensible Tag lists to support third-party addon directional cards
-		// natively
 		if (stack.is(ModTags.DIRECTIONAL_CLUSTER_CARDS)) {
 			Item item = stack.getItem();
 			for (int i = 0; i < numSlots; i++) {
@@ -191,17 +220,11 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		return true;
 	}
 
-	/**
-	 * Evaluates if a card insertion satisfies standard cables, omni, and valve
-	 * capacity rules. Querying extensible ModTags guarantees full compatibility
-	 * with addon cards.
-	 */
 	public boolean isCardInsertionValid(int slot, ItemStack stack) {
 		if (stack.isEmpty())
 			return true;
 		Item item = stack.getItem();
 
-		// 1. Standard or Hardened Cable: maximum of 1 of either allowed total
 		boolean isCable = (stack.is(ModBlocks.CABLE_BLOCK.get().asItem())
 				|| stack.is(ModBlocks.HARDENED_CABLE_BLOCK.get().asItem()));
 		if (isCable) {
@@ -216,7 +239,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			}
 		}
 
-		// 2. Omni-Directional cables: maximum of 1 of each type allowed
 		if (stack.is(ModTags.OMNI_DIRECTIONAL_CLUSTER_CARDS)) {
 			for (int i = 0; i < numSlots; i++) {
 				if (i != slot) {
@@ -228,7 +250,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			}
 		}
 
-		// 3. Directional cables: maximum of 6 of each individual type allowed
 		if (stack.is(ModTags.DIRECTIONAL_CLUSTER_CARDS)) {
 			int count = 0;
 			for (int i = 0; i < numSlots; i++) {
@@ -247,10 +268,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		return true;
 	}
 
-	/**
-	 * Determines if the network is allowed to route/traverse through this cluster
-	 * block.
-	 */
 	public boolean hasCableCard() {
 		for (int i = 0; i < numSlots; i++) {
 			ItemStack stack = inventory.getStackInSlot(i);
@@ -262,25 +279,33 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		return false;
 	}
 
+	// OPEN-CLOSED REFACTOR: Delegate checks dynamically to the public registry
+	
 	public boolean isItemCard(int slot) {
 		ItemStack stack = this.inventory.getStackInSlot(slot);
-		if (stack.isEmpty())
-			return false;
-		return stack.is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem())
-				|| stack.is(ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem());
+		if (stack.isEmpty()) return false;
+		return ClusterCardCapabilityRegistry.hasCapability(Capabilities.ItemHandler.BLOCK, stack.getItem());
 	}
 
 	public boolean isFluidCard(int slot) {
 		ItemStack stack = this.inventory.getStackInSlot(slot);
-		if (stack.isEmpty())
-			return false;
-		return stack.is(ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem())
-				|| stack.is(ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem());
+		if (stack.isEmpty()) return false;
+		return ClusterCardCapabilityRegistry.hasCapability(Capabilities.FluidHandler.BLOCK, stack.getItem());
+	}
+
+	public boolean isEnergyCard(int slot) {
+		ItemStack stack = this.inventory.getStackInSlot(slot);
+		if (stack.isEmpty()) return false;
+		return ClusterCardCapabilityRegistry.hasCapability(Capabilities.EnergyStorage.BLOCK, stack.getItem());
 	}
 
 	public @Nullable IItemHandler getItemHandler(@Nullable Direction side) {
 		if (side == null) {
 			return this.inventory;
+		}
+		IItemHandler cardHandler = getCapabilityFromCards(Capabilities.ItemHandler.BLOCK, side);
+		if (cardHandler != null) {
+			return cardHandler;
 		}
 		return this.directionalItemProxies[side.ordinal()];
 	}
@@ -289,7 +314,18 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		if (side == null) {
 			return null;
 		}
+		IFluidHandler cardHandler = getCapabilityFromCards(Capabilities.FluidHandler.BLOCK, side);
+		if (cardHandler != null) {
+			return cardHandler;
+		}
 		return this.directionalFluidProxies[side.ordinal()];
+	}
+
+	public @Nullable IEnergyStorage getEnergyHandler(@Nullable Direction side) {
+		if (side == null) {
+			return null;
+		}
+		return getCapabilityFromCards(Capabilities.EnergyStorage.BLOCK, side);
 	}
 
 	public ItemStackHandler getSlotBuffer(int slot) {
@@ -313,7 +349,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 			if (dir == null) {
 				continue;
 			}
-			// Delegate custom ticking to the extensible behavior registry
 			ClusterCardBehavior behavior = CableClusterBehaviorRegistry.get(stack.getItem());
 			if (behavior != null) {
 				behavior.tick(level, pos, dir, i, stack, be);
@@ -324,8 +359,6 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 	@Override
 	public void setChanged() {
 		super.setChanged();
-		// Force server-to-client block entity sync whenever properties, directions, or
-		// items modify
 		if (this.level != null && !this.level.isClientSide()) {
 			BlockState state = this.getBlockState();
 			this.level.sendBlockUpdated(this.worldPosition, state, state, Block.UPDATE_ALL);
@@ -401,6 +434,62 @@ public class CableClusterBlockEntity extends BlockEntity implements MenuProvider
 		return Component.translatable(this.getBlockState().is(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get())
 				? "container.sfmflow.advanced_cable_cluster"
 				: "container.sfmflow.cable_cluster");
+	}
+
+	// Dynamic Entity proxies
+
+	public @Nullable IItemHandler getEntityItemHandler(Direction side) {
+		if (this.level == null || side == null) {
+			return null;
+		}
+		BlockPos targetPos = this.worldPosition.relative(side);
+		AABB aabb = new AABB(targetPos).inflate(0.2D);
+		List<Entity> entities = this.level.getEntitiesOfClass(Entity.class, aabb, entity -> !(entity instanceof Player));
+
+		for (Entity entity : entities) {
+			IItemHandler handler = entity.getCapability(Capabilities.ItemHandler.ENTITY_AUTOMATION, null);
+			if (handler == null) {
+				handler = entity.getCapability(Capabilities.ItemHandler.ENTITY, null);
+			}
+			if (handler != null) {
+				return handler;
+			}
+		}
+		return null;
+	}
+
+	public @Nullable IFluidHandler getEntityFluidHandler(Direction side) {
+		if (this.level == null || side == null) {
+			return null;
+		}
+		BlockPos targetPos = this.worldPosition.relative(side);
+		AABB aabb = new AABB(targetPos).inflate(0.2D);
+		List<Entity> entities = this.level.getEntitiesOfClass(Entity.class, aabb, entity -> !(entity instanceof Player));
+
+		for (Entity entity : entities) {
+			IFluidHandler handler = entity.getCapability(Capabilities.FluidHandler.ENTITY, null);
+			if (handler != null) {
+				return handler;
+			}
+		}
+		return null;
+	}
+
+	public @Nullable IEnergyStorage getEntityEnergyHandler(Direction side) {
+		if (this.level == null || side == null) {
+			return null;
+		}
+		BlockPos targetPos = this.worldPosition.relative(side);
+		AABB aabb = new AABB(targetPos).inflate(0.2D);
+		List<Entity> entities = this.level.getEntitiesOfClass(Entity.class, aabb, entity -> !(entity instanceof Player));
+
+		for (Entity entity : entities) {
+			IEnergyStorage handler = entity.getCapability(Capabilities.EnergyStorage.ENTITY, null);
+			if (handler != null) {
+				return handler;
+			}
+		}
+		return null;
 	}
 
 	private static class ClusterItemHandlerProxy implements IItemHandler {

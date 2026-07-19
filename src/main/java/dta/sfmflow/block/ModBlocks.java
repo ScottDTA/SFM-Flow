@@ -74,6 +74,18 @@ public class ModBlocks {
 	public static final DeferredBlock<Block> SCULK_TRIGGER_CABLE_BLOCK = registerBlock("sculk_trigger_cable_block",
 			() -> new SculkTriggerCableBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK).noOcclusion()));
+	
+	public static final DeferredBlock<Block> ITEM_RELAY_BLOCK = registerBlock("item_relay_block",
+			() -> new ItemRelayBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+	
+	public static final DeferredBlock<Block> FLUID_RELAY_BLOCK = registerBlock("fluid_relay_block",
+			() -> new FluidRelayBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+	
+	public static final DeferredBlock<Block> ENERGY_RELAY_BLOCK = registerBlock("energy_relay_block",
+			() -> new EnergyRelayBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 
 	private static <T extends Block> DeferredBlock<T> registerBlock(String name, Supplier<T> block) {
 		DeferredBlock<T> toReturn = BLOCKS.register(name, block);

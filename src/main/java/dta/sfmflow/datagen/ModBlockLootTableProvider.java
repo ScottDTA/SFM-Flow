@@ -33,6 +33,9 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 		dropSelf(ModBlocks.CABLE_CLUSTER_BLOCK.get());
 		dropSelf(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get());
 		dropSelf(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get());
+		dropSelf(ModBlocks.ITEM_RELAY_BLOCK.get());
+		dropSelf(ModBlocks.FLUID_RELAY_BLOCK.get());
+		dropSelf(ModBlocks.ENERGY_RELAY_BLOCK.get());
 	}
 
 	@Override

@@ -114,6 +114,15 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		simpleBlock(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), sculkCableModel);
 		simpleBlockItem(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), sculkCableModel);
 		
+		simpleBlock(ModBlocks.ITEM_RELAY_BLOCK.get());
+		simpleBlockItem(ModBlocks.ITEM_RELAY_BLOCK.get(), models().cubeAll("item_relay_block", modLoc("block/item_relay_block")));
+		
+		simpleBlock(ModBlocks.FLUID_RELAY_BLOCK.get());
+		simpleBlockItem(ModBlocks.FLUID_RELAY_BLOCK.get(), models().cubeAll("fluid_relay_block", modLoc("block/fluid_relay_block")));
+		
+		simpleBlock(ModBlocks.ENERGY_RELAY_BLOCK.get());
+		simpleBlockItem(ModBlocks.ENERGY_RELAY_BLOCK.get(), models().cubeAll("energy_relay_block", modLoc("block/energy_relay_block")));
+		
 
 		BlockModelBuilder inventoryModel = models().cubeAll("block/redstone_emitter_inventory",
 				modLoc("block/redstone_emitter_side_off"));

@@ -8,11 +8,13 @@ import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.item.ModCreativeModeTabs;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.registry.ModDataComponents;
-import dta.sfmflow.networking.ModNetworking; // Link updated networking [3]
+import dta.sfmflow.networking.ModNetworking; 
 import dta.sfmflow.screen.ModMenuTypes;
+import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.loading.FMLEnvironment;
 
@@ -27,6 +29,7 @@ public class SFMFlow {
 
 	public SFMFlow(IEventBus modEventBus, ModContainer modContainer) {
 		modEventBus.addListener(ModNetworking::register);
+		modEventBus.addListener(this::commonSetup);
 
 		ModCreativeModeTabs.register(modEventBus);
 		ModItems.register(modEventBus);
@@ -39,7 +42,16 @@ public class SFMFlow {
 		modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "sfmflow-client.toml");
 
 		if (FMLEnvironment.dist.isClient()) {
-			dta.sfmflow.SFMFlowClient.initialize(modEventBus, modContainer);
+			SFMFlowClient.initialize(modEventBus, modContainer);
 		}
+	}
+
+	/**
+	 * Safe common-setup callback executed after all registries are fully bound and frozen.
+	 */
+	private void commonSetup(FMLCommonSetupEvent event) {
+		event.enqueueWork(() -> {
+			VanillaSFMFlowPlugin.registerCardCapabilities();
+		});
 	}
 }

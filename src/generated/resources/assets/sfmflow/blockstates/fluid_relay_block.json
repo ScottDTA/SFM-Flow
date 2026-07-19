@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "sfmflow:block/fluid_relay_block"
+    }
+  }
+}

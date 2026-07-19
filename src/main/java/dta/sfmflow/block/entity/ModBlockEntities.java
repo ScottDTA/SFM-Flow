@@ -45,6 +45,18 @@ public class ModBlockEntities {
 	public static final Supplier<BlockEntityType<CableClusterBlockEntity>> CABLE_CLUSTER_BE = BLOCK_ENTITIES
 			.register("cable_cluster_be", () -> BlockEntityType.Builder.of(CableClusterBlockEntity::new,
 					ModBlocks.CABLE_CLUSTER_BLOCK.get(), ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get()).build(null));
+	
+	public static final Supplier<BlockEntityType<ItemRelayBlockEntity>> ITEM_RELAY_BE = BLOCK_ENTITIES
+			.register("item_relay_be", () -> BlockEntityType.Builder
+					.of(ItemRelayBlockEntity::new, ModBlocks.ITEM_RELAY_BLOCK.get()).build(null));
+	
+	public static final Supplier<BlockEntityType<FluidRelayBlockEntity>> FLUID_RELAY_BE = BLOCK_ENTITIES
+			.register("fluid_relay_be", () -> BlockEntityType.Builder
+					.of(FluidRelayBlockEntity::new, ModBlocks.FLUID_RELAY_BLOCK.get()).build(null));
+	
+	public static final Supplier<BlockEntityType<EnergyRelayBlockEntity>> ENERGY_RELAY_BE = BLOCK_ENTITIES
+			.register("energy_relay_be", () -> BlockEntityType.Builder
+					.of(EnergyRelayBlockEntity::new, ModBlocks.ENERGY_RELAY_BLOCK.get()).build(null));
 
 	public static void register(IEventBus eventBus) {
 		BLOCK_ENTITIES.register(eventBus);

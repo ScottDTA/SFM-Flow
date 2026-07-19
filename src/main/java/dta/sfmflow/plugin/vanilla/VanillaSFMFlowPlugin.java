@@ -11,6 +11,8 @@ import dta.sfmflow.api.capability.FluidTransferParams;
 import dta.sfmflow.api.capability.ItemTransferParams;
 import dta.sfmflow.api.capability.EnergyTransferParams;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import dta.sfmflow.api.capability.ClusterCardCapabilityRegistry;
+import dta.sfmflow.api.capability.FlowCapabilityPresenceRegistry;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.block.FluidVacuumValveBlock;
 import dta.sfmflow.block.ItemVacuumValveBlock;
@@ -102,7 +104,6 @@ public class VanillaSFMFlowPlugin {
 		
 		ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
 		FlowCapabilityRegistry.register(new FlowCapability<>(sculkCapId, null, "gui.sfmflow.type_sculk"));
-		
 
 		INTERVAL_TRIGGER = FlowComponentBuilder.create("interval_trigger", IntervalTriggerComponent::new)
 				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/interval_trigger_button.png")
@@ -176,45 +177,44 @@ public class VanillaSFMFlowPlugin {
 		
 		REDSTONE_CONDITIONAL = FlowComponentBuilder.create("redstone_conditional", RedstoneConditionalComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/redstone_condition_button.png")
+				.icon("textures/gui/menu_buttons/condition_button.png")
 				.displayName("gui.sfmflow.redstone_conditional")
 				.codec(RedstoneConditionalComponent.CODEC)
 				.build(registry);
 		
 		SPLITTER = FlowComponentBuilder.create("splitter", SplitterComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/splitter_button.png") // Reuses default flow control button
+				.icon("textures/gui/menu_buttons/flow_control_button.png") 
 				.displayName("gui.sfmflow.splitter")
 				.codec(SplitterComponent.CODEC)
 				.build(registry);
 		
 		COLLECTOR = FlowComponentBuilder.create("collector", CollectorComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/collector_button.png") // Reuses default flow control button
+				.icon("textures/gui/menu_buttons/flow_control_button.png") 
 				.displayName("gui.sfmflow.collector")
 				.codec(CollectorComponent.CODEC)
 				.build(registry);
 		
 		SCULK_TRIGGER = FlowComponentBuilder.create("sculk_trigger", SculkTriggerComponent::new)
 				.category(NodeCategory.TRIGGER)
-				.icon("textures/gui/menu_buttons/skulk_trigger_button.png") // Reuses default trigger button icon
+				.icon("textures/gui/menu_buttons/trigger_button.png") 
 				.displayName("gui.sfmflow.sculk_trigger")
 				.codec(SculkTriggerComponent.CODEC)
 				.build(registry);
 		
 		GROUP_NODE = FlowComponentBuilder.create("group_node", GroupComponent::new)
-				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/command_group_button.png")
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_node_button.png")
 				.displayName("gui.sfmflow.menu.group_node").codec(GroupComponent.CODEC).build(registry);
 
 		GROUP_INPUT = FlowComponentBuilder.create("group_input", GroupInputComponent::new)
-				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_input_button.png")
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/input_button.png")
 				.displayName("Group Input").codec(GroupInputComponent.CODEC).build(registry);
 
 		GROUP_OUTPUT = FlowComponentBuilder.create("group_output", GroupOutputComponent::new)
-				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_output_button.png")
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("Group Output").codec(GroupOutputComponent.CODEC).build(registry);
 		
-		// Synchronizes Round-Robin indices from background worker sweeps back to main thread block entities
 		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_sync"),
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof SplitterComponent.SplitterSyncParams task) {
@@ -231,9 +231,64 @@ public class VanillaSFMFlowPlugin {
 					}
 					return false;
 				});
-		
-		
-		
+	}
+
+	/**
+	 * Safe common-setup callback executed after all registries are fully bound and frozen.
+	 */
+	public static void registerCardCapabilities() {
+		// 1. Register Card Capability Proxies safely
+		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK, ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					if (be.getSlotDirection(slot) == side) {
+						return be.getSlotBuffer(slot);
+					}
+					return null;
+				});
+
+		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK, ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					if (be.getSlotDirection(slot) == side) {
+						return be.getSlotBuffer(slot);
+					}
+					return null;
+				});
+
+		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					if (be.getSlotDirection(slot) == side) {
+						return be.getFluidBuffer(slot);
+					}
+					return null;
+				});
+
+		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					if (be.getSlotDirection(slot) == side) {
+						return be.getFluidBuffer(slot);
+					}
+					return null;
+				});
+
+		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK, ModBlocks.ITEM_RELAY_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					return be.getEntityItemHandler(side);
+				});
+
+		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, ModBlocks.FLUID_RELAY_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					return be.getEntityFluidHandler(side);
+				});
+
+		ClusterCardCapabilityRegistry.register(Capabilities.EnergyStorage.BLOCK, ModBlocks.ENERGY_RELAY_BLOCK.get().asItem(), 
+				(level, pos, side, slot, be) -> {
+					return be.getEntityEnergyHandler(side);
+				});
+
+		// 2. Register Specialty Always-Present scan blocks safely
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"), ModBlocks.ITEM_RELAY_BLOCK.get());
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"), ModBlocks.FLUID_RELAY_BLOCK.get());
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"), ModBlocks.ENERGY_RELAY_BLOCK.get());
 	}
 
 	private void registerItemCapability() {
@@ -241,7 +296,6 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry
 				.register(new FlowCapability<>(itemCapId, Capabilities.ItemHandler.BLOCK, "gui.sfmflow.type_item"));
 
-		// Register standard items snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(itemCapId, (IItemHandler handler) -> {
 			Map<Integer, ThreadSafeInventorySnapshot.SlotSnapshot> slots = new HashMap<>();
 			int count = handler.getSlots();
@@ -256,7 +310,6 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.registerTransfer(itemCapId,
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof ItemTransferParams task) {
-						// Intercept transfer task if the source block is a Vacuum Valve
 						if (level.getBlockState(src).is(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get())) {
 							return executeVacuumTransfer(level, src, dest, destSide, task);
 						}
@@ -305,7 +358,6 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry
 				.register(new FlowCapability<>(fluidCapId, Capabilities.FluidHandler.BLOCK, "gui.sfmflow.type_fluid"));
 
-		// Register standard fluids snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(fluidCapId, (IFluidHandler handler) -> {
 			Map<Integer, ThreadSafeInventorySnapshot.TankSnapshot> tanks = new HashMap<>();
 			int count = handler.getTanks();
@@ -384,13 +436,11 @@ public class VanillaSFMFlowPlugin {
 		FlowCapabilityRegistry.register(
 				new FlowCapability<>(energyCapId, Capabilities.EnergyStorage.BLOCK, "gui.sfmflow.type_energy"));
 
-		// Register standard energy snapshotter
 		FlowCapabilityRegistry.registerSnapshotter(energyCapId, (IEnergyStorage handler) -> {
 			return new ThreadSafeInventorySnapshot.EnergySnapshot(handler.getEnergyStored(),
 					handler.getMaxEnergyStored(), handler.canExtract(), handler.canReceive());
 		});
 
-		// Explicit parameter types prevent JMM-type inference breakdowns
 		FlowCapabilityRegistry.registerTransfer(energyCapId,
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof EnergyTransferParams task) {
@@ -448,11 +498,10 @@ public class VanillaSFMFlowPlugin {
 							if (task.isPulse()) {
 								emitter.setPowerForSide(destSide, newPower);
 								emitter.setPulsed(destSide, true);
-								// Schedule 1-tick delay to clear the pulse automatically
 								level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
 							} else {
 								emitter.setPowerForSide(destSide, newPower);
-								emitter.setPulsed(destSide, false); // clear pulse state if set
+								emitter.setPulsed(destSide, false); 
 							}
 							return true;
 						}
@@ -462,7 +511,6 @@ public class VanillaSFMFlowPlugin {
 	}
 
 	private void registerCauldronBridges() {
-		// Bridge stateless vanilla cauldrons to our capability transfer network
 		SpecialBlockCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, Blocks.CAULDRON,
 				(level, pos, state, side) -> new CauldronFluidHandler(level, pos));
 		SpecialBlockCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, Blocks.WATER_CAULDRON,
@@ -471,9 +519,6 @@ public class VanillaSFMFlowPlugin {
 				(level, pos, state, side) -> new CauldronFluidHandler(level, pos));
 	}
 
-	/**
-	 * Resolves the underlying main slot index from nested Capability Wrappers.
-	 */
 	private static int translateSlot(IItemHandler handler, int slotIndex) {
 		if (handler == null) {
 			return slotIndex;
@@ -505,15 +550,10 @@ public class VanillaSFMFlowPlugin {
 				return translateSlot(compose, minSlot + slotIndex);
 			}
 		} catch (Exception e) {
-			// Fallback on security exceptions or missing fields
 		}
 		return slotIndex;
 	}
 
-	/**
-	 * Extracts matching items directly from ground entities in front of the vacuum
-	 * mouth. Re-centered to evaluate the full 3x3x3 volume correctly.
-	 */
 	private static boolean executeVacuumTransfer(Level level, BlockPos src, BlockPos dest, Direction destSide,
 			ItemTransferParams task) {
 		BlockState state = level.getBlockState(src);
@@ -553,7 +593,6 @@ public class VanillaSFMFlowPlugin {
 								ItemHandlerHelper.insertItemStacked(target, realInsert, false);
 							}
 
-							// Update or clean up the entity representation on the ground
 							groundStack.shrink(realTransferCount);
 							if (groundStack.isEmpty()) {
 								entity.discard();

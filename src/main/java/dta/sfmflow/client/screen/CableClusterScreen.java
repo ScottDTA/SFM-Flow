@@ -16,8 +16,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Screen interface mapping slots to directional faces via instant feedback
- * widgets. Redesigned with dynamic panel metrics to eliminate visual overlaps
- * completely.
+ * widgets. Redesigned with dynamic panel metrics and contextual button visibilities.
  */
 @OnlyIn(Dist.CLIENT)
 public class CableClusterScreen extends AbstractContainerScreen<CableClusterMenu> {
@@ -28,6 +27,8 @@ public class CableClusterScreen extends AbstractContainerScreen<CableClusterMenu
 			"textures/gui/cable_cluster_menu.png");
 	private static final ResourceLocation ADV_CABLE_CLUSTER_TX = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/adv_cable_cluster_menu.png");
+
+	private Button[] directionButtons;
 
 	/**
 	 * Initializes the screen and calculates safe background layout heights.
@@ -50,6 +51,8 @@ public class CableClusterScreen extends AbstractContainerScreen<CableClusterMenu
 		int numSlots = this.menu.getBlockEntity().getNumSlots();
 		int left = this.leftPos;
 		int top = this.topPos;
+
+		this.directionButtons = new Button[numSlots]; // Initialize the tracker array
 
 		for (int i = 0; i < numSlots; i++) {
 			final int slotIdx = i;
@@ -97,12 +100,31 @@ public class CableClusterScreen extends AbstractContainerScreen<CableClusterMenu
 				}
 			}).pos(btnX, btnY).size(32, 14).build();
 
+			this.directionButtons[i] = btn; // Store reference
 			this.addRenderableWidget(btn);
 		}
 	}
 
+	private boolean isSlotDirectional(int slot) {
+		return this.menu.getBlockEntity().isSlotDirectional(slot);
+	}
+
 	@Override
 	public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+		// Update button visibilities and messages dynamically based on slot contents
+		int numSlots = this.menu.getBlockEntity().getNumSlots();
+		for (int i = 0; i < numSlots; i++) {
+			if (this.directionButtons != null && this.directionButtons[i] != null) {
+				boolean show = isSlotDirectional(i);
+				this.directionButtons[i].visible = show;
+				this.directionButtons[i].active = show;
+				if (show) {
+					Direction dir = this.menu.getBlockEntity().getSlotDirection(i);
+					this.directionButtons[i].setMessage(Component.literal((dir == null) ? "NONE" : dir.name()));
+				}
+			}
+		}
+
 		this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 		super.render(guiGraphics, mouseX, mouseY, partialTick);
 		this.renderTooltip(guiGraphics, mouseX, mouseY);

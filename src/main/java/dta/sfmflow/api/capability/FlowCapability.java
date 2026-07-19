@@ -9,11 +9,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.BlockCapability;
 import org.jetbrains.annotations.Nullable;
 
+import dta.sfmflow.block.ModBlocks;
 import dta.sfmflow.registry.ModTags;
 
 /**
- * Public API class representing an extensible physical network capability [3].
- * Replaces hardcoded capabilities with a registry-based pattern [3].
+ * Public API class representing an extensible physical network capability.
+ * Replaces hardcoded capabilities with a registry-based pattern.
  */
 public final class FlowCapability<T> {
 	private final ResourceLocation id;
@@ -41,13 +42,19 @@ public final class FlowCapability<T> {
 
 	/**
 	 * Dynamic presence check that evaluates if this capability is exposed by the
-	 * block state [3].
+	 * block state.
 	 */
 	public boolean isPresent(Level level, BlockPos pos, BlockState state, @Nullable BlockEntity be,
 			@Nullable Direction side) {
 		if (id.getPath().equals("redstone")) {
 			return state.is(ModTags.REDSTONE_CABLES);
 		}
+		
+		// Query the public presence registry to support specialty block scan overrides
+		if (FlowCapabilityPresenceRegistry.isAlwaysPresent(this.id, state.getBlock())) {
+			return true;
+		}
+
 		if (capability == null) {
 			return false;
 		}
@@ -58,8 +65,7 @@ public final class FlowCapability<T> {
 	}
 
 	/**
-	 * Symmetrically checks all six directions and the non-directional side context
-	 * [3].
+	 * Symmetrically checks all six directions and the non-directional side context.
 	 */
 	public boolean isPresentAnywhere(Level level, BlockPos pos, BlockState state, @Nullable BlockEntity be) {
 		if (this.isPresent(level, pos, state, be, null)) {

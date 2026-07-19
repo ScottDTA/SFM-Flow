@@ -18,24 +18,28 @@ public class MekanismSlotLayouts implements ISlotLayoutSubProvider {
 		ResourceLocation itemCapId = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item");
 		Optional<ResourceLocation> noCustomTex = Optional.empty();
 
-		registrar.add(
-				ResourceLocation.fromNamespaceAndPath("mekanism", "basic_fluid_tank"), 
-				fluidCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/mek_tank.png"),
-						176, 98, List.of(
-								// Tall non-square vertical bar representing the chemical fluid level tank
-								new SlotEntry(0, 49, 19, 64, 48, false, noCustomTex)
-						)));
+		// Compile the target Mekanism fluid tank block locations
+		List<ResourceLocation> fluidTanks = List.of(
+				ResourceLocation.fromNamespaceAndPath("mekanism", "basic_fluid_tank"),
+				ResourceLocation.fromNamespaceAndPath("mekanism", "advanced_fluid_tank"),
+				ResourceLocation.fromNamespaceAndPath("mekanism", "elite_fluid_tank"),
+				ResourceLocation.fromNamespaceAndPath("mekanism", "ultimate_fluid_tank"),
+				ResourceLocation.fromNamespaceAndPath("mekanism", "creative_fluid_tank")
+		);
 
-		registrar.add(
-				ResourceLocation.fromNamespaceAndPath("mekanism", "basic_fluid_tank"), 
-				itemCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/mek_tank.png"),
-						176, 98, List.of(
-								new SlotEntry(0, 146, 19, 16, 16, false, noCustomTex), // Input Slot
-								new SlotEntry(1, 146, 51, 16, 16, false, noCustomTex)  // Output Slot
-						)));
+		// Expose fluid tank level bar on the "fluid" capability context
+		registrar.add(fluidTanks, fluidCapId, new SlotLayout(
+				ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/mek_tank.png"),
+				176, 98, List.of(
+						new SlotEntry(0, 49, 19, 64, 48, false, noCustomTex)
+				)));
+
+		// Expose item input/output slots on the "item" capability context
+		registrar.add(fluidTanks, itemCapId, new SlotLayout(
+				ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/mek_tank.png"),
+				176, 98, List.of(
+						new SlotEntry(0, 146, 19, 16, 16, false, noCustomTex),
+						new SlotEntry(1, 146, 51, 16, 16, false, noCustomTex)
+				)));
 	}
 }

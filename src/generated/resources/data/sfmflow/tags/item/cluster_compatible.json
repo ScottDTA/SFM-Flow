@@ -8,6 +8,9 @@
     "sfmflow:item_vacuum_valve_block",
     "sfmflow:item_ejector_valve_block",
     "sfmflow:fluid_ejector_valve_block",
+    "sfmflow:item_relay_block",
+    "sfmflow:fluid_relay_block",
+    "sfmflow:energy_relay_block",
     "sfmflow:fluid_vacuum_valve_block"
   ]
 }

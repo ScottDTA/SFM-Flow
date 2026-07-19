@@ -31,10 +31,16 @@ public class ModItemTagProvider extends ItemTagsProvider {
 				ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(),
 				ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(),
 				ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem(),
+				ModBlocks.ITEM_RELAY_BLOCK.get().asItem(),
+				ModBlocks.FLUID_RELAY_BLOCK.get().asItem(),
+				ModBlocks.ENERGY_RELAY_BLOCK.get().asItem(),
 				ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem());
 
 		tag(ModTags.OMNI_DIRECTIONAL_CLUSTER_CARDS).add(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem(),
-				ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem());
+				ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem(),
+				ModBlocks.ITEM_RELAY_BLOCK.get().asItem(),
+				ModBlocks.FLUID_RELAY_BLOCK.get().asItem(),
+				ModBlocks.ENERGY_RELAY_BLOCK.get().asItem());
 
 		tag(ModTags.DIRECTIONAL_CLUSTER_CARDS).add(ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(),
 				ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(),

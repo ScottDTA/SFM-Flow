@@ -30,6 +30,9 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("block.sfmflow.redstone_emitter", "Redstone Emitter");
 		add("block.sfmflow.fluid_ejector_valve_block", "Fluid Ejection Valve");
 		add("block.sfmflow.fluid_vacuum_valve_block", "Fluid Vacuum Valve");
+		add("block.sfmflow.item_relay_block", "Item Relay");
+		add("block.sfmflow.fluid_relay_block", "Fluid Relay");
+		add("block.sfmflow.energy_relay_block", "Energy Relay");
 		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
 		add("container.sfmflow.cable_cluster", "Cable Cluster");
 

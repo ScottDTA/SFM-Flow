@@ -1,0 +1,14 @@
+{
+  "background": "sfmflow:textures/gui/slot_layouts/mek_tank.png",
+  "height": 98,
+  "slots": [
+    {
+      "height": 48,
+      "index": 0,
+      "useGenericTexture": false,
+      "width": 64,
+      "x": 49,
+      "y": 19
+    }
+  ]
+}

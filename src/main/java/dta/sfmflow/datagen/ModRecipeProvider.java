@@ -63,14 +63,14 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
 		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get(), 1).pattern("IDI")
-		.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
-		.define('B', Items.BUCKET).define('G', Items.GLASS).define('D', Items.DROPPER)
-		.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+				.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
+				.define('B', Items.BUCKET).define('G', Items.GLASS).define('D', Items.DROPPER)
+				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
-ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), 1).pattern("IHI")
-		.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
-		.define('B', Items.BUCKET).define('G', Items.GLASS).define('H', Items.HOPPER)
-		.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get(), 1).pattern("IHI")
+				.pattern("CGC").pattern("IBI").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
+				.define('B', Items.BUCKET).define('G', Items.GLASS).define('H', Items.HOPPER)
+				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
 		// Cable Cluster Block (4x Cables, 4x Iron Ingots, 1x Chest)
 		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.CABLE_CLUSTER_BLOCK.get(), 1).pattern("ICI")
@@ -82,18 +82,32 @@ ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_VACUUM_VALVE_BLO
 				.pattern("DKD").pattern("HDH").define('K', ModBlocks.CABLE_CLUSTER_BLOCK.get())
 				.define('H', ModBlocks.HARDENED_CABLE_BLOCK.get()).define('D', Items.DIAMOND)
 				.unlockedBy("has_cluster", has(ModBlocks.CABLE_CLUSTER_BLOCK.get())).save(recipeOutput);
-		
-		// Sculk Trigger Cable shaped crafting recipe [3]
-				ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), 1)
-						.pattern("IAI")
-						.pattern("CSC")
-						.pattern("III")
-						.define('C', ModBlocks.CABLE_BLOCK.get())
-						.define('I', Items.IRON_INGOT)
-						.define('S', Blocks.SCULK_SENSOR) // Acoustic detection [3]
-						.define('A', Items.AMETHYST_SHARD) // Calibrated directional shielding [3]
-						.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get()))
-						.save(recipeOutput);
-		
+
+		// Item Relay (classic 1.7.10 SFM Inventory Relay recipe)
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ITEM_RELAY_BLOCK.get(), 1).pattern("IHI")
+				.pattern("CGC").pattern("IKI").define('I', Items.IRON_INGOT).define('H', Items.HOPPER)
+				.define('C', ModBlocks.CABLE_BLOCK.get()).define('G', Items.GOLD_INGOT).define('K', Items.CHEST)
+				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+
+		// Sculk Trigger Cable shaped crafting recipe
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get(), 1).pattern("IAI")
+				.pattern("CSC").pattern("III").define('C', ModBlocks.CABLE_BLOCK.get()).define('I', Items.IRON_INGOT)
+				.define('S', Blocks.SCULK_SENSOR) // Acoustic detection
+				.define('A', Items.AMETHYST_SHARD) // Calibrated directional shielding
+				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+
+		// Fluid Relay (classic 1.7.10 SFM Liquid Relay recipe)
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.FLUID_RELAY_BLOCK.get(), 1).pattern("IGI")
+				.pattern("CDC").pattern("IBI").define('I', Items.IRON_INGOT).define('G', Items.GLASS)
+				.define('C', ModBlocks.CABLE_BLOCK.get()).define('D', Items.GOLD_INGOT).define('B', Items.BUCKET)
+				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+
+		// Energy Relay (consistently styled classic SFM recipe)
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModBlocks.ENERGY_RELAY_BLOCK.get(), 1).pattern("IPI")
+				.pattern("CDC").pattern("IRI").define('I', Items.IRON_INGOT).define('P', Items.COPPER_INGOT)
+				.define('C', ModBlocks.CABLE_BLOCK.get()).define('D', Items.GOLD_INGOT)
+				.define('R', Blocks.REDSTONE_BLOCK).unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get()))
+				.save(recipeOutput);
+
 	}
 }

@@ -1,5 +1,18 @@
-7-18-2026
+7-19-2026
 
+### [Added]
+* Entity Relay Blocks: Added Item Relay, Fluid Relay, and Energy Relay blocks to allow cables and manager networks to interact with non-player entities (such as boats, carts, and modded entities) in adjacent blocks.
+* Cluster Card Capability Registry: Added extensible API support for custom cluster cards to expose specialized block capabilities.
+
+### [Changed]
+* Cable Cluster UI: Direction configuration buttons now automatically hide or show based on whether the installed card is directional or omni-directional.
+* Network Scanning: Improved network pathfinder scanning to dynamically detect custom card and relay capabilities across all registered networks.
+
+### [Fixed]
+* Capability Routing: Resolved capability binding mismatches for cluster cards and adjacent entity handlers during background flowchart planning sweeps.
+
+
+7-18-2026
 
 ### [Added]
 * Nested Group Folders: Organize complex network setups by grouping nodes inside folders (Sub-Canvases).

@@ -17,36 +17,41 @@ public class VanillaSlotLayouts implements ISlotLayoutSubProvider {
 		ResourceLocation itemCapId = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item");
 		Optional<ResourceLocation> noCustomTex = Optional.empty();
 
-		// Furnace layout mimicking vanilla furnace UI
-		registrar.add(ResourceLocation.withDefaultNamespace("furnace"), itemCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"),
-						176, 98, List.of(
-								new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), 
-								new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex)
-						)));
+		// 1. Group-register all furnace-style blocks sharing identical layouts
+		List<ResourceLocation> furnaces = List.of(
+				ResourceLocation.withDefaultNamespace("furnace"),
+				ResourceLocation.withDefaultNamespace("blast_furnace"),
+				ResourceLocation.withDefaultNamespace("smoker")
+		);
 
-		// Blast Furnace layout
-		registrar.add(ResourceLocation.withDefaultNamespace("blast_furnace"), itemCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"),
-						176, 98, List.of(
-								new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex), 
-								new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), 
-								new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex)
-						)));
+		registrar.add(furnaces, itemCapId, new SlotLayout(
+				ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"),
+				176, 98, List.of(
+						new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex),
+						new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), 
+						new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex)
+				)));
 
-		// Smoker layout
-		registrar.add(ResourceLocation.withDefaultNamespace("smoker"), itemCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/furnace.png"), 
-						176, 98, List.of(
-								new SlotEntry(0, 56, 17, 16, 16, false, noCustomTex), 
-								new SlotEntry(1, 56, 53, 16, 16, false, noCustomTex), 
-								new SlotEntry(2, 111, 30, 26, 26, false, noCustomTex)
-						)));
+		// 2. Group-register dropper-style blocks sharing identical layouts
+		List<ResourceLocation> droppers = List.of(
+				ResourceLocation.withDefaultNamespace("dropper"),
+				ResourceLocation.withDefaultNamespace("dispenser")
+		);
 
+		registrar.add(droppers, itemCapId, new SlotLayout(
+				ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/dropper.png"),
+				176, 98, List.of(
+						new SlotEntry(0, 62, 17, 16, 16, false, noCustomTex),
+						new SlotEntry(1, 80, 17, 16, 16, false, noCustomTex),
+						new SlotEntry(2, 98, 17, 16, 16, false, noCustomTex),
+						new SlotEntry(3, 62, 35, 16, 16, false, noCustomTex),
+						new SlotEntry(4, 80, 35, 16, 16, false, noCustomTex),
+						new SlotEntry(5, 98, 35, 16, 16, false, noCustomTex),
+						new SlotEntry(6, 62, 53, 16, 16, false, noCustomTex),
+						new SlotEntry(7, 80, 53, 16, 16, false, noCustomTex),
+						new SlotEntry(8, 98, 53, 16, 16, false, noCustomTex)
+				)));
+		
 		// Brewing Stand layout
 		registrar.add(ResourceLocation.withDefaultNamespace("brewing_stand"), itemCapId,
 				new SlotLayout(
@@ -57,38 +62,6 @@ public class VanillaSlotLayouts implements ISlotLayoutSubProvider {
 								new SlotEntry(2, 102, 50, 16, 16, false, noCustomTex),
 								new SlotEntry(3, 78, 16, 18, 18, false, noCustomTex),
 								new SlotEntry(4, 17, 17, 16, 16, false, noCustomTex)
-						)));
-
-		// Dropper layout
-		registrar.add(ResourceLocation.withDefaultNamespace("dropper"), itemCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/dropper.png"),
-						176, 98, List.of(
-								new SlotEntry(0, 62, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(1, 80, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(2, 98, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(3, 62, 35, 16, 16, false, noCustomTex),
-								new SlotEntry(4, 80, 35, 16, 16, false, noCustomTex),
-								new SlotEntry(5, 98, 35, 16, 16, false, noCustomTex),
-								new SlotEntry(6, 62, 53, 16, 16, false, noCustomTex),
-								new SlotEntry(7, 80, 53, 16, 16, false, noCustomTex),
-								new SlotEntry(8, 98, 53, 16, 16, false, noCustomTex)
-						)));
-
-		// Dispenser layout
-		registrar.add(ResourceLocation.withDefaultNamespace("dispenser"), itemCapId,
-				new SlotLayout(
-						ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/slot_layouts/dropper.png"),
-						176, 98, List.of(
-								new SlotEntry(0, 62, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(1, 80, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(2, 98, 17, 16, 16, false, noCustomTex),
-								new SlotEntry(3, 62, 35, 16, 16, false, noCustomTex),
-								new SlotEntry(4, 80, 35, 16, 16, false, noCustomTex),
-								new SlotEntry(5, 98, 35, 16, 16, false, noCustomTex),
-								new SlotEntry(6, 62, 53, 16, 16, false, noCustomTex),
-								new SlotEntry(7, 80, 53, 16, 16, false, noCustomTex),
-								new SlotEntry(8, 98, 53, 16, 16, false, noCustomTex)
 						)));
 
 		// Crafter layout

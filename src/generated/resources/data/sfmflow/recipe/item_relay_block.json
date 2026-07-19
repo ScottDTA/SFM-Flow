@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "sfmflow:cable_block"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "H": {
+      "item": "minecraft:hopper"
+    },
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "K": {
+      "item": "minecraft:chest"
+    }
+  },
+  "pattern": [
+    "IHI",
+    "CGC",
+    "IKI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "sfmflow:item_relay_block"
+  }
+}

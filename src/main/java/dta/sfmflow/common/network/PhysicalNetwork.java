@@ -1,6 +1,7 @@
 package dta.sfmflow.common.network;
 
 import dta.sfmflow.ServerConfig;
+import dta.sfmflow.api.capability.ClusterCardCapabilityRegistry;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.event.ManagerNetworkScanEvent;
 import dta.sfmflow.api.logging.FlowLogger;
@@ -251,13 +252,18 @@ public class PhysicalNetwork {
 				}
 
 				Set<ResourceLocation> cardCaps = new HashSet<>();
-				if (cluster.isItemCard(slotIndex)) {
-					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"));
-				} else if (cluster.isFluidCard(slotIndex)) {
-					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
+
+				// 1. Dynamically scan our registries to extract card capabilities without hardcoding 
+				for (var flowCap : FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
+					var blockCap = flowCap.getCapability();
+					if (blockCap != null) {
+						if (ClusterCardCapabilityRegistry.hasCapability(blockCap, card.getItem())) {
+							cardCaps.add(flowCap.getId());
+						}
+					}
 				}
 
-				// Map redstone emitter/receiver cards
+				// 2. Map redstone emitter/receiver cards (which are tag/wire-bound)
 				if (card.is(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem())
 						|| card.is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem())) {
 					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
