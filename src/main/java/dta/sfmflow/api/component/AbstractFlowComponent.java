@@ -40,7 +40,7 @@ public abstract class AbstractFlowComponent {
 	 * Helper record containing core flowchart component properties to streamline
 	 * Codec usage.
 	 */
-	public record BaseProperties(UUID id, int x, int y, int z, String customName, Color colorMask) {
+	public record BaseProperties(UUID id, int x, int y, int z, String customName, Color colorMask, Optional<UUID> parentGroupId) {
 		public static final MapCodec<BaseProperties> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 				.group(UUIDUtil.CODEC.fieldOf("id").forGetter(BaseProperties::id),
 						Codec.INT.optionalFieldOf("x", -9999).forGetter(BaseProperties::x),
@@ -48,9 +48,10 @@ public abstract class AbstractFlowComponent {
 						Codec.INT.optionalFieldOf("z", 0).forGetter(BaseProperties::z),
 						Codec.STRING.optionalFieldOf("customName", "").forGetter(BaseProperties::customName),
 						Color.CODEC.optionalFieldOf("colorMask")
-								.forGetter(props -> Optional.ofNullable(props.colorMask())))
-				.apply(instance, (id, x, y, z, customName, colorMaskOpt) -> new BaseProperties(id, x, y, z, customName,
-						colorMaskOpt.orElse(Color.WHITE))));
+								.forGetter(props -> Optional.ofNullable(props.colorMask())),
+						UUIDUtil.CODEC.optionalFieldOf("parentGroupId").forGetter(BaseProperties::parentGroupId))
+				.apply(instance, (id, x, y, z, customName, colorMaskOpt, parentGroupIdOpt) -> new BaseProperties(id, x, y, z, customName,
+						colorMaskOpt.orElse(Color.WHITE), parentGroupIdOpt)));
 	}
 
 	public static final Codec<AbstractFlowComponent> CODEC = FlowComponentType.REGISTRY.byNameCodec()
@@ -72,6 +73,7 @@ public abstract class AbstractFlowComponent {
 	protected int numInputs = 0;
 	protected String customName = "";
 	protected Color colorMask = Color.WHITE;
+	protected @Nullable UUID parentGroupId = null;
 
 	protected AbstractFlowComponent(UUID uuid) {
 		this.id = uuid;
@@ -82,7 +84,7 @@ public abstract class AbstractFlowComponent {
 	}
 
 	public BaseProperties getBaseProperties() {
-		return new BaseProperties(id, x, y, z, customName, colorMask);
+		return new BaseProperties(id, x, y, z, customName, colorMask, Optional.ofNullable(parentGroupId));
 	}
 
 	public void setBaseProperties(BaseProperties props) {
@@ -92,13 +94,21 @@ public abstract class AbstractFlowComponent {
 		this.z = props.z() == -1 ? 0 : props.z();
 		this.customName = props.customName() == null ? "" : props.customName();
 		this.colorMask = props.colorMask() == null ? Color.WHITE : props.colorMask();
+		this.parentGroupId = props.parentGroupId().orElse(null);
 	}
-
 	/**
 	 * Locked to 64px width standard.
 	 */
 	public int getVisualWidth() {
 		return BASE_WIDTH;
+	}	
+
+	public @Nullable UUID getParentGroupId() {
+		return parentGroupId;
+	}
+
+	public void setParentGroupId(@Nullable UUID id) {
+		this.parentGroupId = id;
 	}
 
 	/**
@@ -232,6 +242,14 @@ public abstract class AbstractFlowComponent {
 	@Nullable
 	public Component getOutputNodeTooltip(int index) {
 		return null;
+	}
+	
+	public void setNumInputs(int count) {
+		this.numInputs = count;
+	}
+
+	public void setNumOutputs(int count) {
+		this.numOutputs = count;
 	}
 
 }

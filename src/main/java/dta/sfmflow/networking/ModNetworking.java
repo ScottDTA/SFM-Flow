@@ -36,6 +36,8 @@ public class ModNetworking {
                 (payload, context) -> ServerPayloadHandler.handleSyncCarriedItem(payload, context));
         registrar.playToServer(RequestSideConfigPropertiesPacket.TYPE, RequestSideConfigPropertiesPacket.STREAM_CODEC,
                 (payload, context) -> ServerPayloadHandler.handleRequestSideConfigProperties(payload, context));
+        registrar.playToServer(MoveComponentGroupPacket.TYPE, MoveComponentGroupPacket.STREAM_CODEC,
+                (payload, context) -> ServerPayloadHandler.handleMoveComponentGroup(payload, context));
 
         // Clientbound Packets (Server to Client)
         registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,

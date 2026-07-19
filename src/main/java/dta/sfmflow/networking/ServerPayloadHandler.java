@@ -2,12 +2,14 @@ package dta.sfmflow.networking;
 
 import java.lang.reflect.Field;
 import java.util.Locale;
+import java.util.UUID;
 
-import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
-import dta.sfmflow.common.network.SculkEventListener;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.flowcomponents.GroupComponent;
+import dta.sfmflow.flowcomponents.GroupInputComponent;
+import dta.sfmflow.flowcomponents.GroupOutputComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
@@ -21,6 +23,7 @@ import dta.sfmflow.networking.packets.clientbound.SyncSideConfigPropertiesPacket
 import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
+import dta.sfmflow.networking.packets.serverbound.MoveComponentGroupPacket;
 import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
@@ -41,7 +44,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -79,10 +81,9 @@ public class ServerPayloadHandler {
 					FlowComponentType type = FlowComponentType.REGISTRY.get(typeLoc);
 
 					if (type != null && manager.getFlowComponents().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get()) {
-						manager.addFlowComponent(type, context.player());
+						// Pass both the player and the parentGroupId
+						manager.addFlowComponent(type, context.player(), data.parentGroupId());
 						manager.setChanged();
-					} else {
-						SFMFlow.LOGGER.warn("Attempted to spawn invalid or blocked node: {}", typeLoc);
 					}
 				}
 			}
@@ -129,7 +130,7 @@ public class ServerPayloadHandler {
 						}
 					}
 
-					// 4. Prune invalid input connections if the input count shrunk [3]
+					// 4. Prune invalid input connections if the input count shrunk
 					if (newInputs < prevInputs) {
 						int finalNewInputs = newInputs;
 						boolean removed = manager.getFlowConnections().removeIf(conn -> 
@@ -187,9 +188,9 @@ public class ServerPayloadHandler {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				var connections = manager.getFlowConnections();
 
-				// Cycle Detection Shield: Block loop creation on the server [3]
+				// Cycle Detection Shield: Block loop creation on the server
 				if (FlowComponentConnections.wouldCreateCycle(connections, data.sourceId(), data.targetId())) {
-					// Send a sync packet to reset client connection state [3]
+					// Send a sync packet to reset client connection state
 					CompoundTag dataTag = new CompoundTag();
 					ListTag listTag = new ListTag();
 					for (var conn : connections) {
@@ -533,4 +534,59 @@ public class ServerPayloadHandler {
 		}
 		return defaultValue;
 	}
+	
+	public static void handleMoveComponentGroup(final MoveComponentGroupPacket data, final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
+				AbstractFlowComponent component = manager.getFlowComponents().get(data.componentId());
+				if (component != null && !(component instanceof GroupInputComponent) && !(component instanceof GroupOutputComponent)) {
+					
+					// Enforce depth limit if moving a GroupComponent folder
+					if (component instanceof GroupComponent group) {
+						int targetDepth = ManagerBlockEntity.getGroupNestingDepth(manager, data.targetGroupId());
+						if (targetDepth >= ServerConfig.MAX_NESTED_GROUP_DEPTH.get()) {
+							return; // Block illegal deep nesting
+						}
+					}
+
+					UUID oldParentId = component.getParentGroupId();
+					component.setParentGroupId(data.targetGroupId());
+
+					// Remove all connections (wires) that this node currently has
+					manager.getFlowConnections().removeIf(wire -> wire.getSourceComponentId().equals(data.componentId())
+							|| wire.getTargetComponentId().equals(data.componentId()));
+
+					manager.setDataDirty(true);
+					manager.setChanged();
+
+					// Sync updated settings (which carries the new parentGroupId)
+					CompoundTag tag = new CompoundTag();
+					component.saveData(tag);
+					manager.broadcastDeltaUpdate(new SyncComponentDeltaPacket(manager.getBlockPos(), component.getId(),
+							SyncComponentDeltaPacket.DeltaType.SETTINGS, tag));
+
+					// Broadcast connections update to prune obsolete wires instantly on the client
+					CompoundTag connTag = new CompoundTag();
+					ListTag listTag = new ListTag();
+					for (var conn : manager.getFlowConnections()) {
+						CompoundTag cTag = new CompoundTag();
+						conn.save(cTag);
+						listTag.add(cTag);
+					}
+					connTag.put("connections", listTag);
+					manager.broadcastConnectionsUpdate(new SyncConnectionsPacket(manager.getBlockPos(), connTag));
+
+					// Recount parent Group node pins on both old and new folders
+					if (oldParentId != null) {
+						manager.updateGroupPinCounts(oldParentId);
+					}
+					if (data.targetGroupId() != null) {
+						manager.updateGroupPinCounts(data.targetGroupId());
+					}
+				}
+			}
+		});
+	}
+	
+	
 }

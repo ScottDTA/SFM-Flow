@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * Consolidates canvas coordinate calculations, widget searches, and parent-child
- * hierarchy traversal algorithms to eliminate duplicate code [3].
+ * hierarchy traversal algorithms to eliminate duplicate code.
  */
 @OnlyIn(Dist.CLIENT)
 public final class FlowLayoutHelper {
@@ -21,11 +21,11 @@ public final class FlowLayoutHelper {
     private FlowLayoutHelper() {}
 
     /**
-     * Finds a widget container matching a target component ID [3].
+     * Finds a widget container matching a target component ID.
      *
-     * @param screen active screen manager [3]
-     * @param id     the UUID of the component being searched [3]
-     * @return the associated FlowWidgetContainer, or null if unregistered [3]
+     * @param screen active screen manager
+     * @param id     the UUID of the component being searched
+     * @return the associated FlowWidgetContainer, or null if unregistered
      */
     @Nullable
     public static FlowWidgetContainer findContainer(ManagerScreen screen, UUID id) {
@@ -43,10 +43,11 @@ public final class FlowLayoutHelper {
     }
 
     /**
-     * Resolves the horizontal pin output offset for rendering or hit testing [3].
+     * Resolves the horizontal pin output offset for rendering or hit testing.
      */
     public static int getOutputOffset(AbstractFlowComponent component, int index) {
-        if (!component.hasOutputNodes() || index < 0 || index >= component.getNumOutputs()) {
+        // Added component.getNumOutputs() <= 0 safety guard
+        if (!component.hasOutputNodes() || index < 0 || index >= component.getNumOutputs() || component.getNumOutputs() <= 0) {
             return 29;
         }
         NodeCount nodeCount = NodeCount.getForCount(component.getNumOutputs());
@@ -58,10 +59,11 @@ public final class FlowLayoutHelper {
     }
 
     /**
-     * Resolves the horizontal pin input offset for rendering or hit testing [3].
+     * Resolves the horizontal pin input offset for rendering or hit testing.
      */
     public static int getInputOffset(AbstractFlowComponent component, int index) {
-        if (!component.hasInputNodes() || index < 0 || index >= component.getNumInputs()) {
+        // Added component.getNumInputs() <= 0 safety guard
+        if (!component.hasInputNodes() || index < 0 || index >= component.getNumInputs() || component.getNumInputs() <= 0) {
             return 29;
         }
         NodeCount nodeCount = NodeCount.getForCount(component.getNumInputs());
@@ -73,11 +75,11 @@ public final class FlowLayoutHelper {
     }
 
     /**
-     * Recursively verifies if a parent element is an ancestor of a target element [3].
+     * Recursively verifies if a parent element is an ancestor of a target element.
      *
-     * @param parent the potential ancestor widget [3]
-     * @param target the target event listener [3]
-     * @return true if target is nested inside parent's children tree, false otherwise [3]
+     * @param parent the potential ancestor widget
+     * @param target the target event listener
+     * @return true if target is nested inside parent's children tree, false otherwise
      */
     public static boolean isAncestorOf(GuiEventListener parent, GuiEventListener target) {
         if (parent == target) {
@@ -94,8 +96,8 @@ public final class FlowLayoutHelper {
     }
     
 	/**
-	 * Verifies if a given widget belongs to the active, top-most interaction panel [3].
-	 * Used to block background tooltips from firing when modals or overlays are open [3].
+	 * Verifies if a given widget belongs to the active, top-most interaction panel.
+	 * Used to block background tooltips from firing when modals or overlays are open.
 	 */
 	public static boolean isWidgetActiveAndOnTop(GuiEventListener widget, ManagerScreen screen) {
 		if (screen.getActiveModalPopup() != null && screen.getActiveModalPopup().visible) {

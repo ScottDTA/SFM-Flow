@@ -3,11 +3,15 @@ package dta.sfmflow.client.screen;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.api.component.AbstractFlowComponent;
+import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.client.screen.widgets.*;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.flowcomponents.GroupComponent;
 import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
@@ -15,8 +19,13 @@ import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.BindVariablePacket;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
+import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.ContainerEventHandler;
@@ -51,9 +60,9 @@ public class ManagerMouseHandler {
 	private String draggedVariableName = "";
 
 	/**
-	 * Constructs a new ManagerMouseHandler associated with the parent screen [3].
+	 * Constructs a new ManagerMouseHandler associated with the parent screen.
 	 *
-	 * @param screen parent screen context [3]
+	 * @param screen parent screen context
 	 */
 	public ManagerMouseHandler(ManagerScreen screen) {
 		this.screen = screen;
@@ -196,7 +205,7 @@ public class ManagerMouseHandler {
 
 		int x = screen.getLeftPos();
 		if (button == 0) {
-			// Updated variable list click range to align with player inventory coordinates [3]
+			// Updated variable list click range to align with player inventory coordinates
 			if (mouseX >= x + 4 && mouseX < x + 166 && mouseY >= screen.height - 90 && mouseY < screen.height) {
 				var groupVars = screen.getMenu().getManagerBlockEntity().getGroupVariables();
 				int clickedIdx = (int) ((mouseY - (screen.height - 90 + 4)) / 16);
@@ -218,6 +227,21 @@ public class ManagerMouseHandler {
 					return true;
 				}
 			}
+			
+			// 1. Check breadcrumbs clicks
+			int drawY = screen.getTopPos() + 4;
+			if (mouseY >= drawY && mouseY < drawY + 10) {
+				for (var node : screen.getActiveBreadcrumbs()) {
+					if (mouseX >= node.xStart() && mouseX < node.xEnd()) {
+						screen.setCurrentGroupId(node.id());
+						screen.refreshWidgetLayout();
+						Minecraft.getInstance().getSoundManager().play(
+								SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+						return true;
+					}
+				}
+			}
+			
 		}
 
 		FlowWidgetBase clickedBase = getTopBaseAt(mouseX, mouseY);
@@ -229,6 +253,27 @@ public class ManagerMouseHandler {
 			if (this.doubleClickCandidateId != null && clickedId.equals(this.doubleClickCandidateId)
 					&& (currentTime - this.lastClickTime < 500L)) {
 				FlowWidgetContainer clickedContainer = clickedBase.getContainer();
+				
+				// Double click navigate INTO Groups 
+				if (clickedContainer.getComponent() instanceof GroupComponent group) {
+					int currentDepth = ManagerBlockEntity.getGroupNestingDepth(screen.getMenu().getManagerBlockEntity(), group.getId());
+					int maxDepth = ServerConfig.MAX_NESTED_GROUP_DEPTH.get();
+
+					if (currentDepth <= maxDepth) {
+						screen.setCurrentGroupId(group.getId());
+						screen.refreshWidgetLayout();
+					} else {
+						// Subtitles style warning alert
+						Minecraft.getInstance().player.displayClientMessage(
+								Component.literal("Nesting limit reached! Max depth is: " + maxDepth).withStyle(ChatFormatting.RED), 
+								true
+						);
+					}
+					this.doubleClickCandidateId = null;
+					this.activeDragged = null;
+					return true;
+				}
+
 				NodeSettingsOverlay settingsOverlay = NodeSettingsOverlayFactory.create(screen,
 						clickedContainer.getComponent());
 				screen.setActiveSettingsOverlay(settingsOverlay);
@@ -314,12 +359,12 @@ public class ManagerMouseHandler {
 				UUID tgtId = targetInput.getContainer().getComponent().getId();
 				int inIdx = targetInput.getPinIndex();
 
-				// Block circular loops on the client-side immediately [3]
+				// Block circular loops on the client-side immediately
 				var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
 				if (FlowComponentConnections.wouldCreateCycle(connections, srcId, tgtId)) {
-					// Play a subtle failure click sound [3]
-					net.minecraft.client.Minecraft.getInstance().getSoundManager().play(
-							net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 0.5F));
+					// Play a subtle failure click sound
+					Minecraft.getInstance().getSoundManager().play(
+							SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 0.5F));
 					this.activeWiringSource = null;
 					return true;
 				}

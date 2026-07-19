@@ -35,12 +35,16 @@ import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.common.network.SculkEventListener;
 import dta.sfmflow.registry.ModTags;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.flowcomponents.GroupComponent;
+import dta.sfmflow.flowcomponents.GroupInputComponent;
+import dta.sfmflow.flowcomponents.GroupOutputComponent;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
 import dta.sfmflow.kernel.ExecutionRingBuffer;
 import dta.sfmflow.kernel.FlowExecutionKernel;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
+import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
@@ -139,7 +143,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 			@Override
 			public void set(int index, int value) {
-				// No-op: server state is the single source of truth for component counts [3]
+				// No-op: server state is the single source of truth for component counts
 			}
 
 			@Override
@@ -499,12 +503,30 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		return ClientboundBlockEntityDataPacket.create(this);
 	}
 
-	public void addFlowComponent(FlowComponentType type, Player player) {
+	public void addFlowComponent(FlowComponentType type, Player player, @Nullable UUID parentGroupId) {
+		// Enforce maximum limit of 5 inputs/outputs per group on creation
+		if (parentGroupId != null) {
+			if (type == VanillaSFMFlowPlugin.GROUP_INPUT.get() && countGroupTerminals(parentGroupId, true) >= 5) {
+				if (player instanceof ServerPlayer sp) {
+					sp.sendSystemMessage(Component.literal("Cannot add more than 5 Group Inputs!").withStyle(net.minecraft.ChatFormatting.RED));
+				}
+				return;
+			}
+			if (type == VanillaSFMFlowPlugin.GROUP_OUTPUT.get() && countGroupTerminals(parentGroupId, false) >= 5) {
+				if (player instanceof ServerPlayer sp) {
+					sp.sendSystemMessage(Component.literal("Cannot add more than 5 Group Outputs!").withStyle(net.minecraft.ChatFormatting.RED));
+				}
+				return;
+			}
+		}
+
 		if (flowchart.components().size() < ServerConfig.MAX_COMPONENT_AMOUNT.get()) {
 			UUID newUUID = UUID.randomUUID();
 			AbstractFlowComponent newComponent = type.createComponent(newUUID);
 			newComponent.setZ(flowchart.components().size() + 1);
+			newComponent.setParentGroupId(parentGroupId); // Assign to sub-canvas
 			flowchart.components().put(newUUID, newComponent);
+
 			this.isDataDirty = true;
 			this.isProfileDirty = true;
 			this.setChanged();
@@ -513,6 +535,11 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			newComponent.saveData(tag);
 			broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, newUUID,
 					SyncComponentDeltaPacket.DeltaType.ADD, tag));
+
+			// Recount and sync if we spawned a terminal inside a group
+			if (parentGroupId != null && (type == VanillaSFMFlowPlugin.GROUP_INPUT.get() || type == VanillaSFMFlowPlugin.GROUP_OUTPUT.get())) {
+				updateGroupPinCounts(parentGroupId);
+			}
 		}
 	}
 
@@ -530,6 +557,55 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 	public void componentMoved(ComponentMoved pData, IPayloadContext context) {
 		CanvasActionHandler.move(this, pData, context);
+	}
+	
+	public int countGroupTerminals(UUID parentGroupId, boolean isInput) {
+		int count = 0;
+		for (AbstractFlowComponent comp : getFlowComponents().values()) {
+			if (parentGroupId.equals(comp.getParentGroupId())) {
+				if (isInput && comp instanceof GroupInputComponent) {
+					count++;
+				} else if (!isInput && comp instanceof GroupOutputComponent) {
+					count++;
+				}
+			}
+		}
+		return count;
+	}
+
+	public void updateGroupPinCounts(UUID parentGroupId) {
+		AbstractFlowComponent group = getFlowComponents().get(parentGroupId);
+		if (group instanceof GroupComponent groupComp) { // Pattern-matching cast 
+			int inputs = countGroupTerminals(parentGroupId, true);
+			int outputs = countGroupTerminals(parentGroupId, false);
+
+			groupComp.setNumInputs(inputs);
+			groupComp.setNumOutputs(outputs);
+
+			// Broadcast delta update to clients to visually rebuild pins instantly
+			CompoundTag tag = new CompoundTag();
+			groupComp.saveData(tag);
+			broadcastDeltaUpdate(new SyncComponentDeltaPacket(this.worldPosition, parentGroupId,
+					SyncComponentDeltaPacket.DeltaType.SETTINGS, tag));
+		}
+	}
+	
+	public static int getGroupNestingDepth(ManagerBlockEntity manager, @Nullable UUID groupId) {
+		if (groupId == null) return 0;
+		int depth = 1;
+		UUID parent = groupId;
+		while (parent != null) {
+			AbstractFlowComponent comp = manager.getFlowComponents().get(parent);
+			if (comp != null) {
+				parent = comp.getParentGroupId();
+				if (parent != null) {
+					depth++;
+				}
+			} else {
+				break;
+			}
+		}
+		return depth;
 	}
 
 	@Override
@@ -553,7 +629,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode flowchart: {}", err))
 				.ifPresent(nbt -> tag.put("flowchart", nbt));
 
-		// Call .codec().listOf() to safely serialize lists of variables [3]
+		// Call .codec().listOf() to safely serialize lists of variables
 		InventoryGroupVariable.CODEC.listOf().encodeStart(ops, this.groupVariables)
 				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to encode group variables: {}", err))
 				.ifPresent(nbt -> tag.put("GroupVariables", nbt));
@@ -670,9 +746,28 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 			}
 		}
 
+		if (this.flowchart != null && this.flowchart.components() != null) {
+			List<UUID> orphans = new ArrayList<>();
+			for (AbstractFlowComponent comp : this.flowchart.components().values()) {
+				UUID parentId = comp.getParentGroupId();
+				if (parentId != null && !this.flowchart.components().containsKey(parentId)) {
+					orphans.add(comp.getId());
+				}
+			}
+			for (UUID id : orphans) {
+				this.flowchart.components().remove(id);
+				this.flowchart.connections().removeIf(wire -> wire.getSourceComponentId().equals(id)
+						|| wire.getTargetComponentId().equals(id));
+			}
+			if (!orphans.isEmpty()) {
+				SFMFlow.LOGGER.warn("[SFM-Flow] Swept and repaired {} orphaned nodes from Manager at {}!", orphans.size(), this.worldPosition);
+				this.setDataDirty(true);
+			}
+		}
+
 		this.isTriggerCacheDirty = true;
 		this.isProfileDirty = true;
-		this.cachedFlowchartNbt = null; // Clear cached NBT on reload [3]
+		this.cachedFlowchartNbt = null; 
 	}
 
 	@Override

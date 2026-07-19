@@ -1,6 +1,11 @@
 7-18-2026
 
+
 ### [Added]
+* Nested Group Folders: Organize complex network setups by grouping nodes inside folders (Sub-Canvases).
+* Directory Migration: Use the new right-click context option "Move Group" to relocate placed nodes between folders.
+* Interactive Breadcrumbs: Easily navigate between directory levels using the clickable path bar (e.g., Root > Folder > Subfolder).
+* Error and Warning Bubbling: Parent folders will now glow with red outline errors or yellow warning highlights if any of their nested sub-canvas elements require attention.
 * Added `AbstractTargetSettingsOverlay` and `AbstractFilterableTargetSettingsOverlay` client API classes to consolidate 3D block previews, target selectors, and 12-slot ghost item grids.
 * Added `AbstractTransferComponent` and `AbstractFilterableTransferComponent` common API classes to unify targeted slot configurations, whitelist states, and side configurations across all item, fluid, and energy transfer components.
 * Promoted base classes `AbstractModalPopup` and `NodeSettingsOverlay` to the public client-only API package (`dta.sfmflow.api.client.widget`), allowing add-on developers to design and register custom overlay panels and popups cleanly.
@@ -9,6 +14,8 @@
 * Added the **Snapshot Profile** system, which analyzes your active flowchart and restricts off-thread inventory snapshotting strictly to the blocks and capabilities being used.
 
 ### [Changed]
+* Group Terminals Limit: Enforced a strict maximum limit of 5 Inputs and 5 Outputs per group folder to ensure workspace clarity.
+* Node Spawning: Newly created nodes are now spawned directly into your currently viewed directory level instead of always appearing at Root.
 * Refactored Item, Fluid, and Energy transfer settings overlays to inherit from the consolidated target settings overlay classes, eliminating redundant coordinate setups and saving routines.
 * Refactored Item, Fluid, and Energy transfer nodes to extend the new base hierarchies, successfully eliminating hundreds of lines of duplicate boilerplate variables and setters.
 * Simplified NBT saving and loading on all transfer components to inherit properties directly from parent class handlers.
@@ -26,6 +33,8 @@
 * Simplified variable card definitions by migrating from MapCodecs to standard Codecs.
 
 ### [Fixed]
+* Orphaned Node Sweeper: Fixed a potential memory and data leak by automatically sweeping and clearing orphaned child nodes if their parent folder was deleted.
+* Empty Port Safety: Resolved a visual glitch where empty nodes or groups with zero configured ports would cause UI pin rendering crashes.
 * Fixed potential coordinate and variable desyncs when loading complex layouts by standardizing inherited NBT serialization patterns.
 * Fixed potential configuration loading bugs on older layout files by ensuring that saved enum string properties parse correctly regardless of capitalization.
 * Fixed potential loading bugs on older layout configurations by implementing strict, case-insensitive string parsing fallback maps for all component operator enums.

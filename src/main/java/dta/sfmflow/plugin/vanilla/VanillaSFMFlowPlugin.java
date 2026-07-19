@@ -22,6 +22,9 @@ import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
+import dta.sfmflow.flowcomponents.GroupComponent;
+import dta.sfmflow.flowcomponents.GroupInputComponent;
+import dta.sfmflow.flowcomponents.GroupOutputComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemConditionalComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
@@ -84,6 +87,9 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> SPLITTER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> COLLECTOR;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> SCULK_TRIGGER;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_NODE;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_INPUT;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_OUTPUT;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -170,33 +176,45 @@ public class VanillaSFMFlowPlugin {
 		
 		REDSTONE_CONDITIONAL = FlowComponentBuilder.create("redstone_conditional", RedstoneConditionalComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/condition_button.png")
+				.icon("textures/gui/menu_buttons/redstone_condition_button.png")
 				.displayName("gui.sfmflow.redstone_conditional")
 				.codec(RedstoneConditionalComponent.CODEC)
 				.build(registry);
 		
 		SPLITTER = FlowComponentBuilder.create("splitter", SplitterComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/flow_control_button.png") // Reuses default flow control button
+				.icon("textures/gui/menu_buttons/splitter_button.png") // Reuses default flow control button
 				.displayName("gui.sfmflow.splitter")
 				.codec(SplitterComponent.CODEC)
 				.build(registry);
 		
 		COLLECTOR = FlowComponentBuilder.create("collector", CollectorComponent::new)
 				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/flow_control_button.png") // Reuses default flow control button
+				.icon("textures/gui/menu_buttons/collector_button.png") // Reuses default flow control button
 				.displayName("gui.sfmflow.collector")
 				.codec(CollectorComponent.CODEC)
 				.build(registry);
 		
 		SCULK_TRIGGER = FlowComponentBuilder.create("sculk_trigger", SculkTriggerComponent::new)
 				.category(NodeCategory.TRIGGER)
-				.icon("textures/gui/menu_buttons/trigger_button.png") // Reuses default trigger button icon [3]
+				.icon("textures/gui/menu_buttons/skulk_trigger_button.png") // Reuses default trigger button icon
 				.displayName("gui.sfmflow.sculk_trigger")
 				.codec(SculkTriggerComponent.CODEC)
 				.build(registry);
 		
-		// Synchronizes Round-Robin indices from background worker sweeps back to main thread block entities [3]
+		GROUP_NODE = FlowComponentBuilder.create("group_node", GroupComponent::new)
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/command_group_button.png")
+				.displayName("gui.sfmflow.menu.group_node").codec(GroupComponent.CODEC).build(registry);
+
+		GROUP_INPUT = FlowComponentBuilder.create("group_input", GroupInputComponent::new)
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_input_button.png")
+				.displayName("Group Input").codec(GroupInputComponent.CODEC).build(registry);
+
+		GROUP_OUTPUT = FlowComponentBuilder.create("group_output", GroupOutputComponent::new)
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_output_button.png")
+				.displayName("Group Output").codec(GroupOutputComponent.CODEC).build(registry);
+		
+		// Synchronizes Round-Robin indices from background worker sweeps back to main thread block entities
 		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_sync"),
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof SplitterComponent.SplitterSyncParams task) {

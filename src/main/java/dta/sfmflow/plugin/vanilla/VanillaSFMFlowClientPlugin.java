@@ -5,7 +5,9 @@ import dta.sfmflow.api.client.SideConfigPopupRegistry;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.DataComponentOverlayRegistry;
 import dta.sfmflow.api.client.WorkspaceValidatorRegistry;
+import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.WorkspaceValidator;
 import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.AdvancedItemFilterVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.CollectorSettingsOverlay;
@@ -34,6 +36,7 @@ import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
+import dta.sfmflow.flowcomponents.GroupComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemConditionalComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
@@ -171,50 +174,48 @@ public class VanillaSFMFlowClientPlugin {
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.FLUID_CONDITIONAL.get(), (screen, component) -> {
 			if (component instanceof FluidConditionalComponent conditional) {
 				return new FluidConditionalSettingsOverlay(screen, conditional);
 			}
 			return null;
-		});	
-		
+		});
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ENERGY_CONDITIONAL.get(), (screen, component) -> {
 			if (component instanceof EnergyConditionalComponent conditional) {
 				return new EnergyConditionalSettingsOverlay(screen, conditional);
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.REDSTONE_CONDITIONAL.get(), (screen, component) -> {
 			if (component instanceof RedstoneConditionalComponent conditional) {
 				return new RedstoneConditionalSettingsOverlay(screen, conditional);
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SPLITTER.get(), (screen, component) -> {
 			if (component instanceof SplitterComponent splitter) {
 				return new SplitterSettingsOverlay(screen, splitter);
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.COLLECTOR.get(), (screen, component) -> {
 			if (component instanceof CollectorComponent collector) {
 				return new CollectorSettingsOverlay(screen, collector);
 			}
 			return null;
 		});
-		
+
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SCULK_TRIGGER.get(), (screen, component) -> {
 			if (component instanceof SculkTriggerComponent trigger) {
 				return new SculkTriggerSettingsOverlay(screen, trigger);
 			}
 			return null;
 		});
-
-
 
 		// 2. Sided Configuration Popups
 		SideConfigPopupRegistry.register(EnergyTransferComponent.class, (screen, sideModel, face, pos, onChanged) -> {
@@ -233,19 +234,22 @@ public class VanillaSFMFlowClientPlugin {
 		SideConfigPopupRegistry.register(ItemConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
 		});
-		
+
 		SideConfigPopupRegistry.register(FluidConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
 		});
-		
-		SideConfigPopupRegistry.register(RedstoneConditionalComponent.class, (screen, sideModel, face, pos, onChanged) -> {
-			return new RedstoneSideConfigModalPopup(screen, (RedstoneConditionalComponent) sideModel, face, pos, onChanged);
-		});
-		
+
+		SideConfigPopupRegistry.register(RedstoneConditionalComponent.class,
+				(screen, sideModel, face, pos, onChanged) -> {
+					return new RedstoneSideConfigModalPopup(screen, (RedstoneConditionalComponent) sideModel, face, pos,
+							onChanged);
+				});
+
 		SideConfigPopupRegistry.register(SculkTriggerComponent.class, (screen, sideModel, face, pos, onChanged) -> {
-			return new SculkTriggerSideConfigModalPopup(screen, (SculkTriggerComponent) sideModel, face, pos, onChanged);
+			return new SculkTriggerSideConfigModalPopup(screen, (SculkTriggerComponent) sideModel, face, pos,
+					onChanged);
 		});
-		
+
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
 		DataComponentOverlayRegistry.register(DataComponents.ENCHANTMENTS, EnchantmentsComponentSettingsModal::new);
 
@@ -466,7 +470,7 @@ public class VanillaSFMFlowClientPlugin {
 						return null;
 					}
 				});
-		
+
 		WorkspaceValidatorRegistry.register(FluidConditionalComponent.class,
 				new WorkspaceValidatorRegistry.INodeValidator<FluidConditionalComponent>() {
 					@Override
@@ -478,14 +482,15 @@ public class VanillaSFMFlowClientPlugin {
 					}
 
 					@Override
-					public @Nullable Component getErrorTooltip(ManagerScreen screen, FluidConditionalComponent component) {
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							FluidConditionalComponent component) {
 						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
 							return Component.translatable("gui.sfmflow.error.unbound_inventory");
 						}
 						return null;
 					}
 				});
-		
+
 		WorkspaceValidatorRegistry.register(EnergyConditionalComponent.class,
 				new WorkspaceValidatorRegistry.INodeValidator<EnergyConditionalComponent>() {
 					@Override
@@ -497,14 +502,15 @@ public class VanillaSFMFlowClientPlugin {
 					}
 
 					@Override
-					public @Nullable Component getErrorTooltip(ManagerScreen screen, EnergyConditionalComponent component) {
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							EnergyConditionalComponent component) {
 						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
 							return Component.translatable("gui.sfmflow.error.unbound_inventory");
 						}
 						return null;
 					}
 				});
-		
+
 		WorkspaceValidatorRegistry.register(RedstoneConditionalComponent.class,
 				new WorkspaceValidatorRegistry.INodeValidator<RedstoneConditionalComponent>() {
 					@Override
@@ -516,71 +522,79 @@ public class VanillaSFMFlowClientPlugin {
 					}
 
 					@Override
-					public @Nullable Component getErrorTooltip(ManagerScreen screen, RedstoneConditionalComponent component) {
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							RedstoneConditionalComponent component) {
 						if (isInventoryUnboundOrSleeping(screen, component.getInventoryId())) {
 							return Component.translatable("gui.sfmflow.error.unbound_inventory");
 						}
 						return null;
 					}
 				});
-		
-		// Splitter Validator with Chain-Limit Checks [3]
-				WorkspaceValidatorRegistry.register(SplitterComponent.class,
-						new WorkspaceValidatorRegistry.INodeValidator<SplitterComponent>() {
-							@Override
-							public boolean hasError(ManagerScreen screen, SplitterComponent component) {
-								int maxAllowed = ServerConfig.MAX_CHAINED_SPLITTERS.get();
-								return getChainedSplitterDepth(screen, component) > maxAllowed;
+
+		// Splitter Validator with Chain-Limit Checks
+		WorkspaceValidatorRegistry.register(SplitterComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<SplitterComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, SplitterComponent component) {
+						int maxAllowed = ServerConfig.MAX_CHAINED_SPLITTERS.get();
+						return getChainedSplitterDepth(screen, component) > maxAllowed;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, SplitterComponent component) {
+						int maxAllowed = ServerConfig.MAX_CHAINED_SPLITTERS.get();
+						if (getChainedSplitterDepth(screen, component) > maxAllowed) {
+							return Component.translatable("gui.sfmflow.error.splitter_chain_limit", maxAllowed);
+						}
+						return null;
+					}
+
+					private int getChainedSplitterDepth(ManagerScreen screen, SplitterComponent component) {
+						var components = screen.getMenu().getManagerBlockEntity().getFlowComponents();
+						var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
+
+						int maxDepth = 1;
+						Queue<SplitterPathNode> queue = new ArrayDeque<>();
+						queue.add(new SplitterPathNode(component.getId(), 1));
+
+						while (!queue.isEmpty()) {
+							SplitterPathNode current = queue.poll();
+							if (current.depth() > maxDepth) {
+								maxDepth = current.depth();
 							}
 
-							@Override
-							public @Nullable Component getErrorTooltip(ManagerScreen screen, SplitterComponent component) {
-								int maxAllowed = ServerConfig.MAX_CHAINED_SPLITTERS.get();
-								if (getChainedSplitterDepth(screen, component) > maxAllowed) {
-									return Component.translatable("gui.sfmflow.error.splitter_chain_limit", maxAllowed);
-								}
-								return null;
-							}
-
-							private int getChainedSplitterDepth(ManagerScreen screen, SplitterComponent component) {
-								var components = screen.getMenu().getManagerBlockEntity().getFlowComponents();
-								var connections = screen.getMenu().getManagerBlockEntity().getFlowConnections();
-
-								int maxDepth = 1;
-								Queue<SplitterPathNode> queue = new ArrayDeque<>();
-								queue.add(new SplitterPathNode(component.getId(), 1));
-
-								while (!queue.isEmpty()) {
-									SplitterPathNode current = queue.poll();
-									if (current.depth() > maxDepth) {
-										maxDepth = current.depth();
-									}
-
-									for (var conn : connections) {
-										if (conn.getTargetComponentId().equals(current.id())) {
-											UUID parentId = conn.getSourceComponentId();
-											var parentComp = components.get(parentId);
-											if (parentComp instanceof SplitterComponent) {
-												queue.add(new SplitterPathNode(parentId, current.depth() + 1));
-											}
-										}
+							for (var conn : connections) {
+								if (conn.getTargetComponentId().equals(current.id())) {
+									UUID parentId = conn.getSourceComponentId();
+									var parentComp = components.get(parentId);
+									if (parentComp instanceof SplitterComponent) {
+										queue.add(new SplitterPathNode(parentId, current.depth() + 1));
 									}
 								}
-								return maxDepth;
 							}
+						}
+						return maxDepth;
+					}
 
-							class SplitterPathNode {
-								final UUID id;
-								final int depth;
-								SplitterPathNode(UUID id, int depth) {
-									this.id = id;
-									this.depth = depth;
-								}
-								int depth() { return depth; }
-								UUID id() { return id; }
-							}
-						});
-		
+					class SplitterPathNode {
+						final UUID id;
+						final int depth;
+
+						SplitterPathNode(UUID id, int depth) {
+							this.id = id;
+							this.depth = depth;
+						}
+
+						int depth() {
+							return depth;
+						}
+
+						UUID id() {
+							return id;
+						}
+					}
+				});
+
 		WorkspaceValidatorRegistry.register(CollectorComponent.class,
 				new WorkspaceValidatorRegistry.INodeValidator<CollectorComponent>() {
 					@Override
@@ -593,17 +607,110 @@ public class VanillaSFMFlowClientPlugin {
 						return null;
 					}
 				});
-		
+
 		WorkspaceValidatorRegistry.register(SculkTriggerComponent.class,
 				new WorkspaceValidatorRegistry.INodeValidator<SculkTriggerComponent>() {
 					@Override
 					public boolean hasError(ManagerScreen screen, SculkTriggerComponent component) {
-						return false; // Structurally valid in all states [3]
+						return false;
 					}
 
 					@Override
 					public @Nullable Component getErrorTooltip(ManagerScreen screen, SculkTriggerComponent component) {
 						return null;
+					}
+				});
+
+		// 7. Group Nodes Recursive Error/Warning Bubbling
+		WorkspaceValidatorRegistry.register(GroupComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<GroupComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, GroupComponent group) {
+						// Bubble up any nested errors recursively
+						return hasNestedErrorRecursive(screen, group.getId());
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, GroupComponent group) {
+						if (hasError(screen, group)) {
+							return Component.translatable("gui.sfmflow.error.nested_group_error");
+						}
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, GroupComponent group) {
+						// Bubble up any nested warnings recursively
+						return hasNestedWarningRecursive(screen, group.getId());
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, GroupComponent group) {
+						if (hasWarning(screen, group)) {
+							return Component.translatable("gui.sfmflow.warning.nested_group_warning");
+						}
+						return null;
+					}
+
+					// Recursive helper checking child nodes for errors
+					private boolean hasNestedErrorRecursive(ManagerScreen s, UUID groupId) {
+						var comps = s.getMenu().getManagerBlockEntity().getFlowComponents().values();
+						for (AbstractFlowComponent comp : comps) {
+							if (isGroupDescendantOf(s, comp.getParentGroupId(), groupId)) {
+								if (!(comp instanceof GroupComponent)) {
+									if (WorkspaceValidator.hasUnboundInventoryError(s, comp)) {
+										return true;
+									}
+								} else {
+									if (hasNestedErrorRecursive(s, comp.getId())) {
+										return true;
+									}
+								}
+							}
+						}
+						return false;
+					}
+
+					// Recursive helper checking child nodes for warnings
+					private boolean hasNestedWarningRecursive(ManagerScreen s, UUID groupId) {
+						var comps = s.getMenu().getManagerBlockEntity().getFlowComponents().values();
+						for (AbstractFlowComponent comp : comps) {
+							if (isGroupDescendantOf(s, comp.getParentGroupId(), groupId)) {
+								if (!(comp instanceof GroupComponent)) {
+									if (WorkspaceValidator.hasEmptyFilterVariableWarning(s, comp)) {
+										return true;
+									}
+								} else {
+									if (hasNestedWarningRecursive(s, comp.getId())) {
+										return true;
+									}
+								}
+							}
+						}
+						return false;
+					}
+
+					// Helper determining if a sub-group is nested inside a target parent group
+					private boolean isGroupDescendantOf(ManagerScreen s, @Nullable UUID queryGroupId,
+							UUID targetGroupId) {
+						if (queryGroupId == null)
+							return false;
+						if (queryGroupId.equals(targetGroupId))
+							return true;
+						UUID current = queryGroupId;
+						var comps = s.getMenu().getManagerBlockEntity().getFlowComponents();
+						while (current != null) {
+							var comp = comps.get(current);
+							if (comp != null) {
+								current = comp.getParentGroupId();
+								if (targetGroupId.equals(current)) {
+									return true;
+								}
+							} else {
+								break;
+							}
+						}
+						return false;
 					}
 				});
 

@@ -3,6 +3,11 @@ package dta.sfmflow.client.screen;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+import javax.annotation.Nullable;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.NodeCategory;
@@ -23,6 +28,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.Renderable;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.GameRenderer;
@@ -58,6 +64,9 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	private final ManagerMouseHandler mouseHandler;
 	private final int originalGuiScale;
 	private final Minecraft mc;
+	private UUID currentGroupId = null; 
+	private final List<BreadcrumbNode> activeBreadcrumbs = new ArrayList<>();
+	public record BreadcrumbNode(String label, @Nullable UUID id, int xStart, int xEnd) {}
 
 	public ManagerScreen(ManagerMenu menu, Inventory playerInventory, Component title) {
 		super(menu, playerInventory, title);
@@ -144,6 +153,19 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 	}
 
+	public UUID getCurrentGroupId() {
+		return currentGroupId;
+	}
+
+	public void setCurrentGroupId(UUID id) {
+		this.currentGroupId = id;
+	}
+
+	public List<BreadcrumbNode> getActiveBreadcrumbs() {
+		return activeBreadcrumbs;
+	}
+	
+	
 	@Override
 	public void removed() {
 		super.removed();
@@ -158,8 +180,11 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	private void buildComponents(int x, int y) {
 		List<FlowWidgetContainer> componentContainers = new ArrayList<>();
 		for (AbstractFlowComponent component : this.getMenu().getManagerBlockEntity().getFlowComponents().values()) {
-			FlowWidgetContainer componetContainer = new FlowWidgetContainer(this, component, x, y);
-			componentContainers.add(componetContainer);
+			// Only instantiate widgets matching the active sub-canvas 
+			if (Objects.equals(component.getParentGroupId(), this.currentGroupId)) {
+				FlowWidgetContainer componetContainer = new FlowWidgetContainer(this, component, x, y);
+				componentContainers.add(componetContainer);
+			}
 		}
 		componentContainers.sort(Comparator.comparing(FlowWidgetContainer::getZ));
 		for (int i = 0; i < componentContainers.size(); i++) {
@@ -319,7 +344,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		guiGraphics.pose().popPose();
 
 		if (this.mouseHandler.getTopHoveredElement() instanceof AbstractFlowWidget flowWidget) {
-			net.minecraft.client.gui.components.Tooltip tooltip = flowWidget.getCustomTooltip();
+			Tooltip tooltip = flowWidget.getCustomTooltip();
 			if (tooltip != null) {
 				guiGraphics.pose().pushPose();
 				guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
@@ -604,6 +629,47 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		if (warningCount > 0) {
 			guiGraphics.drawString(this.font, Component.translatable("gui.sfmflow.warnings", warningCount),
 					currentOffset, 244, 0xFFFED83D, false);
+		}
+
+		// RENDER INTERACTIVE BREADCRUMBS RELATIVE TO TRANSLATED CANVAS
+		activeBreadcrumbs.clear();
+		int startX = 26; // Relative X start
+		int drawY = 4;   // Relative Y start
+
+		List<BreadcrumbNode> trail = new ArrayList<>();
+		UUID parent = this.currentGroupId;
+		while (parent != null) {
+			AbstractFlowComponent comp = getMenu().getManagerBlockEntity().getFlowComponents().get(parent);
+			if (comp != null) {
+				trail.add(0, new BreadcrumbNode(comp.getName().getString(), comp.getId(), 0, 0));
+				parent = comp.getParentGroupId();
+			} else {
+				break;
+			}
+		}
+		trail.add(0, new BreadcrumbNode("Root", null, 0, 0));
+
+		for (int i = 0; i < trail.size(); i++) {
+			var node = trail.get(i);
+			String text = node.label();
+			int width = this.font.width(text);
+
+			// Calculate absolute screen coordinates for hover evaluations
+			int absX = startX + this.leftPos;
+			int absY = drawY + this.topPos;
+			boolean hovered = mouseX >= absX && mouseX < absX + width && mouseY >= absY && mouseY < absY + 10;
+			int color = hovered ? 0xFF39FF14 : 0xFF8B8B8B; // Vibrant green on hover
+
+			guiGraphics.drawString(this.font, text, startX, drawY, color, false);
+			
+			// Store absolute screen boundaries so mouseClicked() is perfectly in-sync
+			activeBreadcrumbs.add(new BreadcrumbNode(text, node.id(), absX, absX + width));
+			startX += width;
+
+			if (i < trail.size() - 1) {
+				guiGraphics.drawString(this.font, " > ", startX, drawY, 0xFF555555, false);
+				startX += this.font.width(" > ");
+			}
 		}
 	}
 

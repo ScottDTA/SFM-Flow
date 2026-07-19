@@ -25,9 +25,9 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * A sliding hover submenu displaying creator nodes mapped to a hovered sidebar
- * category [3]. Features 9-slice background scaling, centered and dynamically
- * scaled FlowWidgetText headers [3], OpenGL scissor masking, customizable
- * width/column structures, and button hover states with custom padding [3].
+ * category. Features 9-slice background scaling, centered and dynamically
+ * scaled FlowWidgetText headers, OpenGL scissor masking, customizable
+ * width/column structures, and button hover states with custom padding.
  */
 @OnlyIn(Dist.CLIENT)
 public class CategoryHoverSubmenu extends AbstractFlowWidget {
@@ -49,8 +49,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 	private final int cellStride = cellSize + cellPadding;
 
 	/**
-	 * Submenu title label, powered by FlowWidgetText for scaled ellipsis support
-	 * [3].
+	 * Submenu title label, powered by FlowWidgetText for scaled ellipsis support.
 	 */
 	private final FlowWidgetText titleWidget;
 
@@ -67,7 +66,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 			}
 		}
 
-		// Dynamically calculate grid columns and scroll boundaries with padding [3]
+		// Dynamically calculate grid columns and scroll boundaries with padding
 		this.numColumns = Math.max(1, Math.min(4, matchedTypes.size()));
 		this.gridWidth = numColumns * cellSize + (numColumns - 1) * cellPadding;
 		this.scrollbarWidth = (matchedTypes.size() > 16) ? 8 : 0;
@@ -75,7 +74,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 		// Scale width dynamically (min 48px to prevent extreme title squeezing)
 		this.width = Math.max(48, 6 + gridWidth + scrollbarWidth + 6);
 
-		// Center grid columns horizontally if they don't occupy full 4-column space [3]
+		// Center grid columns horizontally if they don't occupy full 4-column space
 		int availableGridSpace = this.width - 12 - scrollbarWidth;
 		this.startXOffset = 6 + (availableGridSpace - gridWidth) / 2;
 
@@ -138,7 +137,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 				int col = -1;
 				int row = -1;
 
-				// Evaluate columns cleanly [3]
+				// Evaluate columns cleanly
 				for (int c = 0; c < numColumns; c++) {
 					int cellX = gridX + c * cellStride;
 					if (mouseX >= cellX && mouseX < cellX + cellSize) {
@@ -147,7 +146,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 					}
 				}
 
-				// Evaluate rows cleanly [3]
+				// Evaluate rows cleanly
 				for (int r = 0; r < rows; r++) {
 					int cellY = gridY + r * cellStride - (int) scrollOffset;
 					if (mouseY >= cellY && mouseY < cellY + cellSize) {
@@ -163,7 +162,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 						ResourceLocation typeLoc = FlowComponentType.REGISTRY.getKey(clickedType);
 						if (typeLoc != null) {
 							PacketDistributor.sendToServer(new CreateNodePacket(
-									parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), typeLoc));
+									parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), typeLoc, parentScreen.getCurrentGroupId()));
 						}
 						return true;
 					}
@@ -183,7 +182,7 @@ public class CategoryHoverSubmenu extends AbstractFlowWidget {
 		int gridX = getX() + startXOffset;
 		int gridY = getY() + 18;
 
-		// Expanded horizontal scissor limits to fully support centered layout columns [3]
+		// Expanded horizontal scissor limits to fully support centered layout columns
 		guiGraphics.enableScissor(getX() + 6, gridY, getX() + width - 6, gridY + this.gridHeight);
 
 		for (int i = 0; i < matchedTypes.size(); i++) {

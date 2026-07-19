@@ -5,15 +5,16 @@ import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.util.NodeCount;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
- * Parent node element widget wrapping standard compact cards and terminal pins
- * [3]. Coordinates dragging bounds, layout translations, and delegates input
- * bounds checks cleanly to visible children [3].
+ * Parent node element widget wrapping standard compact cards and terminal pins.
+ * Coordinates dragging bounds, layout translations, and delegates input
+ * bounds checks cleanly to visible children.
  */
 @OnlyIn(Dist.CLIENT)
 public class FlowWidgetContainer extends AbstractFlowWidget {
@@ -36,7 +37,8 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 	}
 
 	private void refreshNodes() {
-		if (component.hasInputNodes()) {
+		// Only calculate spacings and spawn pins if the component actually has active ports
+		if (component.hasInputNodes() && component.getNumInputs() > 0) {
 			int baseY = this.getY() - 6;
 			NodeCount nodeCount = NodeCount.getForCount(component.getNumInputs());
 			int[] spacing = nodeCount.getOffsets(false);
@@ -46,13 +48,14 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 				FlowWidgetInputNode pin = new FlowWidgetInputNode(i, this, finalX, baseY);
 				Component pinTooltip = component.getInputNodeTooltip(i);
 				if (pinTooltip != null) {
-					pin.setCustomTooltip(net.minecraft.client.gui.components.Tooltip.create(pinTooltip));
+					pin.setCustomTooltip(Tooltip.create(pinTooltip));
 				}
 				this.children.add(pin);
 			}
 		}
 
-		if (component.hasOutputNodes()) {
+		// Only calculate spacings and spawn pins if the component actually has active ports
+		if (component.hasOutputNodes() && component.getNumOutputs() > 0) {
 			int baseY = this.getY() + 20;
 			NodeCount nodeCount = NodeCount.getForCount(component.getNumOutputs());
 			int[] spacing = nodeCount.getOffsets(false);
@@ -62,7 +65,7 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 				FlowWidgetOutputNode pin = new FlowWidgetOutputNode(i, this, finalX, baseY);
 				Component pinTooltip = component.getOutputNodeTooltip(i);
 				if (pinTooltip != null) {
-					pin.setCustomTooltip(net.minecraft.client.gui.components.Tooltip.create(pinTooltip));
+					pin.setCustomTooltip(Tooltip.create(pinTooltip));
 				}
 				this.children.add(pin);
 			}
@@ -73,7 +76,7 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
 		for (GuiEventListener child : children) {
 			if (child instanceof AbstractFlowWidget widget) {
-				// Fix: Evaluate individual child visibilities instead of overwriting them [3]
+				// Fix: Evaluate individual child visibilities instead of overwriting them
 				if (widget.visible) {
 					widget.active = this.active;
 					widget.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -85,7 +88,7 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 	@Override
 	protected void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
 		guiGraphics.pose().pushPose();
-		// Reverts back to standard sorted Z-level indexing [3]
+		// Reverts back to standard sorted Z-level indexing
 		guiGraphics.pose().translate(0.0F, 0.0F, this.getZ() * 1.0F);
 
 		int renderMouseX = mouseX;

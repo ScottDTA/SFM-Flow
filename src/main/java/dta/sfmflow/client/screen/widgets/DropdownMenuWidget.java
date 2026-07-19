@@ -5,9 +5,12 @@ import dta.sfmflow.api.client.event.RegisterDropdownLinksEvent;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.flowcomponents.GroupInputComponent;
+import dta.sfmflow.flowcomponents.GroupOutputComponent;
 import dta.sfmflow.networking.packets.serverbound.CanvasActionPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.common.NeoForge;
@@ -17,9 +20,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Compact right-click visual dropdown overlay replacing old ContextMenuOverlay [3].
+ * Compact right-click visual dropdown overlay replacing old ContextMenuOverlay.
  * Houses scrolling logic, viewport scissor bounds, and launches settings
- * modals [3]. Scaled down to 66% with standard grey styling [3].
+ * modals. Scaled down to 66% with standard grey styling.
  */
 @OnlyIn(Dist.CLIENT)
 public class DropdownMenuWidget extends AbstractFlowWidget {
@@ -60,6 +63,15 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 					CanvasAction.COPY));
 			parentScreen.setOpenedDropdown(null);
 		});
+		// Add "Move Group" option to standard components [3]
+				if (!(targetContainer.getComponent() instanceof GroupInputComponent) 
+						&& !(targetContainer.getComponent() instanceof GroupOutputComponent)) {
+					event.addLink(Component.literal("Move Group"), () -> {
+						MoveGroupModalPopup movePopup = new MoveGroupModalPopup(parentScreen, targetContainer);
+						parentScreen.setActiveModalPopup(movePopup);
+						parentScreen.setOpenedDropdown(null);
+					});
+				}
 		event.addLink(Component.literal("Delete Node"), () -> {
 			PacketDistributor.sendToServer(new CanvasActionPacket(
 					parentScreen.getMenu().getManagerBlockEntity().getBlockPos(),
@@ -72,7 +84,7 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 
 		List<RegisterDropdownLinksEvent.LinkEntry> compiled = event.getLinks();
 		
-		// Dynamically compute exact height boundary based on 6px top/bottom padding [3]
+		// Dynamically compute exact height boundary based on 6px top/bottom padding
 		int rawHeight = (compiled.size() * 14) + 12;
 		this.totalContentHeight = compiled.size() * 14;
 		this.needsScrolling = rawHeight > 112;
@@ -112,7 +124,7 @@ public class DropdownMenuWidget extends AbstractFlowWidget {
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (this.visible && this.active && isMouseOver(mouseX, mouseY) && needsScrolling) {
 			int maxScroll = totalContentHeight - (this.height - 12);
-			this.scrollOffset = net.minecraft.util.Mth.clamp(this.scrollOffset - (int) (scrollY * 14), 0, maxScroll);
+			this.scrollOffset = Mth.clamp(this.scrollOffset - (int) (scrollY * 14), 0, maxScroll);
 
 			int index = 0;
 			for (FlowTextLink link : links) {

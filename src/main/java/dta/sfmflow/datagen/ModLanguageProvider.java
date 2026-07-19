@@ -37,6 +37,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");
 		add("gui.sfmflow.error.no_active_sides", "At least one active inventory side must be selected!");
 		add("gui.sfmflow.errors", "Errors: %1$s");
+		add("gui.sfmflow.error.nested_group_error", "An error exists inside this group folder!");
+		add("gui.sfmflow.warning.nested_group_warning", "A warning exists inside this group folder!");
 		add("gui.sfmflow.interval_trigger", "Interval Trigger");
 		add("gui.sfmflow.item_input", "Item Input");
 		add("gui.sfmflow.item_output", "Item Output");
