@@ -19,8 +19,8 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Public API client-only base class representing a custom visual flowchart
- * element [3]. Implements ContainerEventHandler to support vanilla recursive
- * hit checks and input forwarding [3].
+ * element. Implements ContainerEventHandler to support vanilla recursive
+ * hit checks and input forwarding.
  */
 @OnlyIn(Dist.CLIENT)
 public abstract class AbstractFlowWidget extends AbstractWidget implements ContainerEventHandler {
@@ -98,7 +98,15 @@ public abstract class AbstractFlowWidget extends AbstractWidget implements Conta
 
 	@Override
 	public void setFocused(@Nullable GuiEventListener focused) {
-		this.focused = focused;
+		if (this.focused != focused) {
+			if (this.focused != null) {
+				this.focused.setFocused(false); 
+			}
+			this.focused = focused;
+			if (focused != null) {
+				focused.setFocused(true); 
+			}
+		}
 	}
 
 	public void setCustomTooltip(@Nullable Tooltip tooltip) {

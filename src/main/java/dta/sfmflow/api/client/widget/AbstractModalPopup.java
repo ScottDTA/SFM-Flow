@@ -10,7 +10,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Base modal window popup that centers itself dynamically, intercepts all
- * workspace inputs, and delegates drag inputs cleanly to children [3].
+ * workspace inputs, and delegates drag inputs cleanly to children.
  */
 @OnlyIn(Dist.CLIENT)
 public abstract class AbstractModalPopup extends AbstractFlowWidget {
@@ -24,7 +24,7 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 	}
 
 	/**
-	 * Safely dismisses the modal and returns active focus to the main canvas [3].
+	 * Safely dismisses the modal and returns active focus to the main canvas.
 	 */
 	public void close() {
 		this.parentScreen.setActiveModalPopup(null);
@@ -84,26 +84,29 @@ public abstract class AbstractModalPopup extends AbstractFlowWidget {
 			close(); // Cancel and dismiss modal cleanly on ESC [3]
 			return true;
 		}
-		for (GuiEventListener child : children) {
-			if (child.keyPressed(keyCode, scanCode, modifiers)) {
-				return true;
-			}
+		
+		// Only route keyboard presses directly to the currently focused child [3]
+		GuiEventListener activeFocus = this.getFocused();
+		if (activeFocus != null && activeFocus.keyPressed(keyCode, scanCode, modifiers)) {
+			return true;
 		}
+		
 		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 
 	@Override
 	public boolean charTyped(char codePoint, int modifiers) {
-		for (GuiEventListener child : children) {
-			if (child.charTyped(codePoint, modifiers)) {
-				return true;
-			}
+		// Only route character typing directly to the currently focused child [3]
+		GuiEventListener activeFocus = this.getFocused();
+		if (activeFocus != null && activeFocus.charTyped(codePoint, modifiers)) {
+			return true;
 		}
+		
 		return super.charTyped(codePoint, modifiers);
 	}
 
 	/**
-	 * Performs the 9-slice stretching calculations on the submenu background textures [3].
+	 * Performs the 9-slice stretching calculations on the submenu background textures.
 	 */
 	protected void render9SliceBackground(GuiGraphics guiGraphics) {
 		NineSliceUtil.drawDefault(guiGraphics, getX(), getY(), width, height);

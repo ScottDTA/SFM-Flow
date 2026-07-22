@@ -11,6 +11,7 @@
     "sfmflow:fluid_vacuum_valve_block",
     "sfmflow:cable_cluster_block",
     "sfmflow:sculk_trigger_cable_block",
+    "sfmflow:sign_updater_cable_block",
     "sfmflow:energy_relay_block",
     "sfmflow:fluid_relay_block",
     "sfmflow:item_relay_block",

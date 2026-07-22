@@ -4,6 +4,7 @@ import java.lang.reflect.Field;
 import java.util.Locale;
 import java.util.UUID;
 
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.ServerConfig;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
@@ -107,19 +108,19 @@ public class ServerPayloadHandler {
 			if (context.player().level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
 				AbstractFlowComponent component = manager.getFlowComponents().get(data.componentId());
 				if (component != null) {
-					// 1. Record the previous input/output counts before loading settings
+					// Print the exact incoming NBT tag payload received from the client GUI
+					SFMFlow.LOGGER.info("[SFM-Flow] [C2S Diagnostic] Received SaveComponentSettings! NBT: {}", data.settings());
+
 					int prevInputs = component.getNumInputs();
 					int prevOutputs = component.getNumOutputs();
 
 					component.loadData(data.settings());
 
-					// 2. Resolve the new input/output counts
 					int newInputs = component.getNumInputs();
 					int newOutputs = component.getNumOutputs();
 
 					boolean connectionsModified = false;
 
-					// 3. Prune invalid output connections if the output count shrunk
 					if (newOutputs < prevOutputs) {
 						int finalNewOutputs = newOutputs;
 						boolean removed = manager.getFlowConnections().removeIf(conn -> 
@@ -130,7 +131,6 @@ public class ServerPayloadHandler {
 						}
 					}
 
-					// 4. Prune invalid input connections if the input count shrunk
 					if (newInputs < prevInputs) {
 						int finalNewInputs = newInputs;
 						boolean removed = manager.getFlowConnections().removeIf(conn -> 
@@ -157,7 +157,6 @@ public class ServerPayloadHandler {
 					
 					manager.rebuildListeners();
 
-					// 5. If we pruned any dangling connections, broadcast a full connection sync to clients
 					if (connectionsModified) {
 						CompoundTag connTag = new CompoundTag();
 						ListTag listTag = new ListTag();

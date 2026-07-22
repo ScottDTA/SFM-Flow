@@ -1,4 +1,20 @@
-7-19-2026
+7-21-2026
+
+### [Added]
+* Sign Updater Cable: A new specialty network cable block that connects directly with standard wooden signs in your world.
+* Sign Updater Node: A utility flow component allowing the Machine Inventory Manager to dynamically rewrite, recolor, and format sign text.
+* Sign Customization Controls: Configure up to 4 lines of text on both the Front and Back of adjacent signs. Toggles include Dye Color, Glowing Ink, and Waxing states.
+* Direct Sign Redraws: Implemented instant render sync, forcing signs to immediately redraw and display their updated text to nearby players.
+
+### [Changed]
+* Overlaid Text Fields: Refactored overlay and modal keyboard handling to cleanly route keystrokes only to the active text field, improving text editing stability.
+
+### [Fixed]
+* Input Focus Glitches: Resolved an issue where typed characters were lost or duplicated when editing text inside modal settings popups.
+* Flowchart Recompiling: Optimized the compiler's background planning cache to prevent performance lags on high-frequency triggers.
+
+
+7-19-2026 (0.5.15.alpha)
 
 ### [Added]
 * Entity Relay Blocks: Added Item Relay, Fluid Relay, and Energy Relay blocks to allow cables and manager networks to interact with non-player entities (such as boats, carts, and modded entities) in adjacent blocks.

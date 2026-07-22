@@ -29,6 +29,7 @@ import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SculkTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SculkTriggerSideConfigModalPopup;
+import dta.sfmflow.client.screen.widgets.SignUpdaterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 import dta.sfmflow.client.screen.widgets.SplitterSettingsOverlay;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
@@ -45,6 +46,7 @@ import dta.sfmflow.flowcomponents.RedstoneConditionalComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
+import dta.sfmflow.flowcomponents.SignUpdaterComponent;
 import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
@@ -215,6 +217,10 @@ public class VanillaSFMFlowClientPlugin {
 				return new SculkTriggerSettingsOverlay(screen, trigger);
 			}
 			return null;
+		});
+		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER.get(), (screen, component) -> {
+			return new SignUpdaterSettingsOverlay(screen, component);
 		});
 
 		// 2. Sided Configuration Popups
@@ -595,19 +601,6 @@ public class VanillaSFMFlowClientPlugin {
 					}
 				});
 
-		WorkspaceValidatorRegistry.register(CollectorComponent.class,
-				new WorkspaceValidatorRegistry.INodeValidator<CollectorComponent>() {
-					@Override
-					public boolean hasError(ManagerScreen screen, CollectorComponent component) {
-						return false;
-					}
-
-					@Override
-					public @Nullable Component getErrorTooltip(ManagerScreen screen, CollectorComponent component) {
-						return null;
-					}
-				});
-
 		WorkspaceValidatorRegistry.register(SculkTriggerComponent.class,
 				new WorkspaceValidatorRegistry.INodeValidator<SculkTriggerComponent>() {
 					@Override
@@ -620,6 +613,24 @@ public class VanillaSFMFlowClientPlugin {
 						return null;
 					}
 				});
+		
+		WorkspaceValidatorRegistry.register(SignUpdaterComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<SignUpdaterComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, SignUpdaterComponent transfer) {
+						return isInventoryUnboundOrSleeping(screen, transfer.getInventoryId());
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen,
+							SignUpdaterComponent transfer) {
+						if (hasError(screen, transfer)) {
+							return Component.translatable("gui.sfmflow.error.unbound_inventory");
+						}
+						return null;
+					}
+				});
+		
 
 		// 7. Group Nodes Recursive Error/Warning Bubbling
 		WorkspaceValidatorRegistry.register(GroupComponent.class,

@@ -26,6 +26,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
+import java.util.Locale;
 import java.util.UUID;
 
 public class ObserverTriggerComponent extends AbstractTriggerComponent implements IInventoryTarget, ISideConfigurable {
@@ -137,7 +138,7 @@ public class ObserverTriggerComponent extends AbstractTriggerComponent implement
 		super.saveData(compoundTag);
 		compoundTag.putInt("inventoryId", this.inventoryId);
 		compoundTag.putBoolean("previousPowered", this.previousPowered);
-		compoundTag.putString("frontFacing", this.frontFacing.name());
+		compoundTag.putString("frontFacing", this.frontFacing.getSerializedName());
 		return compoundTag;
 	}
 
@@ -163,7 +164,7 @@ public class ObserverTriggerComponent extends AbstractTriggerComponent implement
 		}
 		if (compoundTag.contains("frontFacing")) {
 			try {
-				this.frontFacing = Direction.valueOf(compoundTag.getString("frontFacing"));
+				this.frontFacing = Direction.valueOf(compoundTag.getString("frontFacing").toUpperCase(Locale.ROOT));
 			} catch (IllegalArgumentException e) {
 				this.frontFacing = Direction.NORTH;
 			}

@@ -50,7 +50,7 @@ public final class FlowCapability<T> {
 			return state.is(ModTags.REDSTONE_CABLES);
 		}
 		
-		// Query the public presence registry to support specialty block scan overrides
+		// Query the public presence registry to support specialty block scan overrides [3]
 		if (FlowCapabilityPresenceRegistry.isAlwaysPresent(this.id, state.getBlock())) {
 			return true;
 		}

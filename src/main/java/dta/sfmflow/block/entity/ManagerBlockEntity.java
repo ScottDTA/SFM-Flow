@@ -47,6 +47,7 @@ import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import dta.sfmflow.screen.ManagerMenu;
 import dta.sfmflow.util.ConnectionBlock;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -116,6 +117,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private transient CompoundTag cachedFlowchartNbt = null;
 	private transient ThreadSafeInventorySnapshot.SnapshotProfile snapshotProfile = null;
 	private transient boolean isProfileDirty = true;
+	private boolean isFlowchartCacheDirty = true; // Rebuilt on first load [3]
 
 	public List<InventoryGroupVariable> getGroupVariables() {
 		return this.groupVariables;
@@ -333,17 +335,21 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					var snapshot = ThreadSafeInventorySnapshot.create(this, profile);
 
 					// 1. Resolve or lazily compute the cached flowchart NBT [3]
+					// 1. Resolve or lazily compute the cached flowchart NBT [3]
 					var registries = pLevel.registryAccess();
-					if (this.cachedFlowchartNbt == null || this.isDataDirty) {
+					if (this.cachedFlowchartNbt == null || this.isFlowchartCacheDirty) {
 						var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 						this.cachedFlowchartNbt = (CompoundTag) Flowchart.CODEC.encodeStart(ops, this.flowchart)
 								.resultOrPartial(err -> SFMFlow.LOGGER
 										.error("Failed to clone flowchart state for planning: {}", err))
 								.orElse(new CompoundTag());
-						this.isDataDirty = false;
+						
+						//SFMFlow.LOGGER.info("[SFM-Flow] [C2S Diagnostic] Recompiled cachedFlowchartNbt! Dirty was: {}, Result NBT: {}", this.isFlowchartCacheDirty, this.cachedFlowchartNbt);
+						
+						this.isFlowchartCacheDirty = false; // Cleanly clear only the compiler cache flag here [3]
+					
 					}
 					CompoundTag flowchartNbt = this.cachedFlowchartNbt.copy(); // Deep copy so worker can safely
-																				// parse/modify
 
 					NeoForge.EVENT_BUS
 							.post(new PreFlowchartPlanningEvent(this, snapshot, flowchartNbt, activeTriggers));
@@ -508,13 +514,13 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		if (parentGroupId != null) {
 			if (type == VanillaSFMFlowPlugin.GROUP_INPUT.get() && countGroupTerminals(parentGroupId, true) >= 5) {
 				if (player instanceof ServerPlayer sp) {
-					sp.sendSystemMessage(Component.literal("Cannot add more than 5 Group Inputs!").withStyle(net.minecraft.ChatFormatting.RED));
+					sp.sendSystemMessage(Component.literal("Cannot add more than 5 Group Inputs!").withStyle(ChatFormatting.RED));
 				}
 				return;
 			}
 			if (type == VanillaSFMFlowPlugin.GROUP_OUTPUT.get() && countGroupTerminals(parentGroupId, false) >= 5) {
 				if (player instanceof ServerPlayer sp) {
-					sp.sendSystemMessage(Component.literal("Cannot add more than 5 Group Outputs!").withStyle(net.minecraft.ChatFormatting.RED));
+					sp.sendSystemMessage(Component.literal("Cannot add more than 5 Group Outputs!").withStyle(ChatFormatting.RED));
 				}
 				return;
 			}
@@ -730,8 +736,6 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"));
 					} else if ("ENERGY".equals(strVal)) {
 						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"));
-					} else if ("CHEMICAL".equals(strVal)) {
-						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "chemical"));
 					} else if ("REDSTONE".equals(strVal)) {
 						types.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
 					} else {
@@ -767,7 +771,8 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 		this.isTriggerCacheDirty = true;
 		this.isProfileDirty = true;
-		this.cachedFlowchartNbt = null; 
+		this.isFlowchartCacheDirty = true; // Mark dirty on load [3]
+		this.cachedFlowchartNbt = null;
 	}
 
 	@Override
@@ -832,6 +837,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void setDataDirty(boolean dirty) {
 		this.isDataDirty = dirty;
 		if (dirty) {
+			this.isFlowchartCacheDirty = true; // Mark the compiler cache dirty on edits
 			this.isTriggerCacheDirty = true; // Mark dirty on edits
 			this.isProfileDirty = true; // Re-compile snapshot profile
 		}

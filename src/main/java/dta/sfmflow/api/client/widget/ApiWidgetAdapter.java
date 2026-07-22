@@ -1,27 +1,33 @@
 package dta.sfmflow.api.client.widget;
 
+import java.util.function.Supplier;
+
+import javax.annotation.Nullable;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import dta.sfmflow.client.GradientBlitUtil;
 import dta.sfmflow.util.Color;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Public client-only API widget adapter representing a wrapper for vanilla
- * Minecraft UI controls [3]. Synchronizes visible/active states, delegates
+ * Minecraft UI controls. Synchronizes visible/active states, delegates
  * coordinate modifications, and routes input focus, clicks, drags, releases,
- * and keys directly to the wrapped vanilla component [3].
+ * and keys directly to the wrapped vanilla component.
  *
- * @param <T> the type of vanilla AbstractWidget being wrapped [3]
+ * @param <T> the type of vanilla AbstractWidget being wrapped
  */
 @OnlyIn(Dist.CLIENT)
 public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidget {
 	private final T vanillaWidget;
-	private java.util.function.Supplier<Color> colorSupplier = () -> null;
+	private Supplier<Color> colorSupplier = () -> null;
 
 	public ApiWidgetAdapter(T vanillaWidget) {
 		super(vanillaWidget.getX(), vanillaWidget.getY(), vanillaWidget.getWidth(), vanillaWidget.getHeight(),
@@ -29,7 +35,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		this.vanillaWidget = vanillaWidget;
 	}
 
-	public ApiWidgetAdapter(T vanillaWidget, java.util.function.Supplier<Color> colorSupplier) {
+	public ApiWidgetAdapter(T vanillaWidget, Supplier<Color> colorSupplier) {
 		this(vanillaWidget);
 		this.colorSupplier = colorSupplier;
 	}
@@ -113,7 +119,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 
 	/**
 	 * Defensive bounds verification added to prevent scroll conflicts between
-	 * stacked components [3].
+	 * stacked components.
 	 */
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
@@ -121,6 +127,17 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 			return this.vanillaWidget.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
 		}
 		return false;
+	}
+	
+	@Override
+	public void setFocused(boolean focused) {
+		super.setFocused(focused);
+		this.vanillaWidget.setFocused(focused); 
+	}
+
+	@Override
+	public boolean isFocused() {
+		return this.vanillaWidget.isFocused();
 	}
 
 	@OnlyIn(Dist.CLIENT)
@@ -171,7 +188,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, @javax.annotation.Nullable String text, int x, int y,
+		public int drawString(Font font, @Nullable String text, int x, int y,
 				int color) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color);
@@ -180,7 +197,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, @javax.annotation.Nullable String text, int x, int y,
+		public int drawString(Font font, @Nullable String text, int x, int y,
 				int color, boolean dropShadow) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color, dropShadow);
@@ -189,7 +206,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, @javax.annotation.Nullable String text, float x,
+		public int drawString(Font font, @Nullable String text, float x,
 				float y, int color, boolean dropShadow) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color, dropShadow);
@@ -198,7 +215,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, net.minecraft.util.FormattedCharSequence text, int x,
+		public int drawString(Font font, FormattedCharSequence text, int x,
 				int y, int color) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color);
@@ -207,7 +224,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, net.minecraft.util.FormattedCharSequence text, int x,
+		public int drawString(Font font, FormattedCharSequence text, int x,
 				int y, int color, boolean dropShadow) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color, dropShadow);
@@ -216,7 +233,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, net.minecraft.util.FormattedCharSequence text,
+		public int drawString(Font font, FormattedCharSequence text,
 				float x, float y, int color, boolean dropShadow) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color, dropShadow);
@@ -225,7 +242,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, Component text, int x, int y, int color) {
+		public int drawString(Font font, Component text, int x, int y, int color) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color);
 			resumeTint();
@@ -233,7 +250,7 @@ public class ApiWidgetAdapter<T extends AbstractWidget> extends AbstractFlowWidg
 		}
 
 		@Override
-		public int drawString(net.minecraft.client.gui.Font font, Component text, int x, int y, int color,
+		public int drawString(Font font, Component text, int x, int y, int color,
 				boolean dropShadow) {
 			suspendTint();
 			int res = super.drawString(font, text, x, y, color, dropShadow);

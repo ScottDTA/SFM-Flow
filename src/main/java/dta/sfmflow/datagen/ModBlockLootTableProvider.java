@@ -36,6 +36,7 @@ public class ModBlockLootTableProvider extends BlockLootSubProvider {
 		dropSelf(ModBlocks.ITEM_RELAY_BLOCK.get());
 		dropSelf(ModBlocks.FLUID_RELAY_BLOCK.get());
 		dropSelf(ModBlocks.ENERGY_RELAY_BLOCK.get());
+		dropSelf(ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get());
 	}
 
 	@Override

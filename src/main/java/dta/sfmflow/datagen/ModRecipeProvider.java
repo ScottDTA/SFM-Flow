@@ -8,6 +8,8 @@ import net.minecraft.data.recipes.RecipeCategory;
 import net.minecraft.data.recipes.RecipeOutput;
 import net.minecraft.data.recipes.RecipeProvider;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
+import net.minecraft.data.recipes.ShapelessRecipeBuilder;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.neoforge.common.conditions.IConditionBuilder;
@@ -108,6 +110,10 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 				.define('C', ModBlocks.CABLE_BLOCK.get()).define('D', Items.GOLD_INGOT)
 				.define('R', Blocks.REDSTONE_BLOCK).unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get()))
 				.save(recipeOutput);
+
+		ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get())
+				.requires(ModBlocks.CABLE_BLOCK.get()).requires(ItemTags.SIGNS)
+				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
 
 	}
 }

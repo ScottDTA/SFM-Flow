@@ -57,6 +57,10 @@ public class ModBlockEntities {
 	public static final Supplier<BlockEntityType<EnergyRelayBlockEntity>> ENERGY_RELAY_BE = BLOCK_ENTITIES
 			.register("energy_relay_be", () -> BlockEntityType.Builder
 					.of(EnergyRelayBlockEntity::new, ModBlocks.ENERGY_RELAY_BLOCK.get()).build(null));
+	
+	public static final Supplier<BlockEntityType<SignUpdaterCableBlockEntity>> SIGN_UPDATER_CABLE_BE = BLOCK_ENTITIES
+			.register("sign_updater_cable_be", () -> BlockEntityType.Builder
+					.of(SignUpdaterCableBlockEntity::new, ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get()).build(null));
 
 	public static void register(IEventBus eventBus) {
 		BLOCK_ENTITIES.register(eventBus);

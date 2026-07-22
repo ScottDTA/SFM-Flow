@@ -4,7 +4,6 @@ import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.api.component.FlowComponentType;
-import dta.sfmflow.compat.MekanismCompat;
 import dta.sfmflow.api.capability.FlowCapability;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.FluidTransferParams;
@@ -17,6 +16,7 @@ import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.block.FluidVacuumValveBlock;
 import dta.sfmflow.block.ItemVacuumValveBlock;
 import dta.sfmflow.block.ModBlocks;
+import dta.sfmflow.block.SignUpdaterCableBlock;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.block.entity.RedstoneEmitterBlockEntity;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
@@ -33,27 +33,34 @@ import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
+import dta.sfmflow.flowcomponents.SignUpdaterComponent;
 import dta.sfmflow.flowcomponents.SplitterComponent;
+import dta.sfmflow.networking.packets.clientbound.ForceBlockRenderPacket;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneConditionalComponent;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignText;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
-import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -92,15 +99,16 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_NODE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_INPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_OUTPUT;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> SIGN_UPDATER;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
 		registerItemCapability();
 		registerFluidCapability();
 		registerEnergyCapability();
-		registerChemicalCapability();
 		registerRedstoneCapability();
 		registerCauldronBridges();
+		registerSignUpdaterCapability();
 		
 		ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
 		FlowCapabilityRegistry.register(new FlowCapability<>(sculkCapId, null, "gui.sfmflow.type_sculk"));
@@ -215,6 +223,11 @@ public class VanillaSFMFlowPlugin {
 				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("Group Output").codec(GroupOutputComponent.CODEC).build(registry);
 		
+		SIGN_UPDATER = FlowComponentBuilder.create("sign_updater", SignUpdaterComponent::new)
+				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/sign_button.png")
+				.displayName("gui.sfmflow.sign_updater").codec(SignUpdaterComponent.CODEC).build(registry);
+		
+		
 		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_sync"),
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof SplitterComponent.SplitterSyncParams task) {
@@ -231,6 +244,117 @@ public class VanillaSFMFlowPlugin {
 					}
 					return false;
 				});
+		
+		// Register Sign Updater capability and task execution logic
+				ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
+				FlowCapabilityRegistry.registerTransfer(signUpdaterCapId,
+						(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+							if (params instanceof SignUpdaterComponent.SignUpdaterParams task) {
+								BlockState state = level.getBlockState(dest);
+								if (!state.hasProperty(SignUpdaterCableBlock.FACING)) {
+									return false;
+								}
+								Direction facing = state.getValue(SignUpdaterCableBlock.FACING);
+								BlockPos signPos = dest.relative(facing);
+
+								BlockEntity be = level.getBlockEntity(signPos);
+								if (be instanceof SignBlockEntity sign) {
+									boolean updated = false;
+
+									// 1. Process Front Side Text & Formatting [3]
+									SignText frontText = sign.getFrontText();
+									boolean frontUpdated = false;
+									for (int i = 0; i < 4; i++) {
+										if (task.updateFront().get(i)) {
+											String oldText = frontText.getMessage(i, false).getString();
+											String newText = task.frontLines().get(i);
+											
+											// Only update and mark dirty if the string value actually changed [3]
+											if (!oldText.equals(newText)) {
+												frontText = frontText.setMessage(i, Component.literal(newText));
+												frontUpdated = true;
+											}
+										}
+									}
+									if (frontText.getColor() != task.frontColor()) {
+										frontText = frontText.setColor(task.frontColor());
+										frontUpdated = true;
+									}
+									if (frontText.hasGlowingText() != task.frontGlow()) {
+										frontText = frontText.setHasGlowingText(task.frontGlow());
+										frontUpdated = true;
+									}
+									if (frontUpdated) {
+										sign.setText(frontText, true);
+										updated = true;
+									}
+
+									// 2. Process Back Side Text & Formatting [3]
+									SignText backText = sign.getBackText();
+									boolean backUpdated = false;
+									for (int i = 0; i < 4; i++) {
+										if (task.updateBack().get(i)) {
+											String oldText = backText.getMessage(i, false).getString();
+											String newText = task.backLines().get(i);
+											
+											// Only update and mark dirty if the string value actually changed [3]
+											if (!oldText.equals(newText)) {
+												backText = backText.setMessage(i, Component.literal(newText));
+												backUpdated = true;
+											}
+										}
+									}
+									if (backText.getColor() != task.backColor()) {
+										backText = backText.setColor(task.backColor());
+										backUpdated = true;
+									}
+									if (backText.hasGlowingText() != task.backGlow()) {
+										backText = backText.setHasGlowingText(task.backGlow());
+										backUpdated = true;
+									}
+									if (backUpdated) {
+										sign.setText(backText, false);
+										updated = true;
+									}
+									
+									// 3. Process Waxing State [3]
+									if (sign.isWaxed() != task.waxed()) {
+										sign.setWaxed(task.waxed());
+										updated = true;
+									}
+
+									// 4. Guaranteed Client Sync Packet Delivery [3]
+									if (updated) {
+										sign.setChanged();
+										
+										BlockState signState = level.getBlockState(signPos);
+										level.sendBlockUpdated(signPos, signState, signState, 3);
+										
+										if (level instanceof ServerLevel serverLevel) {
+											var syncPacket = sign.getUpdatePacket();
+											
+											if (syncPacket != null) {
+												double centerX = signPos.getX() + 0.5;
+												double centerY = signPos.getY() + 0.5;
+												double centerZ = signPos.getZ() + 0.5;
+												
+												var renderPacket = new ForceBlockRenderPacket(signPos);
+												
+												// Force update delivery to any player within a standard 64-block visibility sphere [3]
+												for (ServerPlayer player : serverLevel.players()) {
+													if (player.distanceToSqr(centerX, centerY, centerZ) < 4096.0) { // 64 * 64 [3]
+														player.connection.send(syncPacket);
+														PacketDistributor.sendToPlayer(player, renderPacket);
+													}
+												}
+											}
+										}
+										return true;
+									}
+								}
+							}
+							return false;
+						});
 	}
 
 	/**
@@ -284,11 +408,18 @@ public class VanillaSFMFlowPlugin {
 				(level, pos, side, slot, be) -> {
 					return be.getEntityEnergyHandler(side);
 				});
+		
+		
+		
 
 		// 2. Register Specialty Always-Present scan blocks safely
 		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"), ModBlocks.ITEM_RELAY_BLOCK.get());
 		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"), ModBlocks.FLUID_RELAY_BLOCK.get());
 		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"), ModBlocks.ENERGY_RELAY_BLOCK.get());
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(
+				ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater"), 
+				ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get()
+		);
 	}
 
 	private void registerItemCapability() {
@@ -430,6 +561,11 @@ public class VanillaSFMFlowPlugin {
 		}
 		return false;
 	}
+	
+	private void registerSignUpdaterCapability() {
+		ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
+		FlowCapabilityRegistry.register(new FlowCapability<>(signUpdaterCapId, null, "gui.sfmflow.type_sign_updater"));
+	}
 
 	private void registerEnergyCapability() {
 		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
@@ -470,16 +606,6 @@ public class VanillaSFMFlowPlugin {
 					}
 					return false;
 				});
-	}
-
-	@SuppressWarnings("unchecked")
-	private void registerChemicalCapability() {
-		ResourceLocation chemicalCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "chemical");
-		BlockCapability<?, Direction> chemCap = MekanismCompat.getChemicalCapability();
-		if (chemCap != null) {
-			FlowCapabilityRegistry.register(new FlowCapability<>(chemicalCapId,
-					(BlockCapability<Object, Direction>) chemCap, "Chemical (Gas)"));
-		}
 	}
 
 	private void registerRedstoneCapability() {

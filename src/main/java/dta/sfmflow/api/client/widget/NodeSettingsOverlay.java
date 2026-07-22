@@ -83,14 +83,16 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (keyCode == 256) { // GLFW_KEY_ESCAPE
-			closeAndSave(); // Esc key guarantees clean escape and bypasses local focused locks
+			closeAndSave(); // Esc key guarantees clean escape and bypasses local focused locks [3]
 			return true;
 		}
-		for (GuiEventListener child : children) {
-			if (child.keyPressed(keyCode, scanCode, modifiers)) {
-				return true;
-			}
+		
+		// Only route keyboard presses directly to the currently focused child [3]
+		GuiEventListener activeFocus = this.getFocused();
+		if (activeFocus != null && activeFocus.keyPressed(keyCode, scanCode, modifiers)) {
+			return true;
 		}
+		
 		return super.keyPressed(keyCode, scanCode, modifiers);
 	}
 
@@ -103,11 +105,12 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	 */
 	@Override
 	public boolean charTyped(char codePoint, int modifiers) {
-		for (GuiEventListener child : children) {
-			if (child.charTyped(codePoint, modifiers)) {
-				return true;
-			}
+		// Only route character typing directly to the currently focused child [3]
+		GuiEventListener activeFocus = this.getFocused();
+		if (activeFocus != null && activeFocus.charTyped(codePoint, modifiers)) {
+			return true;
 		}
+		
 		return super.charTyped(codePoint, modifiers);
 	}
 

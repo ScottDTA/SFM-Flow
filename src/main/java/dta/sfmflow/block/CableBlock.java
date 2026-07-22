@@ -15,6 +15,8 @@ import dta.sfmflow.common.network.PhysicalNetworkMap;
 import dta.sfmflow.common.network.NetworkMutationEngine;
 import dta.sfmflow.common.network.CableNetworkRegistry;
 import dta.sfmflow.registry.ModTags;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -95,7 +97,7 @@ public class CableBlock extends Block {
 						PhysicalNetworkMap map = network.getNetworkMap();
 						int deletedId = map.getNodeId(pos);
 						if (deletedId != -1) {
-							it.unimi.dsi.fastutil.ints.IntArrayList neighbors = map.getNeighbors(deletedId);
+							IntArrayList neighbors = map.getNeighbors(deletedId);
 							if (neighbors != null && neighbors.size() >= 2) {
 								boolean stillConnected = true;
 								int firstNeighbor = neighbors.getInt(0);

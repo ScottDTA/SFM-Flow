@@ -1,9 +1,11 @@
 package dta.sfmflow.networking;
 
+import dta.sfmflow.networking.packets.clientbound.ForceBlockRenderPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncSideConfigPropertiesPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncSignTextPacket;
 import dta.sfmflow.client.network.ClientSideConfigPropertiesPacketHandlerImpl;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
@@ -11,9 +13,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.function.Supplier;
 
 /**
- * Common side-safe network manager routing clientbound packet processing [3].
+ * Common side-safe network manager routing clientbound packet processing.
  * Shields the Dedicated Server JVM classloader from loading client-only classes
- * during boot [3].
+ * during boot.
  */
 public final class PacketHandlerManager {
 	private PacketHandlerManager() {
@@ -62,8 +64,33 @@ public final class PacketHandlerManager {
 		return (payload, context) -> {
 		};
 	};
-
+	
 	public static void handleSyncSideConfigProperties(final SyncSideConfigPropertiesPacket payload, final IPayloadContext context) {
 		PROPERTIES_HANDLER.get().handle(payload, context);
 	}
+	
+	private static final Supplier<IPacketHandler<ForceBlockRenderPacket>> RENDER_HANDLER = () -> {
+		if (FMLEnvironment.dist == Dist.CLIENT) {
+			return new dta.sfmflow.client.network.ClientForceBlockRenderPacketHandlerImpl();
+		}
+		return (payload, context) -> {
+		};
+	};
+
+	public static void handleForceBlockRender(final ForceBlockRenderPacket payload, final IPayloadContext context) {
+		RENDER_HANDLER.get().handle(payload, context);
+	}
+	
+	private static final Supplier<IPacketHandler<SyncSignTextPacket>> SIGN_TEXT_HANDLER = () -> {
+		if (FMLEnvironment.dist == Dist.CLIENT) {
+			return new dta.sfmflow.client.network.ClientSyncSignTextPacketHandlerImpl();
+		}
+		return (payload, context) -> {
+		};
+	};
+
+	public static void handleSyncSignText(final SyncSignTextPacket payload, final IPayloadContext context) {
+		SIGN_TEXT_HANDLER.get().handle(payload, context);
+	}
+	
 }

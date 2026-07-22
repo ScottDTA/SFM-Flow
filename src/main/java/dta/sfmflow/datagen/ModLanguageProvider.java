@@ -33,6 +33,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("block.sfmflow.item_relay_block", "Item Relay");
 		add("block.sfmflow.fluid_relay_block", "Fluid Relay");
 		add("block.sfmflow.energy_relay_block", "Energy Relay");
+		add("block.sfmflow.sign_updater_cable_block", "Sign Updater Cable");
+		add("gui.sfmflow.sign_updater", "Sign Updater");
 		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
 		add("container.sfmflow.cable_cluster", "Cable Cluster");
 

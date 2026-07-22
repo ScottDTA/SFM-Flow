@@ -242,7 +242,7 @@ public class PhysicalNetwork {
 
 		BlockEntity be = level.getBlockEntity(pos);
 
-		// If the block is a Cable Cluster, index and add each active card independently
+		// If the block is a Cable Cluster, index and add each active card independently [3]
 		if (be instanceof CableClusterBlockEntity cluster) {
 			int numSlots = cluster.getNumSlots();
 			for (int slotIndex = 0; slotIndex < numSlots; slotIndex++) {
@@ -253,7 +253,6 @@ public class PhysicalNetwork {
 
 				Set<ResourceLocation> cardCaps = new HashSet<>();
 
-				// 1. Dynamically scan our registries to extract card capabilities without hardcoding 
 				for (var flowCap : FlowCapabilityRegistry.getRegisteredCapabilities().values()) {
 					var blockCap = flowCap.getCapability();
 					if (blockCap != null) {
@@ -263,7 +262,6 @@ public class PhysicalNetwork {
 					}
 				}
 
-				// 2. Map redstone emitter/receiver cards (which are tag/wire-bound)
 				if (card.is(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem())
 						|| card.is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem())) {
 					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
@@ -297,12 +295,11 @@ public class PhysicalNetwork {
 					this.scannedInventories.add(connection);
 				}
 			}
-			return; // Skip adding the Cable Cluster block itself
+			return;
 		}
 
 		Set<ResourceLocation> discoveredTypes = new HashSet<>();
 
-		// Query dynamically registered capabilities in our FlowCapabilityRegistry
 		for (var entry : FlowCapabilityRegistry.getRegisteredCapabilities().entrySet()) {
 			ResourceLocation capId = entry.getKey();
 			var cap = entry.getValue();
@@ -312,18 +309,23 @@ public class PhysicalNetwork {
 			}
 		}
 
-		// Special redstone-cables tag fallback to register redstone pseudo-capability
 		if (state.is(ModTags.REDSTONE_CABLES)) {
 			ResourceLocation redstoneCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone");
 			discoveredTypes.add(redstoneCapId);
 			this.networkMap.indexCapability(redstoneCapId, posId);
 		}
 
-		// Explicitly check for Sculk Trigger Cable blocks [3]
 		if (state.is(ModBlocks.SCULK_TRIGGER_CABLE_BLOCK.get())) {
 			ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
 			discoveredTypes.add(sculkCapId);
 			this.networkMap.indexCapability(sculkCapId, posId);
+		}
+
+		// Explicitly scan and index the Sign Updater Cable blocks [3]
+		if (state.is(ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get())) {
+			ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
+			discoveredTypes.add(signUpdaterCapId);
+			this.networkMap.indexCapability(signUpdaterCapId, posId);
 		}
 
 		if (!discoveredTypes.isEmpty()) {
@@ -338,17 +340,13 @@ public class PhysicalNetwork {
 			connection.setTypes(discoveredTypes);
 
 			if (level instanceof ServerLevel serverLevel) {
-				// Dynamically allocate and register BlockCapabilityCache for each discovered
-				// capability across all 6 directions plus the non-directional side context
 				for (ResourceLocation capId : discoveredTypes) {
 					var flowCap = FlowCapabilityRegistry.get(capId);
 					if (flowCap != null && flowCap.getCapability() != null) {
-						// Register non-directional cache [3]
 						var nullCache = BlockCapabilityCache.create(
 								(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos, null);
 						connection.registerCache(capId, null, nullCache);
 
-						// Register direction-specific caches
 						for (Direction dir : Direction.values()) {
 							var dirCache = BlockCapabilityCache.create(
 									(BlockCapability<Object, Direction>) flowCap.getCapability(), serverLevel, pos,
@@ -359,10 +357,7 @@ public class PhysicalNetwork {
 				}
 			}
 
-			// Symmetrical Persistent ID Assignment: use the coordinate hashcode to prevent
-			// binding drift
 			connection.setId(pos.hashCode());
-
 			this.scannedInventories.add(connection);
 		}
 	}

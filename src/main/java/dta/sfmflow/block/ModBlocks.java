@@ -83,6 +83,10 @@ public class ModBlocks {
 			() -> new FluidRelayBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
 	
+	public static final DeferredBlock<Block> SIGN_UPDATER_CABLE_BLOCK = registerBlock("sign_updater_cable_block",
+			() -> new SignUpdaterCableBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
+					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
+	
 	public static final DeferredBlock<Block> ENERGY_RELAY_BLOCK = registerBlock("energy_relay_block",
 			() -> new EnergyRelayBlock(BlockBehaviour.Properties.of().strength(2.0F, 5.0F).sound(SoundType.METAL)
 					.requiresCorrectToolForDrops().pushReaction(PushReaction.BLOCK)));
