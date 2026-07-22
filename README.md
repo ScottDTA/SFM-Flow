@@ -6,6 +6,8 @@ https://www.curseforge.com/minecraft/mc-mods/sfm-flow
 
 https://modrinth.com/mod/sfm-flow
 
+Join us on Discord https://discord.gg/7KwgHTnNyj
+
 ---
 
 ## What SFM-Flow Offers
