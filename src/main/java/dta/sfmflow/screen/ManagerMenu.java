@@ -27,7 +27,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The logical container menu for the Manager block interface. Imposes absolute
  * security lockdowns on virtual variable items, tracks item drag origins, and
- * handles dynamic cursor snap-backs cleanly on ghost slot configurations [3].
+ * handles dynamic cursor snap-backs cleanly on ghost slot configurations.
  */
 public class ManagerMenu extends AbstractContainerMenu {
 	private final ManagerBlockEntity blockEntity;
@@ -38,7 +38,7 @@ public class ManagerMenu extends AbstractContainerMenu {
 	private @Nullable AbstractFlowComponent activeComponent = null;
 
 	// Transiently track which inventory slot ID the current cursor drag originated
-	// from [3]
+	// from
 	private transient int lastPickedUpSlotId = -1;
 
 	public ManagerMenu(int pContainerId, Inventory pInv, FriendlyByteBuf pExtradata) {
@@ -57,7 +57,6 @@ public class ManagerMenu extends AbstractContainerMenu {
 		this.data = pData;
 
 		// Security: Override player slots to reject placement of virtual variable cards
-		// [3]
 		for (int r = 0; r < 3; r++) {
 			for (int c = 0; c < 9; c++) {
 				this.addSlot(new Slot(pInv, c + r * 9 + 9, 175 + c * 18, 266 + r * 18) {
@@ -78,7 +77,7 @@ public class ManagerMenu extends AbstractContainerMenu {
 			});
 		}
 
-		// Add 12 Filter Ghost Slots off-screen by default [3]
+		// Add 12 Filter Ghost Slots off-screen by default
 		for (int i = 0; i < 12; i++) {
 			this.addSlot(new FilterGhostSlot(this, i, -9999, -9999));
 		}
@@ -112,29 +111,29 @@ public class ManagerMenu extends AbstractContainerMenu {
 
 	@Override
 	public void clicked(int slotId, int button, ClickType clickType, Player player) {
-		// 1. Intercept drops outside the screen to silently delete variable cards [3]
+		// 1. Intercept drops outside the screen to silently delete variable cards
 		if (slotId == -999) {
 			ItemStack carried = this.getCarried();
 			if (carried.is(ModItems.VARIABLE_CARD.get())) {
-				this.setCarried(ItemStack.EMPTY); // Silently destroy virtual card to prevent drop exploits [3]
+				this.setCarried(ItemStack.EMPTY); // Silently destroy virtual card to prevent drop exploits
 				this.broadcastChanges();
 				return;
 			}
 		}
 
 		// 2. Track original slot index when picking up any real item from player
-		// inventory [3]
+		// inventory
 		if (slotId >= 0 && slotId < 36) {
 			if (clickType == ClickType.PICKUP && this.getCarried().isEmpty()) {
 				Slot slot = this.slots.get(slotId);
 				if (slot.hasItem()) {
-					this.lastPickedUpSlotId = slotId; // Record item source coordinate [3]
+					this.lastPickedUpSlotId = slotId; // Record item source coordinate
 				}
 			}
 		}
 
 		// 3. Absolute Security Shield: If carrying a virtual card, reject any click on
-		// a non-ghost slot entirely [3]
+		// a non-ghost slot entirely
 		if (slotId >= 0 && slotId < this.slots.size()) {
 			Slot targetSlot = this.slots.get(slotId);
 			if (!(targetSlot instanceof FilterGhostSlot)) {
@@ -144,44 +143,50 @@ public class ManagerMenu extends AbstractContainerMenu {
 
 				if (carried.is(ModItems.VARIABLE_CARD.get()) || isHotbarSwapVariable) {
 					this.broadcastChanges();
-					return; // Completely block and cancel transaction [3]
+					return; // Completely block and cancel transaction
 				}
 			}
 		}
 
-		// 4. Intercept and bypass standard clicked validations for FilterGhostSlots [3]
+		// 4. Intercept and bypass standard clicked validations for FilterGhostSlots
 		if (slotId >= 0 && slotId < this.slots.size()) {
 			Slot targetSlot = this.slots.get(slotId);
 			if (targetSlot instanceof FilterGhostSlot ghostSlot) {
 				ItemStack carriedStack = this.getCarried();
 
 				if (clickType == ClickType.PICKUP) {
-					if (button == 0) { // Left-click: Clone item to slot [3]
+					if (button == 0) { // Left-click: Clone item to slot
 						if (!carriedStack.isEmpty()) {
+							// Guard: Block setting inventory list variable cards into filter ghost slots
+							if (FilterGhostSlot.isInventoryListCard(carriedStack, blockEntity)) {
+								this.broadcastChanges();
+								return;
+							}
+
 							ItemStack filterCopy = carriedStack.copyWithCount(1);
 							ghostSlot.set(filterCopy);
 
 							// Symmetrical Cursor Clearing & Snap-back: return stack back to its original
-							// slot index [3]
+							// slot index
 							if (carriedStack.is(ModItems.VARIABLE_CARD.get())) {
 								this.setCarried(ItemStack.EMPTY); // Variables just dissolve silently
 							} else {
 								ItemStack returnStack = carriedStack.copy();
-								this.setCarried(ItemStack.EMPTY); // Clear the mouse cursor first [3]
+								this.setCarried(ItemStack.EMPTY); // Clear the mouse cursor first
 
-								// Symmetrically return items back to the origin slot [3]
+								// Symmetrically return items back to the origin slot
 								if (lastPickedUpSlotId >= 0 && lastPickedUpSlotId < 36) {
 									Slot originalSlot = this.slots.get(lastPickedUpSlotId);
 									if (!originalSlot.hasItem()) {
 										originalSlot.set(returnStack);
 									} else {
-										// Secure fallback: place item back anywhere in player inventory safely [3]
+										// Secure fallback: place item back anywhere in player inventory safely
 										player.getInventory().placeItemBackInInventory(returnStack);
 									}
 								} else {
 									player.getInventory().placeItemBackInInventory(returnStack);
 								}
-								this.lastPickedUpSlotId = -1; // Reset tracking index [3]
+								this.lastPickedUpSlotId = -1; // Reset tracking index
 							}
 						} else {
 							ghostSlot.set(ItemStack.EMPTY);
@@ -196,7 +201,7 @@ public class ManagerMenu extends AbstractContainerMenu {
 					}
 				}
 				this.broadcastChanges();
-				return; // Bypass super.clicked to prevent vanilla transaction mismatches [3]
+				return; // Bypass super.clicked to prevent vanilla transaction mismatches
 			}
 		}
 
@@ -206,7 +211,7 @@ public class ManagerMenu extends AbstractContainerMenu {
 	@Override
 	public void removed(Player player) {
 		ItemStack carried = this.getCarried();
-		// Security check: destroy the card if the menu closes while carrying it [3]
+		// Security check: destroy the card if the menu closes while carrying it
 		if (carried.is(ModItems.VARIABLE_CARD.get())) {
 			this.setCarried(ItemStack.EMPTY);
 		}

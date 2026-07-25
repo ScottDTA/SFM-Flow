@@ -23,6 +23,7 @@ import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
+import dta.sfmflow.flowcomponents.EnergyInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.GroupComponent;
 import dta.sfmflow.flowcomponents.GroupInputComponent;
@@ -104,6 +105,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> SIGN_UPDATER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_INVENTORIES_LIST_VARIABLE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_INVENTORIES_LIST_VARIABLE;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INVENTORIES_LIST_VARIABLE; 
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -353,6 +355,11 @@ public class VanillaSFMFlowPlugin {
 				.displayName("gui.sfmflow.fluid_inventories_list_variable")
 				.codec(FluidInventoriesListVariableComponent.CODEC).build(registry);
 
+		ENERGY_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
+				.create("energy_inventories_list_variable", EnergyInventoriesListVariableComponent::new)
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/energy_input_button.png")
+				.displayName("gui.sfmflow.energy_inventories_list_variable")
+				.codec(EnergyInventoriesListVariableComponent.CODEC).build(registry);
 	}
 
 	/**

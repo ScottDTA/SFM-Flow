@@ -16,6 +16,7 @@ import dta.sfmflow.client.screen.widgets.CollectorSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.DamageComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnchantmentsComponentSettingsModal;
 import dta.sfmflow.client.screen.widgets.EnergyConditionalSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.EnergyInventoriesListVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.EnergySideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidConditionalSettingsOverlay;
@@ -40,6 +41,7 @@ import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
+import dta.sfmflow.flowcomponents.EnergyInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
 import dta.sfmflow.flowcomponents.GroupComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
@@ -239,6 +241,13 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});
 		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.ENERGY_INVENTORIES_LIST_VARIABLE.get(), (screen, component) -> {
+			if (component instanceof EnergyInventoriesListVariableComponent listVar) {
+				return new EnergyInventoriesListVariableSettingsOverlay(screen, listVar);
+			}
+			return null;
+		}); 
+		
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER.get(), (screen, component) -> {
 			return new SignUpdaterSettingsOverlay(screen, component);
 		});
@@ -292,6 +301,7 @@ public class VanillaSFMFlowClientPlugin {
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get(), new VariableClientProperties.FluidVariableProperties());
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.ITEM_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.ItemInventoriesListProperties());
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.FluidInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.ENERGY_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.EnergyInventoriesListProperties()); 
 		
 		// =========================================================================
 		// WORKSPACE VALIDATION REGISTRATIONS
@@ -827,6 +837,52 @@ public class VanillaSFMFlowClientPlugin {
 						return Component.translatable("gui.sfmflow.warning.empty_fluid_inventories_list");
 					}
 				});
+		
+		WorkspaceValidatorRegistry.register(FluidInventoriesListVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<FluidInventoriesListVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return component.getEntries().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_fluid_inventories_list");
+					}
+				});
+
+		WorkspaceValidatorRegistry.register(EnergyInventoriesListVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<EnergyInventoriesListVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, EnergyInventoriesListVariableComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, EnergyInventoriesListVariableComponent component) {
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, EnergyInventoriesListVariableComponent component) {
+						return component.getEntries().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, EnergyInventoriesListVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_energy_inventories_list");
+					}
+				}); // Addition
 		
 		
 	}
