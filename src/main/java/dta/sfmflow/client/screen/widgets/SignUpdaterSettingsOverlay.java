@@ -26,7 +26,7 @@ import java.util.Locale;
 public class SignUpdaterSettingsOverlay extends AbstractTargetSettingsOverlay {
 
 	public SignUpdaterSettingsOverlay(ManagerScreen parentScreen, AbstractFlowComponent component) {
-		// Adjusted height slightly to 365 to fit the new buttons row perfectly [3]
+		// Adjusted height slightly to 365 to fit the new buttons row perfectly
 		super(parentScreen, component, ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater"), 365);
 
 		SignUpdaterComponent signUpdater = (SignUpdaterComponent) component;
@@ -71,7 +71,7 @@ public class SignUpdaterSettingsOverlay extends AbstractTargetSettingsOverlay {
 					signUpdater.setWaxed(value);
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
-					// Automatically refresh the layout to synchronize the Back Column's Wax button visually [3]
+					// Automatically refresh the layout to synchronize the Back Column's Wax button visually
 					parentScreen.refreshWidgetLayout();
 				});
 		this.children.add(new ApiWidgetAdapter<>(frontWaxBtn));
@@ -109,7 +109,7 @@ public class SignUpdaterSettingsOverlay extends AbstractTargetSettingsOverlay {
 					signUpdater.setWaxed(value);
 					parentScreen.getMenu().getManagerBlockEntity().setChanged();
 					sendSettingsUpdate();
-					// Automatically refresh the layout to synchronize the Front Column's Wax button visually [3]
+					// Automatically refresh the layout to synchronize the Front Column's Wax button visually
 					parentScreen.refreshWidgetLayout();
 				});
 		this.children.add(new ApiWidgetAdapter<>(backWaxBtn));

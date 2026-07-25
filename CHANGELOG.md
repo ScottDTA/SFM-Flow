@@ -1,3 +1,17 @@
+7-25-2026
+
+### [Added]
+* Item Inventories List Variable: Added a new variable component allowing multiple block inventory selections to be grouped and referenced together as a single card.
+* Inventories Drawer: Added a side-sliding inventory drawer widget in the manager interface for easy browsing and dragging of inventory variables.
+* Custom Variable Client Renderers: Implemented extensible client-side property handlers for custom variable cards, supporting tailored central overlays and dynamic multi-line tooltips.
+
+### [Changed]
+* Variable Card Tooltips: Enhanced card tooltips to display detailed contents, group colors, and configured block names dynamically.
+* Network Scanning: Updated physical pathfinder scans to properly recognize and index multi-inventory list variable endpoints.
+
+### [Fixed]
+* Variable Binding: Resolved synchronization bugs when dragging and binding inventory group variables to transfer and conditional nodes.
+
 7-21-2026
 
 ### [Added]

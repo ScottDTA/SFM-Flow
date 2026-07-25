@@ -21,9 +21,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.item.component.CustomData;
-import net.minecraft.nbt.CompoundTag;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -32,12 +29,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Side-sliding drawer widget displaying a searchable, vertically scrollable 3x3
- * grid of active variables (supporting items, fluids, and addon variables dynamically).
- */
 @OnlyIn(Dist.CLIENT)
-public class VariableDrawerWidget extends AbstractFlowWidget {
+public class InventoryDrawerWidget extends AbstractFlowWidget {
 
 	private static final ResourceLocation SLOT_TX = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
 			"textures/gui/flowcomponents/variable_drawer_slot.png");
@@ -66,8 +59,8 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 	private transient float slideProgress = isDrawerOpen ? 1.0F : 0.0F;
 	private transient long lastFrameTime = 0L;
 
-	public VariableDrawerWidget(ManagerScreen parentScreen, int x, int y, int width, int height) {
-		super(isDrawerOpen ? x : x - width, y, width, height, Component.literal("Variables Drawer"));
+	public InventoryDrawerWidget(ManagerScreen parentScreen, int x, int y, int width, int height) {
+		super(isDrawerOpen ? x - width : x, y, width, height, Component.literal("Inventories Drawer"));
 		this.parentScreen = parentScreen;
 
 		this.searchEdit = new EditBox(parentScreen.getFont(), getX() + 4, getY() + 6, width - 11, 12,
@@ -83,19 +76,12 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 		var components = parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().values();
 		for (var comp : components) {
-			// Symmetrically exclude Item Inventories List variable instances from the generic variable drawer
-			if (comp instanceof IFlowchartVariable advancedVar && !(comp instanceof ItemInventoriesListVariableComponent)) {
-				if (advancedVar.isFilterEmpty()) {
-					continue;
-				}
-
+			if (comp instanceof ItemInventoriesListVariableComponent listVar) {
 				String componentName = comp.getName().getString().toLowerCase(Locale.ROOT);
-				String itemName = advancedVar.getFilteredContentName().toLowerCase(Locale.ROOT);
-				String colorName = advancedVar.getFilterColor().getSerializedName().toLowerCase(Locale.ROOT);
+				String colorName = listVar.getFilterColor().getSerializedName().toLowerCase(Locale.ROOT);
 
-				if (query.isEmpty() || componentName.contains(query) || itemName.contains(query)
-						|| colorName.contains(query)) {
-					filtered.add(advancedVar);
+				if (query.isEmpty() || componentName.contains(query) || colorName.contains(query)) {
+					filtered.add(listVar);
 				}
 			}
 		}
@@ -108,7 +94,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			return false;
 		}
 
-		if (button == 0 && mouseX >= getX() + width && mouseX < getX() + width + HANDLE_TEX_WIDTH
+		if (button == 0 && mouseX >= getX() - HANDLE_TEX_WIDTH && mouseX < getX()
 				&& mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1) {
 			this.open = !this.open;
 			isDrawerOpen = this.open;
@@ -178,7 +164,6 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Update slide animation progress frame-rate independently
 		long now = Util.getMillis();
 		if (lastFrameTime == 0L) {
 			lastFrameTime = now;
@@ -188,8 +173,8 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		deltaTime = Math.min(deltaTime, 0.1F);
 
 		float speed = 8.0F;
-		int openX = parentScreen.getLeftPos() + 344;
-		int closedX = parentScreen.getLeftPos() + 344 - width;
+		int openX = parentScreen.getLeftPos() + 168 - width;
+		int closedX = parentScreen.getLeftPos() + 168;
 
 		if (open) {
 			if (slideProgress < 1.0F) {
@@ -203,29 +188,26 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			}
 		}
 
-		// Enable first scissor layer to clip everything left of the player inventory boundary
-		guiGraphics.enableScissor(parentScreen.getLeftPos() + 344, 0, parentScreen.width, parentScreen.height);
+		guiGraphics.enableScissor(0, 0, parentScreen.getLeftPos() + 168, parentScreen.height);
 
 		RenderSystem.setShader(GameRenderer::getPositionTexShader);
 		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-		guiGraphics.blit(BACKGROUND_TX, getX(), getY(), width - 3, height, 0.0F, 0.0F, BG_TEX_WIDTH, BG_TEX_HEIGHT,
-				BG_TEX_WIDTH, BG_TEX_HEIGHT);
-		guiGraphics.blit(BACKGROUND_END_TX, getX() + width - 3, getY(), 4, height, 0.0F, 0.0F, 4, BG_TEX_HEIGHT, 4,
-				BG_TEX_HEIGHT);
 
-		guiGraphics.blit(HANDLE_TX, getX() + width, getY() - 1, 0, 0, HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT,
-				HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT);
+		guiGraphics.blit(BACKGROUND_END_TX, getX(), getY(), 4, height, (float) 4, 0.0F, -4, BG_TEX_HEIGHT, 4, BG_TEX_HEIGHT);
+		guiGraphics.blit(BACKGROUND_TX, getX() + 4, getY(), width - 4, height, (float) BG_TEX_WIDTH, 0.0F, -BG_TEX_WIDTH, BG_TEX_HEIGHT, BG_TEX_WIDTH, BG_TEX_HEIGHT);
+
+		guiGraphics.blit(HANDLE_TX, getX() - HANDLE_TEX_WIDTH, getY() - 1, HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT, (float) HANDLE_TEX_WIDTH, 0.0F, -HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT, HANDLE_TEX_WIDTH, HANDLE_TEX_HEIGHT);
 
 		guiGraphics.pose().pushPose();
-		int textWidth = parentScreen.getFont().width("Variables");
+		int textWidth = parentScreen.getFont().width("Inventories");
 		int fontHeight = parentScreen.getFont().lineHeight;
 
-		float textX = (getX() + width - 1) + (HANDLE_TEX_WIDTH + fontHeight) / 2.0F;
-		float textY = (getY() - 1) + (HANDLE_TEX_HEIGHT - textWidth) / 2.0F;
+		float textX = (getX() - HANDLE_TEX_WIDTH) + (HANDLE_TEX_WIDTH - fontHeight) / 2.0F;
+		float textY = (getY() - 1) + (HANDLE_TEX_HEIGHT + textWidth) / 2.0F;
 
 		guiGraphics.pose().translate(textX, textY, 0.0F);
-		guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(90.0F));
-		guiGraphics.drawString(parentScreen.getFont(), "Variables", 0, 0, 0xFF404040, false);
+		guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(270.0F));
+		guiGraphics.drawString(parentScreen.getFont(), "Inventories", 0, 0, 0xFF404040, false);
 		guiGraphics.pose().popPose();
 
 		this.searchEdit.setX(getX() + 4);
@@ -234,12 +216,12 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 		int gridX = getX() + 8;
 		int gridY = getY() + 20;
-		
-		// Enable second scissor layer to bound items to grid viewport bounds
+
 		guiGraphics.enableScissor(gridX, gridY, gridX + 54, gridY + 54);
 
 		List<IFlowchartVariable> vars = getFilteredVariables();
 
+		// Symmetrically evaluate and render slot backgrounds *only* for slots containing variables
 		for (int i = 0; i < vars.size(); i++) {
 			int col = i % 3;
 			int row = i / 3;
@@ -252,40 +234,19 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			}
 
 			boolean isHovered = mouseX >= cellX && mouseX < cellX + 18 && mouseY >= cellY && mouseY < cellY + 18;
-
 			guiGraphics.blit(SLOT_TX, cellX, cellY, 0.0F, isHovered ? 18.0F : 0.0F, 18, 18, 18, 36);
 
-			ItemStack filterCardStack = vars.get(i).toItemStack();
-
-			if (!filterCardStack.isEmpty()) {
-				guiGraphics.renderItem(filterCardStack, cellX + 1, cellY + 1);
-				guiGraphics.renderItemDecorations(parentScreen.getFont(), filterCardStack, cellX + 1, cellY + 1);
-
-				CustomData customData = filterCardStack.get(DataComponents.CUSTOM_DATA);
-				if (customData != null) {
-					CompoundTag tag = customData.copyTag();
-					if (tag.getBoolean("UseModId")) {
-						guiGraphics.pose().pushPose();
-						guiGraphics.pose().translate(0, 0, 200.0F);
-						String modIdText = "MID";
-						int strW = parentScreen.getFont().width(modIdText);
-						float textScale = 0.55F;
-						guiGraphics.pose().pushPose();
-						guiGraphics.pose().translate(cellX + 17 - (strW * textScale), cellY + 12, 0);
-						guiGraphics.pose().scale(textScale, textScale, 1.0F);
-						guiGraphics.drawString(parentScreen.getFont(), modIdText, 0, 0, 0xFFFFFF00, true);
-						guiGraphics.pose().popPose();
-						guiGraphics.pose().popPose();
-					}
-				}
+			ItemStack cardStack = vars.get(i).toItemStack();
+			if (!cardStack.isEmpty()) {
+				guiGraphics.renderItem(cardStack, cellX + 1, cellY + 1);
+				guiGraphics.renderItemDecorations(parentScreen.getFont(), cardStack, cellX + 1, cellY + 1);
 			}
 		}
 
-		// Disable scissor layers in correct reverse stack order
-		guiGraphics.disableScissor(); // Close out inner 54x54 grid area
-		guiGraphics.disableScissor(); // Close out main screen overlay area
+		guiGraphics.disableScissor();
+		guiGraphics.disableScissor();
 
-		boolean hoveringHandle = mouseX >= getX() + width && mouseX < getX() + width + HANDLE_TEX_WIDTH
+		boolean hoveringHandle = mouseX >= getX() - HANDLE_TEX_WIDTH && mouseX < getX()
 				&& mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1;
 		if (hoveringHandle) {
 			Component tooltipText = open ? Component.literal("Close Drawer") : Component.literal("Open Drawer");
@@ -309,8 +270,8 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	@Override
 	public boolean isMouseOver(double mouseX, double mouseY) {
-		double leftBound = parentScreen.getLeftPos() + 344;
-		double rightBound = getX() + width + HANDLE_TEX_WIDTH;
+		double leftBound = getX() - HANDLE_TEX_WIDTH;
+		double rightBound = parentScreen.getLeftPos() + 168;
 		double topBound = getY() - 1;
 		double bottomBound = getY() + height + 1;
 		return this.visible && mouseX >= leftBound && mouseX < rightBound && mouseY >= topBound && mouseY < bottomBound;

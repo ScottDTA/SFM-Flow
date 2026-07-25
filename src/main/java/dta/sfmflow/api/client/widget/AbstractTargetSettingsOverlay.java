@@ -20,7 +20,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public abstract class AbstractTargetSettingsOverlay extends NodeSettingsOverlay {
 	protected final InventorySelectorWidget selectorWidget;
 	protected final BlockPreview3DWidget previewWidget;
-	protected final ResourceLocation capabilityId;
+	protected ResourceLocation capabilityId;
 
 	public AbstractTargetSettingsOverlay(ManagerScreen parentScreen, AbstractFlowComponent component, ResourceLocation capabilityId, int height) {
 		super(parentScreen, component);
@@ -94,5 +94,12 @@ public abstract class AbstractTargetSettingsOverlay extends NodeSettingsOverlay 
 		PacketDistributor.sendToServer(
 				new SetActiveFilterComponentPacket(parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), null));
 		super.closeAndSave();
+	}
+	
+	/**
+	 * Dynamically updates the active capability context.
+	 */
+	public void setCapabilityId(ResourceLocation capabilityId) {
+		this.capabilityId = capabilityId;
 	}
 }

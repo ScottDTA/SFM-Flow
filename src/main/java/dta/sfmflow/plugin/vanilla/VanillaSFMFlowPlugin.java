@@ -29,6 +29,7 @@ import dta.sfmflow.flowcomponents.GroupInputComponent;
 import dta.sfmflow.flowcomponents.GroupOutputComponent;
 import dta.sfmflow.flowcomponents.IntervalTriggerComponent;
 import dta.sfmflow.flowcomponents.ItemConditionalComponent;
+import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.flowcomponents.RedstoneEmitterComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
@@ -100,6 +101,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_INPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_OUTPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> SIGN_UPDATER;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_INVENTORIES_LIST_VARIABLE;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -109,7 +111,7 @@ public class VanillaSFMFlowPlugin {
 		registerRedstoneCapability();
 		registerCauldronBridges();
 		registerSignUpdaterCapability();
-		
+
 		ResourceLocation sculkCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sculk");
 		FlowCapabilityRegistry.register(new FlowCapability<>(sculkCapId, null, "gui.sfmflow.type_sculk"));
 
@@ -168,52 +170,35 @@ public class VanillaSFMFlowPlugin {
 		ITEM_CONDITIONAL = FlowComponentBuilder.create("item_conditional", ItemConditionalComponent::new)
 				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/condition_button.png")
 				.displayName("gui.sfmflow.item_conditional").codec(ItemConditionalComponent.CODEC).build(registry);
-		
+
 		FLUID_CONDITIONAL = FlowComponentBuilder.create("fluid_conditional", FluidConditionalComponent::new)
-				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/fluid_condition_button.png") 
-				.displayName("gui.sfmflow.fluid_conditional")
-				.codec(FluidConditionalComponent.CODEC)
-				.build(registry);
-		
+				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/fluid_condition_button.png")
+				.displayName("gui.sfmflow.fluid_conditional").codec(FluidConditionalComponent.CODEC).build(registry);
+
 		ENERGY_CONDITIONAL = FlowComponentBuilder.create("energy_conditional", EnergyConditionalComponent::new)
-				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/energy_condition_button.png") 
-				.displayName("gui.sfmflow.energy_conditional")
-				.codec(EnergyConditionalComponent.CODEC)
-				.build(registry);
-		
+				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/energy_condition_button.png")
+				.displayName("gui.sfmflow.energy_conditional").codec(EnergyConditionalComponent.CODEC).build(registry);
+
 		REDSTONE_CONDITIONAL = FlowComponentBuilder.create("redstone_conditional", RedstoneConditionalComponent::new)
-				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/condition_button.png")
-				.displayName("gui.sfmflow.redstone_conditional")
-				.codec(RedstoneConditionalComponent.CODEC)
+				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/condition_button.png")
+				.displayName("gui.sfmflow.redstone_conditional").codec(RedstoneConditionalComponent.CODEC)
 				.build(registry);
-		
-		SPLITTER = FlowComponentBuilder.create("splitter", SplitterComponent::new)
-				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/flow_control_button.png") 
-				.displayName("gui.sfmflow.splitter")
-				.codec(SplitterComponent.CODEC)
-				.build(registry);
-		
-		COLLECTOR = FlowComponentBuilder.create("collector", CollectorComponent::new)
-				.category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/flow_control_button.png") 
-				.displayName("gui.sfmflow.collector")
-				.codec(CollectorComponent.CODEC)
-				.build(registry);
-		
+
+		SPLITTER = FlowComponentBuilder.create("splitter", SplitterComponent::new).category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/flow_control_button.png").displayName("gui.sfmflow.splitter")
+				.codec(SplitterComponent.CODEC).build(registry);
+
+		COLLECTOR = FlowComponentBuilder.create("collector", CollectorComponent::new).category(NodeCategory.LOGIC)
+				.icon("textures/gui/menu_buttons/flow_control_button.png").displayName("gui.sfmflow.collector")
+				.codec(CollectorComponent.CODEC).build(registry);
+
 		SCULK_TRIGGER = FlowComponentBuilder.create("sculk_trigger", SculkTriggerComponent::new)
-				.category(NodeCategory.TRIGGER)
-				.icon("textures/gui/menu_buttons/trigger_button.png") 
-				.displayName("gui.sfmflow.sculk_trigger")
-				.codec(SculkTriggerComponent.CODEC)
-				.build(registry);
-		
-		GROUP_NODE = FlowComponentBuilder.create("group_node", GroupComponent::new)
-				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_node_button.png")
-				.displayName("gui.sfmflow.menu.group_node").codec(GroupComponent.CODEC).build(registry);
+				.category(NodeCategory.TRIGGER).icon("textures/gui/menu_buttons/trigger_button.png")
+				.displayName("gui.sfmflow.sculk_trigger").codec(SculkTriggerComponent.CODEC).build(registry);
+
+		GROUP_NODE = FlowComponentBuilder.create("group_node", GroupComponent::new).category(NodeCategory.UTILITY)
+				.icon("textures/gui/menu_buttons/group_node_button.png").displayName("gui.sfmflow.menu.group_node")
+				.codec(GroupComponent.CODEC).build(registry);
 
 		GROUP_INPUT = FlowComponentBuilder.create("group_input", GroupInputComponent::new)
 				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/input_button.png")
@@ -222,12 +207,11 @@ public class VanillaSFMFlowPlugin {
 		GROUP_OUTPUT = FlowComponentBuilder.create("group_output", GroupOutputComponent::new)
 				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/output_button.png")
 				.displayName("Group Output").codec(GroupOutputComponent.CODEC).build(registry);
-		
+
 		SIGN_UPDATER = FlowComponentBuilder.create("sign_updater", SignUpdaterComponent::new)
 				.category(NodeCategory.OUTPUT).icon("textures/gui/menu_buttons/sign_button.png")
 				.displayName("gui.sfmflow.sign_updater").codec(SignUpdaterComponent.CODEC).build(registry);
-		
-		
+
 		FlowCapabilityRegistry.registerTransfer(ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_sync"),
 				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
 					if (params instanceof SplitterComponent.SplitterSyncParams task) {
@@ -244,182 +228,190 @@ public class VanillaSFMFlowPlugin {
 					}
 					return false;
 				});
-		
+
 		// Register Sign Updater capability and task execution logic
-				ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
-				FlowCapabilityRegistry.registerTransfer(signUpdaterCapId,
-						(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
-							if (params instanceof SignUpdaterComponent.SignUpdaterParams task) {
-								BlockState state = level.getBlockState(dest);
-								if (!state.hasProperty(SignUpdaterCableBlock.FACING)) {
-									return false;
-								}
-								Direction facing = state.getValue(SignUpdaterCableBlock.FACING);
-								BlockPos signPos = dest.relative(facing);
+		ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
+		FlowCapabilityRegistry.registerTransfer(signUpdaterCapId,
+				(Level level, BlockPos src, Direction srcSide, BlockPos dest, Direction destSide, Object params) -> {
+					if (params instanceof SignUpdaterComponent.SignUpdaterParams task) {
+						BlockState state = level.getBlockState(dest);
+						if (!state.hasProperty(SignUpdaterCableBlock.FACING)) {
+							return false;
+						}
+						Direction facing = state.getValue(SignUpdaterCableBlock.FACING);
+						BlockPos signPos = dest.relative(facing);
 
-								BlockEntity be = level.getBlockEntity(signPos);
-								if (be instanceof SignBlockEntity sign) {
-									boolean updated = false;
+						BlockEntity be = level.getBlockEntity(signPos);
+						if (be instanceof SignBlockEntity sign) {
+							boolean updated = false;
 
-									// 1. Process Front Side Text & Formatting [3]
-									SignText frontText = sign.getFrontText();
-									boolean frontUpdated = false;
-									for (int i = 0; i < 4; i++) {
-										if (task.updateFront().get(i)) {
-											String oldText = frontText.getMessage(i, false).getString();
-											String newText = task.frontLines().get(i);
-											
-											// Only update and mark dirty if the string value actually changed [3]
-											if (!oldText.equals(newText)) {
-												frontText = frontText.setMessage(i, Component.literal(newText));
-												frontUpdated = true;
-											}
-										}
-									}
-									if (frontText.getColor() != task.frontColor()) {
-										frontText = frontText.setColor(task.frontColor());
+							// 1. Process Front Side Text & Formatting
+							SignText frontText = sign.getFrontText();
+							boolean frontUpdated = false;
+							for (int i = 0; i < 4; i++) {
+								if (task.updateFront().get(i)) {
+									String oldText = frontText.getMessage(i, false).getString();
+									String newText = task.frontLines().get(i);
+
+									// Only update and mark dirty if the string value actually changed
+									if (!oldText.equals(newText)) {
+										frontText = frontText.setMessage(i, Component.literal(newText));
 										frontUpdated = true;
-									}
-									if (frontText.hasGlowingText() != task.frontGlow()) {
-										frontText = frontText.setHasGlowingText(task.frontGlow());
-										frontUpdated = true;
-									}
-									if (frontUpdated) {
-										sign.setText(frontText, true);
-										updated = true;
-									}
-
-									// 2. Process Back Side Text & Formatting [3]
-									SignText backText = sign.getBackText();
-									boolean backUpdated = false;
-									for (int i = 0; i < 4; i++) {
-										if (task.updateBack().get(i)) {
-											String oldText = backText.getMessage(i, false).getString();
-											String newText = task.backLines().get(i);
-											
-											// Only update and mark dirty if the string value actually changed [3]
-											if (!oldText.equals(newText)) {
-												backText = backText.setMessage(i, Component.literal(newText));
-												backUpdated = true;
-											}
-										}
-									}
-									if (backText.getColor() != task.backColor()) {
-										backText = backText.setColor(task.backColor());
-										backUpdated = true;
-									}
-									if (backText.hasGlowingText() != task.backGlow()) {
-										backText = backText.setHasGlowingText(task.backGlow());
-										backUpdated = true;
-									}
-									if (backUpdated) {
-										sign.setText(backText, false);
-										updated = true;
-									}
-									
-									// 3. Process Waxing State [3]
-									if (sign.isWaxed() != task.waxed()) {
-										sign.setWaxed(task.waxed());
-										updated = true;
-									}
-
-									// 4. Guaranteed Client Sync Packet Delivery [3]
-									if (updated) {
-										sign.setChanged();
-										
-										BlockState signState = level.getBlockState(signPos);
-										level.sendBlockUpdated(signPos, signState, signState, 3);
-										
-										if (level instanceof ServerLevel serverLevel) {
-											var syncPacket = sign.getUpdatePacket();
-											
-											if (syncPacket != null) {
-												double centerX = signPos.getX() + 0.5;
-												double centerY = signPos.getY() + 0.5;
-												double centerZ = signPos.getZ() + 0.5;
-												
-												var renderPacket = new ForceBlockRenderPacket(signPos);
-												
-												// Force update delivery to any player within a standard 64-block visibility sphere [3]
-												for (ServerPlayer player : serverLevel.players()) {
-													if (player.distanceToSqr(centerX, centerY, centerZ) < 4096.0) { // 64 * 64 [3]
-														player.connection.send(syncPacket);
-														PacketDistributor.sendToPlayer(player, renderPacket);
-													}
-												}
-											}
-										}
-										return true;
 									}
 								}
 							}
-							return false;
-						});
+							if (frontText.getColor() != task.frontColor()) {
+								frontText = frontText.setColor(task.frontColor());
+								frontUpdated = true;
+							}
+							if (frontText.hasGlowingText() != task.frontGlow()) {
+								frontText = frontText.setHasGlowingText(task.frontGlow());
+								frontUpdated = true;
+							}
+							if (frontUpdated) {
+								sign.setText(frontText, true);
+								updated = true;
+							}
+
+							// 2. Process Back Side Text & Formatting
+							SignText backText = sign.getBackText();
+							boolean backUpdated = false;
+							for (int i = 0; i < 4; i++) {
+								if (task.updateBack().get(i)) {
+									String oldText = backText.getMessage(i, false).getString();
+									String newText = task.backLines().get(i);
+
+									// Only update and mark dirty if the string value actually changed
+									if (!oldText.equals(newText)) {
+										backText = backText.setMessage(i, Component.literal(newText));
+										backUpdated = true;
+									}
+								}
+							}
+							if (backText.getColor() != task.backColor()) {
+								backText = backText.setColor(task.backColor());
+								backUpdated = true;
+							}
+							if (backText.hasGlowingText() != task.backGlow()) {
+								backText = backText.setHasGlowingText(task.backGlow());
+								backUpdated = true;
+							}
+							if (backUpdated) {
+								sign.setText(backText, false);
+								updated = true;
+							}
+
+							// 3. Process Waxing State
+							if (sign.isWaxed() != task.waxed()) {
+								sign.setWaxed(task.waxed());
+								updated = true;
+							}
+
+							// 4. Guaranteed Client Sync Packet Delivery
+							if (updated) {
+								sign.setChanged();
+
+								BlockState signState = level.getBlockState(signPos);
+								level.sendBlockUpdated(signPos, signState, signState, 3);
+
+								if (level instanceof ServerLevel serverLevel) {
+									var syncPacket = sign.getUpdatePacket();
+
+									if (syncPacket != null) {
+										double centerX = signPos.getX() + 0.5;
+										double centerY = signPos.getY() + 0.5;
+										double centerZ = signPos.getZ() + 0.5;
+
+										var renderPacket = new ForceBlockRenderPacket(signPos);
+
+										// Force update delivery to any player within a standard 64-block visibility
+										// sphere [3]
+										for (ServerPlayer player : serverLevel.players()) {
+											if (player.distanceToSqr(centerX, centerY, centerZ) < 4096.0) { 
+												player.connection.send(syncPacket);
+												// PacketDistributor.sendToPlayer(player, renderPacket);
+											}
+										}
+									}
+								}
+								return true;
+							}
+						}
+					}
+					return false;
+				});
+
+		ITEM_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
+				.create("item_inventories_list_variable", ItemInventoriesListVariableComponent::new)
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
+				.displayName("gui.sfmflow.item_inventories_list_variable")
+				.codec(ItemInventoriesListVariableComponent.CODEC).build(registry);
+
 	}
 
 	/**
-	 * Safe common-setup callback executed after all registries are fully bound and frozen.
+	 * Safe common-setup callback executed after all registries are fully bound and
+	 * frozen.
 	 */
 	public static void registerCardCapabilities() {
 		// 1. Register Card Capability Proxies safely
-		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK, ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK,
+				ModBlocks.ITEM_VACUUM_VALVE_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					if (be.getSlotDirection(slot) == side) {
 						return be.getSlotBuffer(slot);
 					}
 					return null;
 				});
 
-		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK, ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK,
+				ModBlocks.ITEM_EJECTOR_VALVE_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					if (be.getSlotDirection(slot) == side) {
 						return be.getSlotBuffer(slot);
 					}
 					return null;
 				});
 
-		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK,
+				ModBlocks.FLUID_VACUUM_VALVE_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					if (be.getSlotDirection(slot) == side) {
 						return be.getFluidBuffer(slot);
 					}
 					return null;
 				});
 
-		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK,
+				ModBlocks.FLUID_EJECTOR_VALVE_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					if (be.getSlotDirection(slot) == side) {
 						return be.getFluidBuffer(slot);
 					}
 					return null;
 				});
 
-		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK, ModBlocks.ITEM_RELAY_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.ItemHandler.BLOCK,
+				ModBlocks.ITEM_RELAY_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					return be.getEntityItemHandler(side);
 				});
 
-		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK, ModBlocks.FLUID_RELAY_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.FluidHandler.BLOCK,
+				ModBlocks.FLUID_RELAY_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					return be.getEntityFluidHandler(side);
 				});
 
-		ClusterCardCapabilityRegistry.register(Capabilities.EnergyStorage.BLOCK, ModBlocks.ENERGY_RELAY_BLOCK.get().asItem(), 
-				(level, pos, side, slot, be) -> {
+		ClusterCardCapabilityRegistry.register(Capabilities.EnergyStorage.BLOCK,
+				ModBlocks.ENERGY_RELAY_BLOCK.get().asItem(), (level, pos, side, slot, be) -> {
 					return be.getEntityEnergyHandler(side);
 				});
-		
-		
-		
 
 		// 2. Register Specialty Always-Present scan blocks safely
-		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"), ModBlocks.ITEM_RELAY_BLOCK.get());
-		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"), ModBlocks.FLUID_RELAY_BLOCK.get());
-		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"), ModBlocks.ENERGY_RELAY_BLOCK.get());
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "item"),
+				ModBlocks.ITEM_RELAY_BLOCK.get());
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"),
+				ModBlocks.FLUID_RELAY_BLOCK.get());
+		FlowCapabilityPresenceRegistry.registerAlwaysPresent(ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"),
+				ModBlocks.ENERGY_RELAY_BLOCK.get());
 		FlowCapabilityPresenceRegistry.registerAlwaysPresent(
-				ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater"), 
-				ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get()
-		);
+				ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater"),
+				ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get());
 	}
 
 	private void registerItemCapability() {
@@ -561,7 +553,7 @@ public class VanillaSFMFlowPlugin {
 		}
 		return false;
 	}
-	
+
 	private void registerSignUpdaterCapability() {
 		ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
 		FlowCapabilityRegistry.register(new FlowCapability<>(signUpdaterCapId, null, "gui.sfmflow.type_sign_updater"));
@@ -627,7 +619,7 @@ public class VanillaSFMFlowPlugin {
 								level.scheduleTick(dest, level.getBlockState(dest).getBlock(), 1);
 							} else {
 								emitter.setPowerForSide(destSide, newPower);
-								emitter.setPulsed(destSide, false); 
+								emitter.setPulsed(destSide, false);
 							}
 							return true;
 						}

@@ -37,6 +37,10 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.sign_updater", "Sign Updater");
 		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
 		add("container.sfmflow.cable_cluster", "Cable Cluster");
+		
+		add("gui.sfmflow.item_inventories_list_variable", "Item Inventories List");
+		add("gui.sfmflow.warning.empty_inventories_list", "Inventories list variable cannot be empty!");
+		
 
 		add("gui.sfmflow.commands", "Commands: %1$s");
 		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");

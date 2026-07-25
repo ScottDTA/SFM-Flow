@@ -2,6 +2,7 @@ package dta.sfmflow.api.client.widget;
 
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
@@ -28,7 +29,7 @@ import java.util.function.Predicate;
 @OnlyIn(Dist.CLIENT)
 public class InventorySelectorWidget extends AbstractFlowWidget {
 	private final IInventoryTarget model;
-	private final ResourceLocation capabilityType;
+	private ResourceLocation capabilityType;
 	private final ManagerScreen parentScreen;
 	private final EditBox searchEdit;
 	private final Consumer<ConnectionBlock> onSelected;
@@ -150,6 +151,7 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 		// Apply hardware scissors mask around selection row
 		guiGraphics.enableScissor(listX, listY, listX + 260, listY + 18);
 
+		// Flush deferred item renders inside the scissor mask bounds
 		for (int i = 0; i < filtered.size(); i++) {
 			ConnectionBlock inv = filtered.get(i);
 			int cardX = listX + i * 20 - (int) scrollX;
@@ -157,7 +159,17 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 			boolean isSelected = model.getInventoryId() == inv.getId();
 			boolean hovered = mouseX >= cardX && mouseX < cardX + 18 && mouseY >= listY && mouseY < listY + 18;
 
-			int border = isSelected ? 0xFF39FF14 : (hovered ? 0xFF8B8B8B : 0xFF434343);
+			// Query the model dynamically to check if this inventory is bound or contained
+			boolean inList = model.isInventoryBound(inv.getId());
+
+			// Render a semi-translucent green background to indicate inclusion in the list
+			if (inList) {
+				guiGraphics.fill(cardX + 1, listY + 1, cardX + 17, listY + 17, 0x4039FF14);
+			}
+
+			// Soft green border for list members, vibrant green for the active target, dark
+			// charcoal otherwise
+			int border = isSelected ? 0xFF39FF14 : (hovered ? 0xFF8B8B8B : (inList ? 0xAA39FF14 : 0xFF434343));
 			guiGraphics.renderOutline(cardX, listY, 18, 18, border);
 
 			// Render the Card's icon instead of the Cluster block
@@ -193,29 +205,45 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 		}
 
 		// Tooltip rendering pass for block icons
-				if (mouseX >= listX && mouseX < listX + 260 && mouseY >= listY && mouseY < listY + 18) {
-					for (int i = 0; i < filtered.size(); i++) {
-						ConnectionBlock inv = filtered.get(i);
-						int cardX = listX + i * 20 - (int) scrollX;
-						if (mouseX >= cardX && mouseX < cardX + 18) {
-							// Draw multi-line tooltips using GuiGraphics component lists
-							guiGraphics.renderComponentTooltip(parentScreen.getFont(), inv.getMultiLineTooltip(level), mouseX, mouseY);
-						}
-					}
+		if (mouseX >= listX && mouseX < listX + 260 && mouseY >= listY && mouseY < listY + 18) {
+			for (int i = 0; i < filtered.size(); i++) {
+				ConnectionBlock inv = filtered.get(i);
+				int cardX = listX + i * 20 - (int) scrollX;
+				if (mouseX >= cardX && mouseX < cardX + 18) {
+					// Draw multi-line tooltips using GuiGraphics component lists
+					guiGraphics.renderComponentTooltip(parentScreen.getFont(), inv.getMultiLineTooltip(level), mouseX,
+							mouseY);
 				}
+			}
+		}
 	}
 
 	@Override
 	public void setX(int x) {
-		int dif = this.getX() - x; 
+		int dif = this.getX() - x;
 		super.setX(x);
 		updateChildrenXPositions(dif);
 	}
 
 	@Override
 	public void setY(int y) {
-		int dif = this.getY() - y; 
+		int dif = this.getY() - y;
 		super.setY(y);
 		updateChildrenYPositions(dif);
 	}
+
+	/**
+	 * Dynamically updates the filtered capability type for this selector.
+	 */
+	public void setCapabilityType(ResourceLocation capabilityType) {
+		this.capabilityType = capabilityType;
+	}
+
+	/**
+	 * Resets the scroll bar back to the start to prevent viewport clipping.
+	 */
+	public void resetScroll() {
+		this.scrollX = 0.0F;
+	}
+
 }

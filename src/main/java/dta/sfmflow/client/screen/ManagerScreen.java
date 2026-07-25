@@ -16,8 +16,14 @@ import dta.sfmflow.api.client.widget.AbstractModalPopup;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.client.widget.NodeSettingsOverlay;
 import dta.sfmflow.api.component.AbstractFlowComponent;
-import dta.sfmflow.client.screen.widgets.*;
 import dta.sfmflow.client.screen.helper.WorkspaceValidator;
+import dta.sfmflow.client.screen.widgets.CategoryButton;
+import dta.sfmflow.client.screen.widgets.CategoryHoverSubmenu;
+import dta.sfmflow.client.screen.widgets.DropdownMenuWidget;
+import dta.sfmflow.client.screen.widgets.FlowWidgetBase;
+import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
+import dta.sfmflow.client.screen.widgets.InventoryDrawerWidget;
+import dta.sfmflow.client.screen.widgets.VariableDrawerWidget;
 import dta.sfmflow.util.MenuSlotRepositioner;
 import dta.sfmflow.client.render.VectorWireRenderer;
 import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
@@ -123,6 +129,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			}
 		}
 
+		this.addRenderableWidget(new InventoryDrawerWidget(this, x + 168, this.height - 86, 75, 82));
 		this.addRenderableWidget(new VariableDrawerWidget(this, x + 344, this.height - 86, 75, 82));
 
 		if (this.activeModalPopup != null) {

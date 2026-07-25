@@ -47,10 +47,16 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	}
 
 	/**
-	 * Safely dismisses the modal configuration screen and returns focus to the
-	 * clean canvas.
+	 * Safely dismisses the modal configuration screen, sends the final compiled settings NBT 
+	 * payload to the server, and returns focus to the clean canvas.
 	 */
 	public void closeAndSave() {
+		// Consolidate saving here to guarantee the final state is synced upon close
+		CompoundTag nbt = new CompoundTag();
+		component.saveData(nbt);
+		PacketDistributor.sendToServer(new SaveComponentSettings(
+				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
+
 		this.parentScreen.setActiveSettingsOverlay(null);
 	}
 
@@ -59,10 +65,6 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	 * and closes.
 	 */
 	public void saveAndClose() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
 		closeAndSave();
 	}
 
@@ -83,7 +85,7 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	@Override
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		if (keyCode == 256) { // GLFW_KEY_ESCAPE
-			closeAndSave(); // Esc key guarantees clean escape and bypasses local focused locks [3]
+			closeAndSave(); // Esc key guarantees clean escape and bypasses local focused locks
 			return true;
 		}
 		
@@ -235,12 +237,12 @@ public abstract class NodeSettingsOverlay extends AbstractFlowWidget {
 	}
 
 	/**
-	 * Consolidated helper to serialize and push component updates to the server.
+	 * Consolidated helper to mark the local block entity as changed.
+	 * Suppresses direct packet sending to avoid network congestion during editing.
 	 */
 	protected void sendSettingsUpdate() {
-		CompoundTag nbt = new CompoundTag();
-		component.saveData(nbt);
-		PacketDistributor.sendToServer(new SaveComponentSettings(
-				parentScreen.getMenu().getManagerBlockEntity().getBlockPos(), component.getId(), nbt));
+		if (parentScreen.getMenu() != null && parentScreen.getMenu().getManagerBlockEntity() != null) {
+			parentScreen.getMenu().getManagerBlockEntity().setChanged();
+		}
 	}
 }

@@ -4,6 +4,7 @@ import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
 import dta.sfmflow.api.component.FlowComponentBuilder;
+import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.VariableCardRenderer;
@@ -11,6 +12,7 @@ import dta.sfmflow.client.screen.CableClusterScreen;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
+import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.item.VariableCardItem;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowClientPlugin;
@@ -86,6 +88,9 @@ public class SFMFlowClient {
 					if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
 						return 0xFF000000 | advancedVar.getFilterColor().getHexColor();
 					}
+					if (comp instanceof ItemInventoriesListVariableComponent listVar) {
+						return 0xFF000000 | listVar.getFilterColor().getHexColor();
+					}
 				}
 
 				DyedItemColor dyedColor = stack.get(DataComponents.DYED_COLOR);
@@ -107,7 +112,6 @@ public class SFMFlowClient {
 			// Register vanilla client properties directly, completely avoiding static
 			// plugin lists
 			new VanillaSFMFlowClientPlugin().registerClientProperties();
-
 			VariableCardItem.setTooltipDataResolver(stack -> {
 				UUID varId = VariableCardRenderer.getVariableId(stack);
 				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
@@ -116,10 +120,13 @@ public class SFMFlowClient {
 						return new Object[] { advancedVar.getFilterStack(), advancedVar.isUseQuantity(),
 								advancedVar.getQuantity(), advancedVar.getFilterColor() };
 					}
-					// Added tooltip support for fluid variables
 					if (comp instanceof AdvancedFluidFilterVariableComponent advancedVar) {
 						return new Object[] { advancedVar.getFilterFluid(), advancedVar.isUseQuantity(),
 								advancedVar.getQuantity(), advancedVar.getFilterColor() };
+					}
+					// Dynamic Inventories List resolver
+					if (comp instanceof ItemInventoriesListVariableComponent listVar) {
+						return new Object[] { listVar, false, 0, listVar.getFilterColor() };
 					}
 				}
 				return null;
@@ -138,31 +145,35 @@ public class SFMFlowClient {
 			});
 
 			for (FlowComponentBuilder builder : FlowComponentBuilder.getRegisteredBuilders()) {
-				FlowClientRegistry.register(builder.getHolder().get(), new INodeClientProperties() {
-					@Override
-					public NodeCategory getCategory() {
-						return builder.getCategory();
-					}
-
-					@Override
-					public ResourceLocation getIconTexture() {
-						ResourceLocation parsed = ResourceLocation.tryParse(builder.getIconPath());
-						if (parsed != null && !parsed.getNamespace().equals("minecraft")) {
-							return parsed;
+				FlowComponentType type = builder.getHolder().get();
+				// Allow specialized properties to take precedence over the generic fallback
+				if (FlowClientRegistry.getProperties(type) == null) {
+					FlowClientRegistry.register(type, new INodeClientProperties() {
+						@Override
+						public NodeCategory getCategory() {
+							return builder.getCategory();
 						}
-						return ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, builder.getIconPath());
-					}
 
-					@Override
-					public Component getDisplayName() {
-						return Component.translatable(builder.getDisplayNameKey());
-					}
+						@Override
+						public ResourceLocation getIconTexture() {
+							ResourceLocation parsed = ResourceLocation.tryParse(builder.getIconPath());
+							if (parsed != null && !parsed.getNamespace().equals("minecraft")) {
+								return parsed;
+							}
+							return ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, builder.getIconPath());
+						}
 
-					@Override
-					public Supplier<Boolean> isEnabled() {
-						return () -> true;
-					}
-				});
+						@Override
+						public Component getDisplayName() {
+							return Component.translatable(builder.getDisplayNameKey());
+						}
+
+						@Override
+						public Supplier<Boolean> isEnabled() {
+							return () -> true;
+						}
+					});
+				}
 			}
 		});
 	}
