@@ -19,6 +19,7 @@ import dta.sfmflow.client.screen.widgets.EnergyConditionalSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.EnergySideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.EnergyTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidConditionalSettingsOverlay;
+import dta.sfmflow.client.screen.widgets.FluidInventoriesListVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.FluidTransferSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.IntervalTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.ItemConditionalSettingsOverlay;
@@ -54,6 +55,7 @@ import dta.sfmflow.flowcomponents.SignUpdaterComponent;
 import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
+import dta.sfmflow.flowcomponents.FluidInventoriesListVariableComponent;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
@@ -230,6 +232,13 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});	
 		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get(), (screen, component) -> {
+			if (component instanceof FluidInventoriesListVariableComponent listVar) {
+				return new FluidInventoriesListVariableSettingsOverlay(screen, listVar);
+			}
+			return null;
+		});
+		
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER.get(), (screen, component) -> {
 			return new SignUpdaterSettingsOverlay(screen, component);
 		});
@@ -270,6 +279,10 @@ public class VanillaSFMFlowClientPlugin {
 		SideConfigPopupRegistry.register(ItemInventoriesListVariableComponent.class, (screen, sideModel, face, pos, onChanged) -> {
 			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
 		});
+		
+		SideConfigPopupRegistry.register(FluidInventoriesListVariableComponent.class, (screen, sideModel, face, pos, onChanged) -> {
+			return new SlotLayoutModalPopup(screen, sideModel, face, pos, onChanged);
+		});
 
 		DataComponentOverlayRegistry.register(DataComponents.DAMAGE, DamageComponentSettingsModal::new);
 		DataComponentOverlayRegistry.register(DataComponents.ENCHANTMENTS, EnchantmentsComponentSettingsModal::new);
@@ -278,7 +291,8 @@ public class VanillaSFMFlowClientPlugin {
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_ITEM_FILTER_VARIABLE.get(), new VariableClientProperties.ItemVariableProperties());
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get(), new VariableClientProperties.FluidVariableProperties());
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.ITEM_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.ItemInventoriesListProperties());
-
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.FluidInventoriesListProperties());
+		
 		// =========================================================================
 		// WORKSPACE VALIDATION REGISTRATIONS
 		// =========================================================================
@@ -765,6 +779,52 @@ public class VanillaSFMFlowClientPlugin {
 					@Override
 					public @Nullable Component getWarningTooltip(ManagerScreen screen, ItemInventoriesListVariableComponent component) {
 						return Component.translatable("gui.sfmflow.warning.empty_inventories_list");
+					}
+				});
+		
+		WorkspaceValidatorRegistry.register(ItemInventoriesListVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<ItemInventoriesListVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, ItemInventoriesListVariableComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, ItemInventoriesListVariableComponent component) {
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, ItemInventoriesListVariableComponent component) {
+						return component.getEntries().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, ItemInventoriesListVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_inventories_list");
+					}
+				});
+
+		WorkspaceValidatorRegistry.register(FluidInventoriesListVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<FluidInventoriesListVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return component.getEntries().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, FluidInventoriesListVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_fluid_inventories_list");
 					}
 				});
 		

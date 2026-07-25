@@ -39,6 +39,7 @@ import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.networking.packets.clientbound.SyncSignTextPacket;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
+import dta.sfmflow.flowcomponents.FluidInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
 import dta.sfmflow.flowcomponents.RedstoneConditionalComponent;
 import net.minecraft.core.BlockPos;
@@ -102,6 +103,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> GROUP_OUTPUT;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> SIGN_UPDATER;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ITEM_INVENTORIES_LIST_VARIABLE;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_INVENTORIES_LIST_VARIABLE;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -344,6 +346,12 @@ public class VanillaSFMFlowPlugin {
 				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
 				.displayName("gui.sfmflow.item_inventories_list_variable")
 				.codec(ItemInventoriesListVariableComponent.CODEC).build(registry);
+		
+		FLUID_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
+				.create("fluid_inventories_list_variable", FluidInventoriesListVariableComponent::new)
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/fluid_variable_button.png")
+				.displayName("gui.sfmflow.fluid_inventories_list_variable")
+				.codec(FluidInventoriesListVariableComponent.CODEC).build(registry);
 
 	}
 

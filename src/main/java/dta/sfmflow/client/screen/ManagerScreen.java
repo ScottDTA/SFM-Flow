@@ -348,6 +348,16 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		guiGraphics.pose().pushPose();
 		guiGraphics.pose().translate(0.0F, 0.0F, baseZ + 1000.0F);
 		this.renderTooltip(guiGraphics, mouseX, mouseY);
+
+		// Render drawer tooltips in the deferred pass to prevent depth and scissor culling
+		for (var renderable : this.renderables) {
+			if (renderable instanceof InventoryDrawerWidget drawer) {
+				drawer.renderTooltipDeferred(guiGraphics, mouseX, mouseY);
+			} else if (renderable instanceof VariableDrawerWidget drawer) {
+				drawer.renderTooltipDeferred(guiGraphics, mouseX, mouseY);
+			}
+		}
+
 		guiGraphics.pose().popPose();
 
 		if (this.mouseHandler.getTopHoveredElement() instanceof AbstractFlowWidget flowWidget) {

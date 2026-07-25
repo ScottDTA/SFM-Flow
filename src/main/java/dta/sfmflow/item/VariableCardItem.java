@@ -4,6 +4,7 @@ import dta.sfmflow.client.render.VariableCardRenderer;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.IVariableClientProperties;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.SFMFlow;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -18,7 +19,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Custom item representing the advanced filter card capability. Safely
@@ -27,14 +27,8 @@ import java.util.function.Function;
  */
 public class VariableCardItem extends Item {
 
-	private static Function<ItemStack, Object[]> tooltipDataResolver = stack -> null;
-
 	public VariableCardItem(Properties properties) {
 		super(properties);
-	}
-
-	public static void setTooltipDataResolver(Function<ItemStack, Object[]> resolver) {
-		tooltipDataResolver = resolver;
 	}
 
 	/**
@@ -61,17 +55,19 @@ public class VariableCardItem extends Item {
 	@Override
 	public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents,
 			TooltipFlag tooltipFlag) {
-		ResourceLocation typeKey = getVariableTypeKey(stack);
-		if (typeKey != null) {
-			var type = FlowComponentType.REGISTRY.get(typeKey);
-			if (type != null) {
-				var props = FlowClientRegistry.getProperties(type);
-				if (props instanceof IVariableClientProperties varProps) {
-					varProps.appendTooltip(stack, tooltipComponents);
-					super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-					return;
+		try {
+			ResourceLocation typeKey = getVariableTypeKey(stack);
+			if (typeKey != null) {
+				var type = FlowComponentType.REGISTRY.get(typeKey);
+				if (type != null) {
+					var props = FlowClientRegistry.getProperties(type);
+					if (props instanceof IVariableClientProperties varProps) {
+						varProps.appendTooltip(stack, tooltipComponents);
+					}
 				}
 			}
+		} catch (Exception e) {
+			SFMFlow.LOGGER.error("An error occurred while compiling custom tooltips for Variable Card", e);
 		}
 		super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
 	}

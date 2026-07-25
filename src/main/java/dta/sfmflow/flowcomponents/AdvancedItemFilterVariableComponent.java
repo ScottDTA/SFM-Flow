@@ -44,7 +44,7 @@ import java.util.UUID;
 
 /**
  * Variable component that stores a single item filter along with an optional
- * quantity limit [3]. Configured with 0 inputs and 0 outputs [3].
+ * quantity limit. Configured with 0 inputs and 0 outputs.
  */
 public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		implements IGhostSlotAware, IFlowchartVariable {
@@ -188,8 +188,8 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 	}
 
 	/**
-	 * Matches an item stack based on the dynamic card configurations [3]. Performs
-	 * deep value-based equality checking on enabled data components [3].
+	 * Matches an item stack based on the dynamic card configurations. Performs deep
+	 * value-based equality checking on enabled data components.
 	 */
 	public static boolean matchesVariableFilter(AdvancedItemFilterVariableComponent varComp, ItemStack candidate) {
 		ItemStack filterItem = varComp.getFilterStack();
@@ -226,7 +226,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 						boolean filterHas = filterItem.has(type);
 						boolean candidateHas = candidate.has(type);
 						if (filterHas != candidateHas) {
-							return false; // Type mismatch [3]
+							return false;
 						}
 						if (filterHas) {
 							if (type == DataComponents.DAMAGE) {
@@ -261,12 +261,12 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 												return false;
 											}
 										}
-										continue; // Match succeeded, bypass standard Objects.equals check [3]
+										continue; // Match succeeded, bypass standard Objects.equals check
 									}
 								}
 							}
 
-							// Custom evaluation pass for tool enchantment values [3]
+							// Custom evaluation pass for tool enchantment values
 							if (type == DataComponents.ENCHANTMENTS) {
 								CompoundTag enchSettings = varComp.getCustomComponentSettings()
 										.getCompound("minecraft:enchantments");
@@ -315,7 +315,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 											}
 										}
 
-										// 2. For EXACT match, make sure candidate has NO other enchantments [3]
+										// 2. For EXACT match, make sure candidate has NO other enchantments
 										if ("EXACT".equals(mode)) {
 											for (var holder : candidateEnchs.keySet()) {
 												ResourceLocation locKey = holder.unwrapKey().map(ResourceKey::location)
@@ -326,14 +326,14 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 											}
 										}
 									}
-									continue; // Match succeeded, bypass standard Objects.equals check [3]
+									continue; // Match succeeded, bypass standard Objects.equals check
 								}
 							}
 
 							Object filterVal = filterItem.get(type);
 							Object candidateVal = candidate.get(type);
 							if (!Objects.equals(filterVal, candidateVal)) {
-								return false; // Values differ [3]
+								return false; // Values differ
 							}
 						}
 					}
@@ -359,7 +359,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 		stack.set(DataComponents.DYED_COLOR, new DyedItemColor(this.getFilterColor().getHexColor(), true));
 
 		// Symmetrically apply the standard vanilla enchantment glint override to the
-		// card item stack if component filtering is enabled [3]
+		// card item stack if component filtering is enabled
 		if (this.useComponentFilter) {
 			stack.set(DataComponents.ENCHANTMENT_GLINT_OVERRIDE, true);
 		}
@@ -448,8 +448,7 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 					this.setUseComponentFilter(decoded.isUseComponentFilter());
 					this.enabledComponentTypes.clear();
 					this.enabledComponentTypes.addAll(decoded.getEnabledComponentTypes());
-					this.customComponentSettings = decoded.getCustomComponentSettings(); // Safely load from parsed
-																							// codec [3]
+					this.customComponentSettings = decoded.getCustomComponentSettings();
 				});
 
 		if (compoundTag.contains("filterStack")) {
@@ -522,6 +521,11 @@ public class AdvancedItemFilterVariableComponent extends AbstractFlowComponent
 	@Override
 	public String getFilteredContentName() {
 		return this.filterStack.getHoverName().getString();
+	}
+
+	@Override
+	public boolean hasGlint() {
+		return this.useComponentFilter;
 	}
 
 }

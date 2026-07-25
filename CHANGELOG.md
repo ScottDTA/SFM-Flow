@@ -2,16 +2,21 @@
 
 
 ### [Added]
+* Fluid Inventories List: Added a new variable component allowing multiple fluid tank selections to be grouped and referenced together as a single card.
+* Dynamic Overlays for Lists: Fluid inventory list cards now cycle dynamically through the icons of your configured fluid tank blocks in screens and inventories.
 * Item Inventories List Variable: Added a new variable component allowing multiple block inventory selections to be grouped and referenced together as a single card.
 * Inventories Drawer: Added a side-sliding inventory drawer widget in the manager interface for easy browsing and dragging of inventory variables.
 * Custom Variable Client Renderers: Implemented extensible client-side property handlers for custom variable cards, supporting tailored central overlays and dynamic multi-line tooltips.
 
 ### [Changed]
+* Drawer Tooltips: Relocated variable drawer tooltips to a separate, deferred rendering pass, resolving depth-clipping and scissor-culling bugs in the UI.
 * Sign Updater Cable Optimization: Refactored the Sign Updater Cable block to operate as a regular block without tile entity overhead, reducing server resource usage on large networks.
 * Variable Card Tooltips: Enhanced card tooltips to display detailed contents, group colors, and configured block names dynamically.
 * Network Scanning: Updated physical pathfinder scans to properly recognize and index multi-inventory list variable endpoints.
 
 ### [Fixed]
+* Client Tooltip Crashes: Wrapped the variable card tooltip system in a protective try-catch barrier to prevent client crashes if a custom variable handler fails.
+* Rendering State Leaks: Cleanly flushed model rendering batches on the variable card renderer, resolving visual anomalies and glint glitches on item cards.
 * Variable Binding: Resolved synchronization bugs when dragging and binding inventory group variables to transfer and conditional nodes.
 
 ### [Removed]

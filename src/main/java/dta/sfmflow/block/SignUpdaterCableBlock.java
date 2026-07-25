@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
 
 /**
- * Non-conductive network sign updater block participating in BFS scans [3].
+ * Non-conductive network sign updater block participating in BFS scans.
  * Configured as a regular block to eliminate unnecessary block entity overhead.
  */
 public class SignUpdaterCableBlock extends Block {

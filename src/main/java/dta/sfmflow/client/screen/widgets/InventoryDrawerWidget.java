@@ -5,7 +5,6 @@ import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.math.Axis;
@@ -76,7 +75,7 @@ public class InventoryDrawerWidget extends AbstractFlowWidget {
 
 		var components = parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().values();
 		for (var comp : components) {
-			if (comp instanceof ItemInventoriesListVariableComponent listVar) {
+			if (comp instanceof IFlowchartVariable listVar && listVar.isInventoryList()) {
 				String componentName = comp.getName().getString().toLowerCase(Locale.ROOT);
 				String colorName = listVar.getFilterColor().getSerializedName().toLowerCase(Locale.ROOT);
 
@@ -221,7 +220,6 @@ public class InventoryDrawerWidget extends AbstractFlowWidget {
 
 		List<IFlowchartVariable> vars = getFilteredVariables();
 
-		// Symmetrically evaluate and render slot backgrounds *only* for slots containing variables
 		for (int i = 0; i < vars.size(); i++) {
 			int col = i % 3;
 			int row = i / 3;
@@ -245,13 +243,28 @@ public class InventoryDrawerWidget extends AbstractFlowWidget {
 
 		guiGraphics.disableScissor();
 		guiGraphics.disableScissor();
+	}
+
+	/**
+	 * Defer tooltip rendering to the final, clean screen draw pass.
+	 * This prevents items, backgrounds, or custom meshes from culling the text.
+	 */
+	public void renderTooltipDeferred(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+		if (!this.visible) {
+			return;
+		}
+
+		int gridX = getX() + 8;
+		int gridY = getY() + 20;
 
 		boolean hoveringHandle = mouseX >= getX() - HANDLE_TEX_WIDTH && mouseX < getX()
 				&& mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1;
+
 		if (hoveringHandle) {
 			Component tooltipText = open ? Component.literal("Close Drawer") : Component.literal("Open Drawer");
 			guiGraphics.renderTooltip(parentScreen.getFont(), tooltipText, mouseX, mouseY);
 		} else if (mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
+			List<IFlowchartVariable> vars = getFilteredVariables();
 			for (int i = 0; i < vars.size(); i++) {
 				int col = i % 3;
 				int row = i / 3;

@@ -40,25 +40,25 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
-public class ItemInventoriesListVariableComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable, ISlotConfigurable, IFlowchartVariable {
+public class FluidInventoriesListVariableComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable, ISlotConfigurable, IFlowchartVariable {
 
-	public record ItemInventoriesListEntry(int inventoryId, int activeSidesMask, List<Long> enabledSlotsMasks) {
-		public static final Codec<ItemInventoriesListEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-				Codec.INT.fieldOf("inventoryId").forGetter(ItemInventoriesListEntry::inventoryId),
-				Codec.INT.fieldOf("activeSidesMask").forGetter(ItemInventoriesListEntry::activeSidesMask),
+	public record FluidInventoriesListEntry(int inventoryId, int activeSidesMask, List<Long> enabledSlotsMasks) {
+		public static final Codec<FluidInventoriesListEntry> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+				Codec.INT.fieldOf("inventoryId").forGetter(FluidInventoriesListEntry::inventoryId),
+				Codec.INT.fieldOf("activeSidesMask").forGetter(FluidInventoriesListEntry::activeSidesMask),
 				Codec.LONG.listOf().optionalFieldOf("enabledSlotsMasks", List.of(-1L, -1L, -1L, -1L, -1L, -1L))
-						.forGetter(ItemInventoriesListEntry::enabledSlotsMasks)
-		).apply(instance, ItemInventoriesListEntry::new));
+						.forGetter(FluidInventoriesListEntry::enabledSlotsMasks)
+		).apply(instance, FluidInventoriesListEntry::new));
 	}
 
-	public static final MapCodec<ItemInventoriesListVariableComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
-			.group(BaseProperties.CODEC.fieldOf("base").forGetter(ItemInventoriesListVariableComponent::getBaseProperties),
-					ItemInventoriesListEntry.CODEC.listOf().optionalFieldOf("entries", List.of())
-							.forGetter(ItemInventoriesListVariableComponent::getEntries),
+	public static final MapCodec<FluidInventoriesListVariableComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
+			.group(BaseProperties.CODEC.fieldOf("base").forGetter(FluidInventoriesListVariableComponent::getBaseProperties),
+					FluidInventoriesListEntry.CODEC.listOf().optionalFieldOf("entries", List.of())
+							.forGetter(FluidInventoriesListVariableComponent::getEntries),
 					Color.CODEC.optionalFieldOf("filterColor", Color.WHITE)
-							.forGetter(ItemInventoriesListVariableComponent::getFilterColor))
+							.forGetter(FluidInventoriesListVariableComponent::getFilterColor))
 			.apply(instance, (baseProps, entries, col) -> {
-				ItemInventoriesListVariableComponent comp = new ItemInventoriesListVariableComponent(baseProps.id());
+				FluidInventoriesListVariableComponent comp = new FluidInventoriesListVariableComponent(baseProps.id());
 				comp.setBaseProperties(baseProps);
 				comp.entries.clear();
 				comp.entries.addAll(entries);
@@ -66,14 +66,14 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 				return comp;
 			}));
 
-	private final List<ItemInventoriesListEntry> entries = new ArrayList<>();
+	private final List<FluidInventoriesListEntry> entries = new ArrayList<>();
 	private Color filterColor = Color.WHITE;
 
 	private transient int selectedInventoryId = -1;
 	private transient int selectedActiveSidesMask = 0;
 	private transient final List<Long> selectedEnabledSlotsMasks = new ArrayList<>(List.of(-1L, -1L, -1L, -1L, -1L, -1L));
 
-	public ItemInventoriesListVariableComponent(UUID uuid) {
+	public FluidInventoriesListVariableComponent(UUID uuid) {
 		super(uuid);
 		this.hasInputNodes = false;
 		this.hasOutputNodes = false;
@@ -81,10 +81,10 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 
 	@Override
 	public FlowComponentType getType() {
-		return VanillaSFMFlowPlugin.ITEM_INVENTORIES_LIST_VARIABLE.get();
+		return VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get();
 	}
 
-	public List<ItemInventoriesListEntry> getEntries() {
+	public List<FluidInventoriesListEntry> getEntries() {
 		return entries;
 	}
 
@@ -105,7 +105,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 	public void setInventoryId(int id) {
 		this.selectedInventoryId = id;
 		boolean found = false;
-		for (ItemInventoriesListEntry entry : entries) {
+		for (FluidInventoriesListEntry entry : entries) {
 			if (entry.inventoryId() == id) {
 				this.selectedActiveSidesMask = entry.activeSidesMask();
 				this.selectedEnabledSlotsMasks.clear();
@@ -133,7 +133,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		if (dir != null) {
 			selectedActiveSidesMask ^= (1 << dir.ordinal());
 			if (isSelectedInList()) {
-				setSelectedInList(true); // Re-adds and saves current active sides to the list entry
+				setSelectedInList(true);
 			}
 		}
 	}
@@ -163,12 +163,12 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		selectedEnabledSlotsMasks.set(idx, mask);
 
 		if (isSelectedInList()) {
-			setSelectedInList(true); // Re-adds and saves current slot configurations to the list entry
+			setSelectedInList(true);
 		}
 	}
 
 	public boolean isSelectedInList() {
-		for (ItemInventoriesListEntry entry : entries) {
+		for (FluidInventoriesListEntry entry : entries) {
 			if (entry.inventoryId() == selectedInventoryId) {
 				return true;
 			}
@@ -180,7 +180,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		if (selectedInventoryId == -1) return;
 		entries.removeIf(e -> e.inventoryId() == selectedInventoryId);
 		if (add) {
-			entries.add(new ItemInventoriesListEntry(selectedInventoryId, selectedActiveSidesMask, new ArrayList<>(selectedEnabledSlotsMasks)));
+			entries.add(new FluidInventoriesListEntry(selectedInventoryId, selectedActiveSidesMask, new ArrayList<>(selectedEnabledSlotsMasks)));
 		}
 	}
 
@@ -191,7 +191,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 
 		CompoundTag tag = new CompoundTag();
 		tag.putUUID("VariableId", this.getId());
-		tag.putString("VariableType", "sfmflow:item_inventories_list_variable"); 
+		tag.putString("VariableType", "sfmflow:fluid_inventories_list_variable");
 		tag.putString("FilterColor", this.filterColor.name());
 
 		ListTag entriesList = new ListTag();
@@ -209,7 +209,6 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		}
 		tag.put("entries", entriesList);
 
-		// Resolve and save block items representing the configured targets for client-side rendering
 		ListTag itemsList = new ListTag();
 		Level level = Minecraft.getInstance().level;
 		if (level != null && !this.entries.isEmpty() && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
@@ -246,7 +245,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 
 	@Override
 	public String getFilteredContentName() {
-		return "Item Inventories List";
+		return "Fluid Inventories List";
 	}
 
 	@Override
@@ -255,7 +254,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		compoundTag.putString("filterColor", this.filterColor.getSerializedName());
 
 		ListTag list = new ListTag();
-		for (ItemInventoriesListEntry entry : entries) {
+		for (FluidInventoriesListEntry entry : entries) {
 			CompoundTag entryTag = new CompoundTag();
 			entryTag.putInt("inventoryId", entry.inventoryId());
 			entryTag.putInt("activeSidesMask", entry.activeSidesMask());
@@ -277,8 +276,8 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 		var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
 
-		ItemInventoriesListVariableComponent.CODEC.codec().parse(ops, compoundTag)
-				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse Item Inventories List component data: {}", err))
+		FluidInventoriesListVariableComponent.CODEC.codec().parse(ops, compoundTag)
+				.resultOrPartial(err -> SFMFlow.LOGGER.error("Failed to parse Fluid Inventories List component data: {}", err))
 				.ifPresent(decoded -> {
 					this.setBaseProperties(decoded.getBaseProperties());
 					this.entries.clear();
@@ -310,7 +309,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 				while (masks.size() < 6) {
 					masks.add(-1L);
 				}
-				this.entries.add(new ItemInventoriesListEntry(entryTag.getInt("inventoryId"), entryTag.getInt("activeSidesMask"), masks));
+				this.entries.add(new FluidInventoriesListEntry(entryTag.getInt("inventoryId"), entryTag.getInt("activeSidesMask"), masks));
 			}
 		}
 	}
@@ -320,7 +319,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		if (getCustomName() != null && !getCustomName().isEmpty()) {
 			return Component.literal(getCustomName());
 		}
-		return Component.translatable("gui.sfmflow.item_inventories_list_variable");
+		return Component.translatable("gui.sfmflow.fluid_inventories_list_variable");
 	}
 	
 	@Override
@@ -328,7 +327,7 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 		if (id == -1) {
 			return false;
 		}
-		for (ItemInventoriesListEntry entry : entries) {
+		for (FluidInventoriesListEntry entry : entries) {
 			if (entry.inventoryId() == id) {
 				return true;
 			}

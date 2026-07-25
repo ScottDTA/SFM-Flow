@@ -5,16 +5,13 @@ import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.VariableCardRenderer;
 import dta.sfmflow.client.screen.CableClusterScreen;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
-import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
-import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
-import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
 import dta.sfmflow.item.ModItems;
-import dta.sfmflow.item.VariableCardItem;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowClientPlugin;
 import dta.sfmflow.screen.ModMenuTypes;
 import dta.sfmflow.util.Color;
@@ -85,11 +82,8 @@ public class SFMFlowClient {
 				UUID varId = VariableCardRenderer.getVariableId(stack);
 				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
-					if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-						return 0xFF000000 | advancedVar.getFilterColor().getHexColor();
-					}
-					if (comp instanceof ItemInventoriesListVariableComponent listVar) {
-						return 0xFF000000 | listVar.getFilterColor().getHexColor();
+					if (comp instanceof IFlowchartVariable flowchartVar) {
+						return 0xFF000000 | flowchartVar.getFilterColor().getHexColor();
 					}
 				}
 
@@ -109,27 +103,20 @@ public class SFMFlowClient {
 		NeoForge.EVENT_BUS.register(HighlightManager.class);
 
 		event.enqueueWork(() -> {
-			// Register vanilla client properties directly, completely avoiding static
-			// plugin lists
+			// Register vanilla client properties directly, completely avoiding static plugin lists
 			new VanillaSFMFlowClientPlugin().registerClientProperties();
-			VariableCardItem.setTooltipDataResolver(stack -> {
-				UUID varId = VariableCardRenderer.getVariableId(stack);
-				if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
-					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
-					if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-						return new Object[] { advancedVar.getFilterStack(), advancedVar.isUseQuantity(),
-								advancedVar.getQuantity(), advancedVar.getFilterColor() };
-					}
-					if (comp instanceof AdvancedFluidFilterVariableComponent advancedVar) {
-						return new Object[] { advancedVar.getFilterFluid(), advancedVar.isUseQuantity(),
-								advancedVar.getQuantity(), advancedVar.getFilterColor() };
-					}
-					// Dynamic Inventories List resolver
-					if (comp instanceof ItemInventoriesListVariableComponent listVar) {
-						return new Object[] { listVar, false, 0, listVar.getFilterColor() };
-					}
+
+			Color.setResolver((color, isText) -> {
+				if (isText) {
+					var specValue = ClientConfig.TEXT_CONFIGS.get(color);
+					return specValue != null
+							? ClientConfig.parseHexColor(specValue.get(), color.getDefaultHexTextColor())
+							: color.getDefaultHexTextColor();
+				} else {
+					var specValue = ClientConfig.BG_CONFIGS.get(color);
+					return specValue != null ? ClientConfig.parseHexColor(specValue.get(), color.getDefaultHexColor())
+							: color.getDefaultHexColor();
 				}
-				return null;
 			});
 			Color.setResolver((color, isText) -> {
 				if (isText) {

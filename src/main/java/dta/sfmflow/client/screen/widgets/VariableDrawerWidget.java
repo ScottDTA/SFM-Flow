@@ -5,7 +5,6 @@ import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.math.Axis;
@@ -32,10 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * Side-sliding drawer widget displaying a searchable, vertically scrollable 3x3
- * grid of active variables (supporting items, fluids, and addon variables dynamically).
- */
 @OnlyIn(Dist.CLIENT)
 public class VariableDrawerWidget extends AbstractFlowWidget {
 
@@ -83,8 +78,7 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 		var components = parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().values();
 		for (var comp : components) {
-			// Symmetrically exclude Item Inventories List variable instances from the generic variable drawer
-			if (comp instanceof IFlowchartVariable advancedVar && !(comp instanceof ItemInventoriesListVariableComponent)) {
+			if (comp instanceof IFlowchartVariable advancedVar && !advancedVar.isInventoryList()) {
 				if (advancedVar.isFilterEmpty()) {
 					continue;
 				}
@@ -178,7 +172,6 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 	@Override
 	protected void renderComponent(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-		// Update slide animation progress frame-rate independently
 		long now = Util.getMillis();
 		if (lastFrameTime == 0L) {
 			lastFrameTime = now;
@@ -203,7 +196,6 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			}
 		}
 
-		// Enable first scissor layer to clip everything left of the player inventory boundary
 		guiGraphics.enableScissor(parentScreen.getLeftPos() + 344, 0, parentScreen.width, parentScreen.height);
 
 		RenderSystem.setShader(GameRenderer::getPositionTexShader);
@@ -235,7 +227,6 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 		int gridX = getX() + 8;
 		int gridY = getY() + 20;
 		
-		// Enable second scissor layer to bound items to grid viewport bounds
 		guiGraphics.enableScissor(gridX, gridY, gridX + 54, gridY + 54);
 
 		List<IFlowchartVariable> vars = getFilteredVariables();
@@ -281,16 +272,30 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			}
 		}
 
-		// Disable scissor layers in correct reverse stack order
-		guiGraphics.disableScissor(); // Close out inner 54x54 grid area
-		guiGraphics.disableScissor(); // Close out main screen overlay area
+		guiGraphics.disableScissor(); 
+		guiGraphics.disableScissor(); 
+	}
+
+	/**
+	 * Defer tooltip rendering to the final, clean screen draw pass.
+	 * This prevents items, backgrounds, or custom meshes from culling the text.
+	 */
+	public void renderTooltipDeferred(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+		if (!this.visible) {
+			return;
+		}
+
+		int gridX = getX() + 8;
+		int gridY = getY() + 20;
 
 		boolean hoveringHandle = mouseX >= getX() + width && mouseX < getX() + width + HANDLE_TEX_WIDTH
 				&& mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1;
+
 		if (hoveringHandle) {
 			Component tooltipText = open ? Component.literal("Close Drawer") : Component.literal("Open Drawer");
 			guiGraphics.renderTooltip(parentScreen.getFont(), tooltipText, mouseX, mouseY);
 		} else if (mouseX >= gridX && mouseX < gridX + 54 && mouseY >= gridY && mouseY < gridY + 54) {
+			List<IFlowchartVariable> vars = getFilteredVariables();
 			for (int i = 0; i < vars.size(); i++) {
 				int col = i % 3;
 				int row = i / 3;

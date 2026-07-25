@@ -5,8 +5,8 @@ import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.IVariableClientProperties;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.item.VariableCardItem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
@@ -72,14 +72,19 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 				}
 			}
 		}
+
+		// Flush the translucent glint and model rendering batch safely to prevent state leaking
+		if (buffer instanceof MultiBufferSource.BufferSource bufferSource) {
+			bufferSource.endBatch();
+		}
 	}
 
 	public static boolean hasComponentFilter(ItemStack stack) {
 		UUID varId = getVariableId(stack);
 		if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 			var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
-			if (comp instanceof AdvancedItemFilterVariableComponent advancedVar) {
-				return advancedVar.isUseComponentFilter();
+			if (comp instanceof IFlowchartVariable flowchartVar) {
+				return flowchartVar.hasGlint();
 			}
 		}
 		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);

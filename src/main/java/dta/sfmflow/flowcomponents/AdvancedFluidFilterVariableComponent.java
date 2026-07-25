@@ -42,7 +42,7 @@ import java.util.UUID;
 
 /**
  * Variable component that stores a single fluid filter along with an optional
- * quantity limit in mB [3]. Configured with 0 inputs and 0 outputs [3].
+ * quantity limit in mB. Configured with 0 inputs and 0 outputs.
  */
 public class AdvancedFluidFilterVariableComponent extends AbstractFlowComponent
 		implements IGhostSlotAware, IFlowchartVariable {
@@ -186,9 +186,8 @@ public class AdvancedFluidFilterVariableComponent extends AbstractFlowComponent
 	}
 
 	/**
-	 * Matches an in-transit fluid stack based on the dynamic card configurations
-	 * [3]. Performs deep value-based equality checking on enabled data components
-	 * [3].
+	 * Matches an in-transit fluid stack based on the dynamic card configurations.
+	 * Performs deep value-based equality checking on enabled data components.
 	 */
 	public static boolean matchesVariableFilter(AdvancedFluidFilterVariableComponent varComp, FluidStack candidate) {
 		FluidStack filterFluid = varComp.getFilterFluid();
@@ -262,7 +261,7 @@ public class AdvancedFluidFilterVariableComponent extends AbstractFlowComponent
 		tag.putBoolean("UseComponentFilter", this.useComponentFilter);
 		tag.put("CustomComponentSettings", this.customComponentSettings);
 
-		// Serialize the active fluid so the custom BEWLR item renderer can find it [3]
+		// Serialize the active fluid so the custom BEWLR item renderer can find it
 		HolderLookup.Provider registries = RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY);
 		if (!this.filterFluid.isEmpty()) {
 			tag.put("FilterFluid", this.filterFluid.save(registries));
@@ -407,6 +406,11 @@ public class AdvancedFluidFilterVariableComponent extends AbstractFlowComponent
 	@Override
 	public String getFilteredContentName() {
 		return this.filterFluid.getHoverName().getString();
+	}
+	
+	@Override
+	public boolean hasGlint() {
+		return this.useComponentFilter;
 	}
 
 }

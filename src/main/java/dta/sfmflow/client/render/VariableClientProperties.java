@@ -10,6 +10,7 @@ import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.flowcomponents.AdvancedFluidFilterVariableComponent;
 import dta.sfmflow.flowcomponents.AdvancedItemFilterVariableComponent;
 import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
+import dta.sfmflow.flowcomponents.FluidInventoriesListVariableComponent;
 import dta.sfmflow.registry.ModDataComponents;
 import dta.sfmflow.util.Color;
 import net.minecraft.ChatFormatting;
@@ -289,21 +290,28 @@ public final class VariableClientProperties {
 				try { tintColor = Color.valueOf(tag.getString("FilterColor")); } catch (IllegalArgumentException ignored) {}
 			}
 
+			ClientLevel level = Minecraft.getInstance().level;
+			if (level == null) {
+				return;
+			}
+
 			UUID varId = VariableCardRenderer.getVariableId(stack);
 			if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
-				var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
-				if (comp instanceof ItemInventoriesListVariableComponent listVar) {
-					tintColor = listVar.getFilterColor();
-					ClientLevel level = Minecraft.getInstance().level;
-					if (level != null) {
+				if (screen.getMenu() != null && screen.getMenu().getManagerBlockEntity() != null) {
+					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
+					if (comp instanceof ItemInventoriesListVariableComponent listVar) {
+						tintColor = listVar.getFilterColor();
 						for (var entry : listVar.getEntries()) {
-							for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
-								if (block.getId() == entry.inventoryId()) {
-									BlockState state = level.getBlockState(block.getBlockPos());
-									if (!state.isAir()) {
-										inventoriesNames.add(state.getBlock().getName().getString());
+							var inventories = screen.getMenu().getManagerBlockEntity().getInventories();
+							if (inventories != null) {
+								for (var block : inventories) {
+									if (block != null && block.getId() == entry.inventoryId()) {
+										BlockState state = level.getBlockState(block.getBlockPos());
+										if (state != null && !state.isAir()) {
+											inventoriesNames.add(state.getBlock().getName().getString());
+										}
+										break;
 									}
-									break;
 								}
 							}
 						}
@@ -314,7 +322,7 @@ public final class VariableClientProperties {
 				if (tag.contains("InventoriesListItems")) {
 					ListTag list = tag.getList("InventoriesListItems", Tag.TAG_COMPOUND);
 					for (int i = 0; i < list.size(); i++) {
-						ItemStack.parse(Minecraft.getInstance().level.registryAccess(), list.getCompound(i))
+						ItemStack.parse(level.registryAccess(), list.getCompound(i))
 								.ifPresent(item -> inventoriesNames.add(item.getHoverName().getString()));
 					}
 				}
@@ -339,6 +347,129 @@ public final class VariableClientProperties {
 			if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 				var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
 				if (comp instanceof ItemInventoriesListVariableComponent listVar) {
+					ClientLevel level = Minecraft.getInstance().level;
+					if (level != null) {
+						for (var entry : listVar.getEntries()) {
+							for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
+								if (block.getId() == entry.inventoryId()) {
+									BlockState state = level.getBlockState(block.getBlockPos());
+									if (!state.isAir()) {
+										items.add(new ItemStack(state.getBlock().asItem()));
+									}
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+			CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+			if (customData != null && items.isEmpty()) {
+				CompoundTag tag = customData.copyTag();
+				if (tag.contains("InventoriesListItems")) {
+					ListTag list = tag.getList("InventoriesListItems", Tag.TAG_COMPOUND);
+					for (int i = 0; i < list.size(); i++) {
+						ItemStack.parse(Minecraft.getInstance().level.registryAccess(), list.getCompound(i))
+								.ifPresent(items::add);
+					}
+				}
+			}
+			return items;
+		}
+	}
+
+	public static class FluidInventoriesListProperties implements INodeClientProperties, IVariableClientProperties {
+		@Override public NodeCategory getCategory() { return NodeCategory.VARIABLE; }
+		@Override public ResourceLocation getIconTexture() { return ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/menu_buttons/fluid_variable_button.png"); }
+		@Override public Component getDisplayName() { return Component.translatable("gui.sfmflow.fluid_inventories_list_variable"); }
+		@Override public Supplier<Boolean> isEnabled() { return () -> true; }
+
+		@Override
+		public void renderOverlay(ItemStack stack, ItemDisplayContext displayContext, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+			Minecraft mc = Minecraft.getInstance();
+			List<ItemStack> listItems = getLiveInventoriesListStacks(stack);
+			if (!listItems.isEmpty()) {
+				long gameTime = mc.level != null ? mc.level.getGameTime() : 0;
+				int idx = (int) ((gameTime / 20) % listItems.size());
+				ItemStack cycleStack = listItems.get(idx);
+
+				poseStack.pushPose();
+				poseStack.translate(0.5f, 0.5f, 1.0f);
+				poseStack.scale(0.5f, 0.5f, 0.5f);
+				
+				mc.getItemRenderer().renderStatic(cycleStack, displayContext, packedLight, packedOverlay, poseStack, buffer, mc.level, 0);
+				poseStack.popPose();
+			}
+		}
+
+		@Override
+		public void appendTooltip(ItemStack stack, List<Component> tooltipComponents) {
+			Color tintColor = Color.WHITE;
+			List<String> inventoriesNames = new ArrayList<>();
+
+			CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+			if (customData != null) {
+				CompoundTag tag = customData.copyTag();
+				try { tintColor = Color.valueOf(tag.getString("FilterColor")); } catch (IllegalArgumentException ignored) {}
+			}
+
+			ClientLevel level = Minecraft.getInstance().level;
+			if (level == null) {
+				return;
+			}
+
+			UUID varId = VariableCardRenderer.getVariableId(stack);
+			if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
+				if (screen.getMenu() != null && screen.getMenu().getManagerBlockEntity() != null) {
+					var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
+					if (comp instanceof FluidInventoriesListVariableComponent listVar) {
+						tintColor = listVar.getFilterColor();
+						for (var entry : listVar.getEntries()) {
+							var inventories = screen.getMenu().getManagerBlockEntity().getInventories();
+							if (inventories != null) {
+								for (var block : inventories) {
+									if (block != null && block.getId() == entry.inventoryId()) {
+										BlockState state = level.getBlockState(block.getBlockPos());
+										if (state != null && !state.isAir()) {
+											inventoriesNames.add(state.getBlock().getName().getString());
+										}
+										break;
+									}
+								}
+							}
+						}
+					}
+				}
+			} else if (customData != null) {
+				CompoundTag tag = customData.copyTag();
+				if (tag.contains("InventoriesListItems")) {
+					ListTag list = tag.getList("InventoriesListItems", Tag.TAG_COMPOUND);
+					for (int i = 0; i < list.size(); i++) {
+						ItemStack.parse(level.registryAccess(), list.getCompound(i))
+								.ifPresent(item -> inventoriesNames.add(item.getHoverName().getString()));
+					}
+				}
+			}
+
+			tooltipComponents.add(Component.literal("Type: ").withStyle(ChatFormatting.GRAY).append(Component.literal("Fluid Inventories List").withStyle(ChatFormatting.LIGHT_PURPLE)));
+			tooltipComponents.add(Component.literal("Color: ").withStyle(ChatFormatting.GRAY).append(Component.literal(tintColor.getSerializedName().toUpperCase(Locale.ROOT)).withStyle(tintColor.getChatFormat())));
+
+			if (inventoriesNames.isEmpty()) {
+				tooltipComponents.add(Component.literal("Configured Blocks: ").withStyle(ChatFormatting.GRAY).append(Component.literal("Empty").withStyle(ChatFormatting.DARK_GRAY)));
+			} else {
+				tooltipComponents.add(Component.literal("Configured Blocks:").withStyle(ChatFormatting.GRAY));
+				for (String name : inventoriesNames) {
+					tooltipComponents.add(Component.literal(" - " + name).withStyle(ChatFormatting.DARK_GREEN));
+				}
+			}
+		}
+
+		private List<ItemStack> getLiveInventoriesListStacks(ItemStack stack) {
+			List<ItemStack> items = new ArrayList<>();
+			UUID varId = VariableCardRenderer.getVariableId(stack);
+			if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
+				var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
+				if (comp instanceof FluidInventoriesListVariableComponent listVar) {
 					ClientLevel level = Minecraft.getInstance().level;
 					if (level != null) {
 						for (var entry : listVar.getEntries()) {
