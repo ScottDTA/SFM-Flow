@@ -1,6 +1,5 @@
 package dta.sfmflow.networking;
 
-import dta.sfmflow.networking.packets.clientbound.ForceBlockRenderPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
@@ -67,18 +66,6 @@ public final class PacketHandlerManager {
 	
 	public static void handleSyncSideConfigProperties(final SyncSideConfigPropertiesPacket payload, final IPayloadContext context) {
 		PROPERTIES_HANDLER.get().handle(payload, context);
-	}
-	
-	private static final Supplier<IPacketHandler<ForceBlockRenderPacket>> RENDER_HANDLER = () -> {
-		if (FMLEnvironment.dist == Dist.CLIENT) {
-			return new dta.sfmflow.client.network.ClientForceBlockRenderPacketHandlerImpl();
-		}
-		return (payload, context) -> {
-		};
-	};
-
-	public static void handleForceBlockRender(final ForceBlockRenderPacket payload, final IPayloadContext context) {
-		RENDER_HANDLER.get().handle(payload, context);
 	}
 	
 	private static final Supplier<IPacketHandler<SyncSignTextPacket>> SIGN_TEXT_HANDLER = () -> {

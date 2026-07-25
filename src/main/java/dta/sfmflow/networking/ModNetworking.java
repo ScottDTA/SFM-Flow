@@ -49,9 +49,6 @@ public class ModNetworking {
         registrar.playToClient(SyncSideConfigPropertiesPacket.TYPE, SyncSideConfigPropertiesPacket.STREAM_CODEC,
                 PacketHandlerManager::handleSyncSideConfigProperties);
      // Clientbound Packets (Server to Client)
-        registrar.playToClient(ForceBlockRenderPacket.TYPE, ForceBlockRenderPacket.STREAM_CODEC,
-                PacketHandlerManager::handleForceBlockRender);
-     // Clientbound Packets (Server to Client)
         registrar.playToClient(SyncSignTextPacket.TYPE, SyncSignTextPacket.STREAM_CODEC,
                 PacketHandlerManager::handleSyncSignText);
     }

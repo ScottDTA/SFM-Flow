@@ -36,7 +36,7 @@ import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
 import dta.sfmflow.flowcomponents.SignUpdaterComponent;
 import dta.sfmflow.flowcomponents.SplitterComponent;
-import dta.sfmflow.networking.packets.clientbound.ForceBlockRenderPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncSignTextPacket;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
 import dta.sfmflow.flowcomponents.ObserverTriggerComponent;
@@ -315,22 +315,20 @@ public class VanillaSFMFlowPlugin {
 								level.sendBlockUpdated(signPos, signState, signState, 3);
 
 								if (level instanceof ServerLevel serverLevel) {
-									var syncPacket = sign.getUpdatePacket();
+									double centerX = signPos.getX() + 0.5;
+									double centerY = signPos.getY() + 0.5;
+									double centerZ = signPos.getZ() + 0.5;
 
-									if (syncPacket != null) {
-										double centerX = signPos.getX() + 0.5;
-										double centerY = signPos.getY() + 0.5;
-										double centerZ = signPos.getZ() + 0.5;
+									// Instantiate our custom clientbound redraw packet
+									var customSyncPacket = new SyncSignTextPacket(signPos, task.frontLines(),
+											task.backLines(), task.frontColor(), task.backColor(), task.frontGlow(),
+											task.backGlow(), task.waxed());
 
-										var renderPacket = new ForceBlockRenderPacket(signPos);
-
-										// Force update delivery to any player within a standard 64-block visibility
-										// sphere [3]
-										for (ServerPlayer player : serverLevel.players()) {
-											if (player.distanceToSqr(centerX, centerY, centerZ) < 4096.0) { 
-												player.connection.send(syncPacket);
-												// PacketDistributor.sendToPlayer(player, renderPacket);
-											}
+									// Force update delivery to any player within a standard 64-block visibility
+									// sphere
+									for (ServerPlayer player : serverLevel.players()) {
+										if (player.distanceToSqr(centerX, centerY, centerZ) < 4096.0) {
+											PacketDistributor.sendToPlayer(player, customSyncPacket);
 										}
 									}
 								}
