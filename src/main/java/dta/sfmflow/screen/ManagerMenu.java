@@ -158,7 +158,8 @@ public class ManagerMenu extends AbstractContainerMenu {
 					if (button == 0) { // Left-click: Clone item to slot
 						if (!carriedStack.isEmpty()) {
 							// Guard: Block setting inventory list variable cards into filter ghost slots
-							if (FilterGhostSlot.isInventoryListCard(carriedStack, blockEntity)) {
+							// [3]
+							if (FilterGhostSlot.isInventoryListCard(carriedStack)) {
 								this.broadcastChanges();
 								return;
 							}
@@ -167,14 +168,14 @@ public class ManagerMenu extends AbstractContainerMenu {
 							ghostSlot.set(filterCopy);
 
 							// Symmetrical Cursor Clearing & Snap-back: return stack back to its original
-							// slot index
+							// slot index [3]
 							if (carriedStack.is(ModItems.VARIABLE_CARD.get())) {
 								this.setCarried(ItemStack.EMPTY); // Variables just dissolve silently
 							} else {
 								ItemStack returnStack = carriedStack.copy();
 								this.setCarried(ItemStack.EMPTY); // Clear the mouse cursor first
 
-								// Symmetrically return items back to the origin slot
+								// Symmetrically return items back to the origin slot [3]
 								if (lastPickedUpSlotId >= 0 && lastPickedUpSlotId < 36) {
 									Slot originalSlot = this.slots.get(lastPickedUpSlotId);
 									if (!originalSlot.hasItem()) {

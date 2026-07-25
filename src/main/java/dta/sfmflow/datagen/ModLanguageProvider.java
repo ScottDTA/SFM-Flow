@@ -44,6 +44,10 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.warning.empty_fluid_inventories_list", "Fluid inventories list variable cannot be empty!");
 		add("gui.sfmflow.energy_inventories_list_variable", "Energy Inventories List");
 		add("gui.sfmflow.warning.empty_energy_inventories_list", "Energy inventories list variable cannot be empty!");
+		
+		add("gui.sfmflow.redstone_inventories_list_variable", "Redstone Inventories List");
+		add("gui.sfmflow.warning.empty_redstone_inventories_list", "Redstone inventories list variable cannot be empty!");
+		
 
 		add("gui.sfmflow.commands", "Commands: %1$s");
 		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");

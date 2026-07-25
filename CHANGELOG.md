@@ -2,6 +2,7 @@
 
 
 ### [Added]
+* Redstone List Card Visuals: Added complete client rendering and tooltip line support for Redstone Inventories List variable cards, which now cycle through the icons of your configured Redstone blocks.
 * Energy Inventories List: Added a new variable component allowing multiple energy storage selections (such as batteries or generators) to be grouped and referenced together as a single card.
 * Dynamic Overlays for Energy: Energy inventory list cards now cycle dynamically through the icons of your configured energy blocks in screens and inventories.
 * Fluid Inventories List: Added a new variable component allowing multiple fluid tank selections to be grouped and referenced together as a single card.
@@ -11,6 +12,7 @@
 * Custom Variable Client Renderers: Implemented extensible client-side property handlers for custom variable cards, supporting tailored central overlays and dynamic multi-line tooltips.
 
 ### [Changed]
+* Performance Optimizations: Redesigned the safety validation check for variable cards to run on a thread-safe memory cache, reducing behind-the-scenes allocations and game lag.
 * Drawer Tooltips: Relocated variable drawer tooltips to a separate, deferred rendering pass, resolving depth-clipping and scissor-culling bugs in the UI.
 * Sign Updater Cable Optimization: Refactored the Sign Updater Cable block to operate as a regular block without tile entity overhead, reducing server resource usage on large networks.
 * Variable Card Tooltips: Enhanced card tooltips to display detailed contents, group colors, and configured block names dynamically.
