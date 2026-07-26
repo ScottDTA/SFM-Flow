@@ -15,6 +15,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.util.Color;
+import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.UUIDUtil;
@@ -117,6 +118,13 @@ public abstract class AbstractFlowComponent {
 	}
 
 	public void setBoundInventoryListVariableId(@Nullable UUID id) {
+	}
+	
+	/**
+	 * Resolves a list of customized ConnectionBlock targets for iteration sweeps.
+	 */
+	public List<ConnectionBlock> resolveListElements(FlowchartPlanningContext context) {
+		return Collections.emptyList();
 	}
 	
 	public List<Integer> getBoundInventoryIds() {

@@ -1,7 +1,5 @@
 7-26-2026
 
-
-
 ### [Added]
 * Added the ForEach Loop node, enabling sequential execution of flowchart branches across entire groups of machines or inventories.
 * Added the ForEach settings panel, allowing players to customize iteration order (Top-To-Bottom, Bottom-To-Top, or Random) and assign a custom name and color to the element variables.
@@ -9,6 +7,8 @@
 * Added support for dynamic block resolution, allowing the automation pipeline to evaluate virtual inventory references. This prepares the planning kernel to support "For Each" loop execution paths over grouped machines.
 
 ### [Changed]
+* Refactored ForEach Loop components to evaluate list variables polymorphically. This decouples loop iteration from specific core list types, allowing future addons to easily introduce custom target lists.
+* Improved the background planning context to automatically forward all active pipeline buffers (Items, Fluids, Energy, and custom addon properties) into ForEach loop sub-traversals.
 * Upgraded transfer planners to consume in-transit energy and fluid buffers symmetrically with item transfers.
 * Improved the main item filter slot to permit placing inventory list cards directly onto ForEach components.
 * Refactored all transfer planners (Item, Fluid, Energy) and logical conditional nodes to resolve their targets dynamically at runtime rather than matching only static connected blocks.

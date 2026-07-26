@@ -10,10 +10,12 @@ import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.component.ISlotConfigurable;
+import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import dta.sfmflow.util.Color;
+import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -35,6 +37,7 @@ import net.minecraft.world.item.component.DyedItemColor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -348,5 +351,35 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 	@Override
 	public boolean isInventoryList() {
 		return true;
+	}
+	
+	@Override
+	public List<ConnectionBlock> resolveListElements(FlowchartPlanningContext context) {
+		List<ConnectionBlock> resolved = new ArrayList<>();
+		for (var entry : entries) {
+			for (ConnectionBlock block : context.getConnectedInventories()) {
+				if (block.getId() == entry.inventoryId()) {
+					ConnectionBlock customized = new ConnectionBlock(block);
+					customized.setSleeping(block.isSleeping());
+					customized.setTypes(block.getTypes());
+					try {
+						Field field = ConnectionBlock.class.getDeclaredField("direction");
+						field.setAccessible(true);
+						int sidesMask = entry.activeSidesMask();
+						Direction primaryDir = block.getDirection();
+						for (Direction dir : Direction.values()) {
+							if ((sidesMask & (1 << dir.ordinal())) != 0) {
+								primaryDir = dir;
+								break;
+							}
+						}
+						field.set(customized, primaryDir);
+					} catch (Exception ignored) {}
+					resolved.add(customized);
+					break;
+				}
+			}
+		}
+		return resolved;
 	}
 }

@@ -26,6 +26,7 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.StringRepresentable;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -34,27 +35,32 @@ import javax.annotation.Nullable;
 public class ForEachComponent extends AbstractFlowComponent {
 
 	public enum IterationMode implements StringRepresentable {
-		TOP_TO_BOTTOM("top_to_bottom"),
-		BOTTOM_TO_TOP("bottom_to_top"),
-		RANDOM("random");
+		TOP_TO_BOTTOM("top_to_bottom"), BOTTOM_TO_TOP("bottom_to_top"), RANDOM("random");
 
 		private final String name;
 
-		IterationMode(String name) { this.name = name; }
+		IterationMode(String name) {
+			this.name = name;
+		}
 
 		@Override
-		public String getSerializedName() { return name; }
+		public String getSerializedName() {
+			return name;
+		}
 	}
 
 	public static final Codec<IterationMode> MODE_CODEC = StringRepresentable.fromEnum(IterationMode::values);
 
 	public static final MapCodec<ForEachComponent> CODEC = RecordCodecBuilder.mapCodec(instance -> instance
 			.group(BaseProperties.CODEC.fieldOf("base").forGetter(ForEachComponent::getBaseProperties),
-					UUIDUtil.CODEC.optionalFieldOf("boundListVariableId")
+					UUIDUtil.CODEC
+							.optionalFieldOf("boundListVariableId")
 							.forGetter(comp -> Optional.ofNullable(comp.getBoundListVariableId())),
 					Codec.STRING.optionalFieldOf("elementName", "Element").forGetter(ForEachComponent::getElementName),
-					Color.CODEC.optionalFieldOf("elementColor", Color.WHITE).forGetter(ForEachComponent::getElementColor),
-					MODE_CODEC.optionalFieldOf("iterationMode", IterationMode.TOP_TO_BOTTOM).forGetter(ForEachComponent::getIterationMode))
+					Color.CODEC.optionalFieldOf("elementColor", Color.WHITE)
+							.forGetter(ForEachComponent::getElementColor),
+					MODE_CODEC.optionalFieldOf("iterationMode", IterationMode.TOP_TO_BOTTOM)
+							.forGetter(ForEachComponent::getIterationMode))
 			.apply(instance, (baseProps, boundListVar, elemName, elemColor, mode) -> {
 				ForEachComponent comp = new ForEachComponent(baseProps.id());
 				comp.setBaseProperties(baseProps);
@@ -142,7 +148,8 @@ public class ForEachComponent extends AbstractFlowComponent {
 		int nextDepth = currentDepth + 1;
 
 		if (nextDepth > ServerConfig.MAX_CHAINED_FOREACH.get()) {
-			FlowLogger.execution("[ForEach] Circuit breaker: ForEach chain depth limit exceeded at %s (%d > %d). Suppressing downstream executions.",
+			FlowLogger.execution(
+					"[ForEach] Circuit breaker: ForEach chain depth limit exceeded at %s (%d > %d). Suppressing downstream executions.",
 					this.getId(), nextDepth, ServerConfig.MAX_CHAINED_FOREACH.get());
 			return;
 		}
@@ -159,116 +166,11 @@ public class ForEachComponent extends AbstractFlowComponent {
 			triggerCompletion(context);
 			return;
 		}
-		FlowLogger.execution("[ForEach] Found listComp: %s of class %s", listComp.getName().getString(), listComp.getClass().getSimpleName());
+		FlowLogger.execution("[ForEach] Found listComp: %s of class %s", listComp.getName().getString(),
+				listComp.getClass().getSimpleName());
 
-		List<ConnectionBlock> resolvedList = new ArrayList<>();
-
-		if (listComp instanceof ItemInventoriesListVariableComponent listVar) {
-			FlowLogger.execution("[ForEach] listComp is ItemInventoriesList. Entries size: %d", listVar.getEntries().size());
-			for (var entry : listVar.getEntries()) {
-				boolean foundBlock = false;
-				for (ConnectionBlock block : context.getConnectedInventories()) {
-					if (block.getId() == entry.inventoryId()) {
-						ConnectionBlock customized = new ConnectionBlock(block);
-						customized.setSleeping(block.isSleeping());
-						customized.setTypes(block.getTypes());
-						try {
-							java.lang.reflect.Field field = ConnectionBlock.class.getDeclaredField("direction");
-							field.setAccessible(true);
-							int sidesMask = entry.activeSidesMask();
-							Direction primaryDir = block.getDirection();
-							for (Direction dir : Direction.values()) {
-								if ((sidesMask & (1 << dir.ordinal())) != 0) {
-									primaryDir = dir;
-									break;
-								}
-							}
-							field.set(customized, primaryDir);
-						} catch (Exception ignored) {}
-						resolvedList.add(customized);
-						foundBlock = true;
-						break;
-					}
-				}
-				if (!foundBlock) {
-					FlowLogger.execution("[ForEach] Entry inventory ID %d not found in context connected inventories!", entry.inventoryId());
-				}
-			}
-		} else if (listComp instanceof FluidInventoriesListVariableComponent listVar) {
-			FlowLogger.execution("[ForEach] listComp is FluidInventoriesList. Entries size: %d", listVar.getEntries().size());
-			for (var entry : listVar.getEntries()) {
-				boolean foundBlock = false;
-				for (ConnectionBlock block : context.getConnectedInventories()) {
-					if (block.getId() == entry.inventoryId()) {
-						ConnectionBlock customized = new ConnectionBlock(block);
-						customized.setSleeping(block.isSleeping());
-						customized.setTypes(block.getTypes());
-						resolvedList.add(customized);
-						foundBlock = true;
-						break;
-					}
-				}
-				if (!foundBlock) {
-					FlowLogger.execution("[ForEach] Entry inventory ID %d not found in context connected inventories!", entry.inventoryId());
-				}
-			}
-		} else if (listComp instanceof EnergyInventoriesListVariableComponent listVar) {
-			FlowLogger.execution("[ForEach] listComp is EnergyInventoriesList. Entries size: %d", listVar.getEntries().size());
-			for (var entry : listVar.getEntries()) {
-				boolean foundBlock = false;
-				for (ConnectionBlock block : context.getConnectedInventories()) {
-					if (block.getId() == entry.inventoryId()) {
-						ConnectionBlock customized = new ConnectionBlock(block);
-						customized.setSleeping(block.isSleeping());
-						customized.setTypes(block.getTypes());
-						resolvedList.add(customized);
-						foundBlock = true;
-						break;
-					}
-				}
-				if (!foundBlock) {
-					FlowLogger.execution("[ForEach] Entry inventory ID %d not found in context connected inventories!", entry.inventoryId());
-				}
-			}
-		} else if (listComp instanceof RedstoneInventoriesListVariableComponent listVar) {
-			FlowLogger.execution("[ForEach] listComp is RedstoneInventoriesList. Entries size: %d", listVar.getEntries().size());
-			for (var entry : listVar.getEntries()) {
-				boolean foundBlock = false;
-				for (ConnectionBlock block : context.getConnectedInventories()) {
-					if (block.getId() == entry.inventoryId()) {
-						ConnectionBlock customized = new ConnectionBlock(block);
-						customized.setSleeping(block.isSleeping());
-						customized.setTypes(block.getTypes());
-						resolvedList.add(customized);
-						foundBlock = true;
-						break;
-					}
-				}
-				if (!foundBlock) {
-					FlowLogger.execution("[ForEach] Entry inventory ID %d not found in context connected inventories!", entry.inventoryId());
-				}
-			}
-		} else if (listComp instanceof SignUpdaterInventoriesListVariableComponent listVar) {
-			FlowLogger.execution("[ForEach] listComp is SignUpdaterInventoriesList. Entries size: %d", listVar.getEntries().size());
-			for (var entry : listVar.getEntries()) {
-				boolean foundBlock = false;
-				for (ConnectionBlock block : context.getConnectedInventories()) {
-					if (block.getId() == entry.inventoryId()) {
-						ConnectionBlock customized = new ConnectionBlock(block);
-						customized.setSleeping(block.isSleeping());
-						customized.setTypes(block.getTypes());
-						resolvedList.add(customized);
-						foundBlock = true;
-						break;
-					}
-				}
-				if (!foundBlock) {
-					FlowLogger.execution("[ForEach] Entry inventory ID %d not found in context connected inventories!", entry.inventoryId());
-				}
-			}
-		} else {
-			FlowLogger.execution("[ForEach] listComp is not a recognized list variable class type!");
-		}
+		// Abstractly resolve list elements without hardcoded types
+		List<ConnectionBlock> resolvedList = listComp.resolveListElements(context);
 
 		FlowLogger.execution("[ForEach] Total resolved iteration elements: %d", resolvedList.size());
 
@@ -286,7 +188,7 @@ public class ForEachComponent extends AbstractFlowComponent {
 
 		// 4. Sequentially execute the loop body synchronous sub-traversal
 		ResourceLocation activeBlockKey = ResourceLocation.fromNamespaceAndPath("sfmflow", "active_foreach_block");
-		
+
 		for (ConnectionBlock currentElement : resolvedList) {
 			context.setPipelineBuffer(this.getId(), activeBlockKey, currentElement);
 
@@ -294,10 +196,25 @@ public class ForEachComponent extends AbstractFlowComponent {
 			Queue<UUID> subQueue = new ArrayDeque<>();
 
 			FlowchartPlanningContext subContext = new FlowchartPlanningContext() {
-				@Override public ThreadSafeInventorySnapshot getSnapshot() { return context.getSnapshot(); }
-				@Override public Map<UUID, AbstractFlowComponent> getComponents() { return context.getComponents(); }
-				@Override public List<FlowComponentConnections> getConnections() { return context.getConnections(); }
-				@Override public List<ConnectionBlock> getConnectedInventories() { return context.getConnectedInventories(); }
+				@Override
+				public ThreadSafeInventorySnapshot getSnapshot() {
+					return context.getSnapshot();
+				}
+
+				@Override
+				public Map<UUID, AbstractFlowComponent> getComponents() {
+					return context.getComponents();
+				}
+
+				@Override
+				public List<FlowComponentConnections> getConnections() {
+					return context.getConnections();
+				}
+
+				@Override
+				public List<ConnectionBlock> getConnectedInventories() {
+					return context.getConnectedInventories();
+				}
 
 				@Override
 				public void enqueue(UUID componentId) {
@@ -309,8 +226,10 @@ public class ForEachComponent extends AbstractFlowComponent {
 				}
 
 				@Override
-				public boolean tryWriteTask(ResourceLocation capabilityId, BlockPos src, int srcSlot, Direction srcSide, BlockPos dest, int destSlot, Direction destSide, Object taskParams) {
-					return context.tryWriteTask(capabilityId, src, srcSlot, srcSide, dest, destSlot, destSide, taskParams);
+				public boolean tryWriteTask(ResourceLocation capabilityId, BlockPos src, int srcSlot, Direction srcSide,
+						BlockPos dest, int destSlot, Direction destSide, Object taskParams) {
+					return context.tryWriteTask(capabilityId, src, srcSlot, srcSide, dest, destSlot, destSide,
+							taskParams);
 				}
 
 				@Override
@@ -322,6 +241,11 @@ public class ForEachComponent extends AbstractFlowComponent {
 				public void setPipelineBuffer(UUID componentId, ResourceLocation capabilityId, Object buffer) {
 					context.setPipelineBuffer(componentId, capabilityId, buffer);
 				}
+
+				@Override
+				public void copyPipelineBuffers(UUID srcComponentId, UUID destComponentId) {
+					context.copyPipelineBuffers(srcComponentId, destComponentId);
+				}
 			};
 
 			int startNodeConnectionsCount = 0;
@@ -330,10 +254,9 @@ public class ForEachComponent extends AbstractFlowComponent {
 				if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == 1) {
 					UUID targetId = conn.getTargetComponentId();
 
-					// Synchronize and seed the starting node's input buffers with our loop's running buffers [3]
-					context.setPipelineBuffer(targetId, ResourceLocation.fromNamespaceAndPath("sfmflow", "item"), context.getPipelineBuffer(this.getId(), ResourceLocation.fromNamespaceAndPath("sfmflow", "item")));
-					context.setPipelineBuffer(targetId, ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid"), context.getPipelineBuffer(this.getId(), ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid")));
-					context.setPipelineBuffer(targetId, ResourceLocation.fromNamespaceAndPath("sfmflow", "energy"), context.getPipelineBuffer(this.getId(), ResourceLocation.fromNamespaceAndPath("sfmflow", "energy")));
+					// Dynamically copy all pipeline buffers (Items, Fluids, Energy, and custom
+					// Addon buffers)
+					context.copyPipelineBuffers(this.getId(), targetId);
 
 					subQueue.add(targetId);
 					subVisited.add(targetId);
@@ -341,8 +264,9 @@ public class ForEachComponent extends AbstractFlowComponent {
 				}
 			}
 
-			FlowLogger.execution("[ForEach] Iteration Element: %s at %s. Seeding %d sub-traversal starting nodes.", 
-					currentElement.getDisplayName(null).getString(), currentElement.getBlockPos(), startNodeConnectionsCount);
+			FlowLogger.execution("[ForEach] Iteration Element: %s at %s. Seeding %d sub-traversal starting nodes.",
+					currentElement.getDisplayName(null).getString(), currentElement.getBlockPos(),
+					startNodeConnectionsCount);
 
 			// Run sub-traversal sequentially
 			int subNodesTraversed = 0;
@@ -362,7 +286,6 @@ public class ForEachComponent extends AbstractFlowComponent {
 		context.setPipelineBuffer(this.getId(), activeBlockKey, null);
 		triggerCompletion(context);
 	}
-
 
 	private void triggerCompletion(FlowchartPlanningContext context) {
 		for (FlowComponentConnections conn : context.getConnections()) {

@@ -5,6 +5,7 @@ import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.flowcomponents.FlowComponentConnections;
+import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.api.flowchart.Flowchart;
 import dta.sfmflow.util.ConnectionBlock;
 import net.minecraft.core.BlockPos;
@@ -15,8 +16,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * Cooperative state-machine planning task executing flowchart logic off-thread [3].
- * Operates purely on thread-safe isolated snapshots and copies [3].
+ * Cooperative state-machine planning task executing flowchart logic off-thread.
+ * Operates purely on thread-safe isolated snapshots and copies.
  */
 public class FlowchartPlanningTask {
 	private final ExecutionRingBuffer executionBuffer;
@@ -59,7 +60,7 @@ public class FlowchartPlanningTask {
 				// Automated Splitter Chain Resetter [3]
 				if (activePlanningId != null) {
 					AbstractFlowComponent current = components.get(activePlanningId);
-					if (!(current instanceof dta.sfmflow.flowcomponents.SplitterComponent)) {
+					if (!(current instanceof SplitterComponent)) {
 						// Reset depth of target node to 0 if the source is not a splitter
 						ResourceLocation chainDepthKey = ResourceLocation.fromNamespaceAndPath("sfmflow", "splitter_chain_depth");
 						setPipelineBuffer(componentId, chainDepthKey, 0);
@@ -87,6 +88,16 @@ public class FlowchartPlanningTask {
 		public void setPipelineBuffer(UUID componentId, ResourceLocation capabilityId, Object buffer) {
 			pipelineBuffers.computeIfAbsent(componentId, k -> new HashMap<>()).put(capabilityId, buffer);
 		}
+		
+		@Override
+		public void copyPipelineBuffers(UUID srcComponentId, UUID destComponentId) {
+			Map<ResourceLocation, Object> srcMap = pipelineBuffers.get(srcComponentId);
+			if (srcMap != null && !srcMap.isEmpty()) {
+				Map<ResourceLocation, Object> destMap = pipelineBuffers.computeIfAbsent(destComponentId, k -> new HashMap<>());
+				destMap.putAll(srcMap);
+			}
+		}
+		
 	};
 
 	public FlowchartPlanningTask(
@@ -99,8 +110,8 @@ public class FlowchartPlanningTask {
 		this.executionBuffer = executionBuffer;
 		this.onCircuitBreakerTripped = onCircuitBreakerTripped;
 		this.snapshot = snapshot;
-		this.connections = flowchart.connections(); // Isolated connection list [3]
-		this.components = flowchart.components();     // Isolated components map [3]
+		this.connections = flowchart.connections(); // Isolated connection list
+		this.components = flowchart.components();     // Isolated components map 
 
 		for (UUID id : activeTriggers) {
 			if (id != null && this.components.containsKey(id)) {
@@ -113,9 +124,9 @@ public class FlowchartPlanningTask {
 		long start = System.nanoTime();
 		while (!evaluationQueue.isEmpty() && (System.nanoTime() - start < budgetNs)) {
 			if (nodesTraversed >= 1000) {
-				onCircuitBreakerTripped.run(); // Concurrency-safe atomic callback [3]
+				onCircuitBreakerTripped.run(); // Concurrency-safe atomic callback
 				SFMFlow.LOGGER.error(
-						"[SFM-Flow] Circuit breaker tripped! Flowchart exceeded the 1000-node traversal limit, canceling planning task [3].");
+						"[SFM-Flow] Circuit breaker tripped! Flowchart exceeded the 1000-node traversal limit, canceling planning task.");
 				completed = true;
 				return true;
 			}
@@ -124,9 +135,9 @@ public class FlowchartPlanningTask {
 			AbstractFlowComponent current = components.get(currentId);
 			if (current != null) {
 				nodesTraversed++;
-				this.activePlanningId = currentId; // Set active planning ID [3]
+				this.activePlanningId = currentId; // Set active planning ID
 				current.plan(this.planningContext);
-				this.activePlanningId = null; // Clear active planning ID after planning [3]
+				this.activePlanningId = null; // Clear active planning ID after planning
 			}
 		}
 		if (evaluationQueue.isEmpty()) {

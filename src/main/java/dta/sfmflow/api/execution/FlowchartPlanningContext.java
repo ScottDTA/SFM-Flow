@@ -20,7 +20,7 @@ import java.util.UUID;
 
 /**
  * Public API context providing safe access to flowchart components, connections, and
- * the lock-free task ring buffer during asynchronous evaluation runs [3].
+ * the lock-free task ring buffer during asynchronous evaluation runs.
  */
 public interface FlowchartPlanningContext {
 
@@ -37,27 +37,27 @@ public interface FlowchartPlanningContext {
 	boolean tryWriteTask(ResourceLocation capabilityId, BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, Object taskParams);
 
 	/**
-	 * Retrieves a generic, dynamic in-transit wire buffer mapped to a capability ID [3].
+	 * Retrieves a generic, dynamic in-transit wire buffer mapped to a capability ID.
 	 *
-	 * @param componentId the unique ID of the target component [3]
-	 * @param capabilityId the unique capability key (e.g., sfmflow:item, sfmflow:fluid) [3]
-	 * @return the active buffer Object, or null if empty [3]
+	 * @param componentId the unique ID of the target component
+	 * @param capabilityId the unique capability key (e.g., sfmflow:item, sfmflow:fluid)
+	 * @return the active buffer Object, or null if empty
 	 */
 	default @Nullable Object getPipelineBuffer(UUID componentId, ResourceLocation capabilityId) {
 		return null;
 	}
 
 	/**
-	 * Configures a generic, dynamic in-transit wire buffer mapped to a capability ID [3].
+	 * Configures a generic, dynamic in-transit wire buffer mapped to a capability ID.
 	 *
-	 * @param componentId the unique ID of the target component [3]
-	 * @param capabilityId the unique capability key (e.g., sfmflow:item, sfmflow:fluid) [3]
-	 * @param buffer the buffer Object to store [3]
+	 * @param componentId the unique ID of the target component
+	 * @param capabilityId the unique capability key (e.g., sfmflow:item, sfmflow:fluid)
+	 * @param buffer the buffer Object to store
 	 */
 	default void setPipelineBuffer(UUID componentId, ResourceLocation capabilityId, Object buffer) {}
 
 	/**
-	 * Default convenience helper for standard item transfers, delegating to the generic pipeline map [3].
+	 * Default convenience helper for standard item transfers, delegating to the generic pipeline map.
 	 */
 	default FlowItemBuffer getComponentBuffer(UUID componentId) {
 		ResourceLocation itemCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
@@ -71,7 +71,7 @@ public interface FlowchartPlanningContext {
 	}
 
 	/**
-	 * Default convenience helper for standard item transfers, delegating to the generic pipeline map [3].
+	 * Default convenience helper for standard item transfers, delegating to the generic pipeline map.
 	 */
 	default void setComponentBuffer(UUID componentId, FlowItemBuffer buffer) {
 		ResourceLocation itemCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "item");
@@ -84,7 +84,7 @@ public interface FlowchartPlanningContext {
 	}
 	
 	/**
-	 * Default convenience helper for standard fluid transfers, delegating to the generic pipeline map [3].
+	 * Default convenience helper for standard fluid transfers, delegating to the generic pipeline map.
 	 */
 	default FlowFluidBuffer getFluidComponentBuffer(UUID componentId) {
 		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
@@ -98,7 +98,7 @@ public interface FlowchartPlanningContext {
 	}
 
 	/**
-	 * Default convenience helper for standard fluid transfers, delegating to the generic pipeline map [3].
+	 * Default convenience helper for standard fluid transfers, delegating to the generic pipeline map.
 	 */
 	default void setFluidComponentBuffer(UUID componentId, FlowFluidBuffer buffer) {
 		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
@@ -106,7 +106,7 @@ public interface FlowchartPlanningContext {
 	}
 
 	/**
-	 * Default convenience helper for standard fluid transfer tasks, delegating to the generic pipeline map [3].
+	 * Default convenience helper for standard fluid transfer tasks, delegating to the generic pipeline map.
 	 */
 	default boolean tryWriteFluidTask(BlockPos src, int srcSlot, @Nullable Direction srcSide, BlockPos dest, int destSlot, @Nullable Direction destSide, FluidStack stack, int amount) {
 		ResourceLocation fluidCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "fluid");
@@ -114,7 +114,7 @@ public interface FlowchartPlanningContext {
 	}
 	
 	/**
-	 * Default convenience helper for standard energy transfers, delegating to the generic pipeline map [3].
+	 * Default convenience helper for standard energy transfers, delegating to the generic pipeline map.
 	 */
 	default FlowEnergyBuffer getEnergyComponentBuffer(UUID componentId) {
 		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
@@ -136,5 +136,11 @@ public interface FlowchartPlanningContext {
 		ResourceLocation energyCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "energy");
 		return tryWriteTask(energyCapId, src, 0, srcSide, dest, 0, destSide, new EnergyTransferParams(amount));
 	}
+	
+	/**
+	 * Dynamically copies all active pipeline buffers (including standard and custom addon types) 
+	 * from a source component ID to a destination component ID.
+	 */
+	default void copyPipelineBuffers(UUID srcComponentId, UUID destComponentId) {}
 	
 }
