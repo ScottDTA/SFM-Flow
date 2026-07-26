@@ -35,6 +35,7 @@ import dta.sfmflow.client.screen.widgets.RedstoneSideConfigModalPopup;
 import dta.sfmflow.client.screen.widgets.RedstoneTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SculkTriggerSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SculkTriggerSideConfigModalPopup;
+import dta.sfmflow.client.screen.widgets.SignUpdaterInventoriesListVariableSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SignUpdaterSettingsOverlay;
 import dta.sfmflow.client.screen.widgets.SlotLayoutModalPopup;
 import dta.sfmflow.client.screen.widgets.SplitterSettingsOverlay;
@@ -56,6 +57,7 @@ import dta.sfmflow.flowcomponents.RedstoneInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
 import dta.sfmflow.flowcomponents.SignUpdaterComponent;
+import dta.sfmflow.flowcomponents.SignUpdaterInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
 import dta.sfmflow.flowcomponents.FluidConditionalComponent;
@@ -257,6 +259,13 @@ public class VanillaSFMFlowClientPlugin {
 			return null;
 		});
 		
+		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER_INVENTORIES_LIST_VARIABLE.get(), (screen, component) -> {
+			if (component instanceof SignUpdaterInventoriesListVariableComponent listVar) {
+				return new SignUpdaterInventoriesListVariableSettingsOverlay(screen, listVar);
+			}
+			return null;
+		});
+		
 		FlowOverlayRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER.get(), (screen, component) -> {
 			return new SignUpdaterSettingsOverlay(screen, component);
 		});
@@ -312,6 +321,7 @@ public class VanillaSFMFlowClientPlugin {
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.FluidInventoriesListProperties());
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.ENERGY_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.EnergyInventoriesListProperties()); 
 		FlowClientRegistry.register(VanillaSFMFlowPlugin.REDSTONE_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.RedstoneInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.SignUpdaterInventoriesListProperties());
 		
 		// =========================================================================
 		// WORKSPACE VALIDATION REGISTRATIONS
@@ -937,6 +947,52 @@ public class VanillaSFMFlowClientPlugin {
 					@Override
 					public @Nullable Component getWarningTooltip(ManagerScreen screen, RedstoneInventoriesListVariableComponent component) {
 						return Component.translatable("gui.sfmflow.warning.empty_redstone_inventories_list");
+					}
+				});
+		
+		WorkspaceValidatorRegistry.register(RedstoneInventoriesListVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<RedstoneInventoriesListVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, RedstoneInventoriesListVariableComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, RedstoneInventoriesListVariableComponent component) {
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, RedstoneInventoriesListVariableComponent component) {
+						return component.getEntries().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, RedstoneInventoriesListVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_redstone_inventories_list");
+					}
+				});
+
+		WorkspaceValidatorRegistry.register(SignUpdaterInventoriesListVariableComponent.class,
+				new WorkspaceValidatorRegistry.INodeValidator<SignUpdaterInventoriesListVariableComponent>() {
+					@Override
+					public boolean hasError(ManagerScreen screen, SignUpdaterInventoriesListVariableComponent component) {
+						return false;
+					}
+
+					@Override
+					public @Nullable Component getErrorTooltip(ManagerScreen screen, SignUpdaterInventoriesListVariableComponent component) {
+						return null;
+					}
+
+					@Override
+					public boolean hasWarning(ManagerScreen screen, SignUpdaterInventoriesListVariableComponent component) {
+						return component.getEntries().isEmpty();
+					}
+
+					@Override
+					public @Nullable Component getWarningTooltip(ManagerScreen screen, SignUpdaterInventoriesListVariableComponent component) {
+						return Component.translatable("gui.sfmflow.warning.empty_sign_updater_inventories_list");
 					}
 				});
 		

@@ -17,6 +17,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -104,8 +105,7 @@ public class PhysicalNetwork {
 	private void performScan(Level level, BlockPos startPos) {
 		long startTime = System.nanoTime();
 
-		// Cleanly unregister previously scanned cables to prevent stale dangling
-		// pointer leaks
+		// Cleanly unregister previously scanned cables to prevent stale dangling pointer leaks [3]
 		for (BlockPos oldCable : this.scannedCables) {
 			CableNetworkRegistry.unregisterCable(level, oldCable);
 		}
@@ -115,7 +115,7 @@ public class PhysicalNetwork {
 
 		BitSet visited = new BitSet();
 
-		// Use fastutil primitive IntArrayList to perform double-buffered layered BFS
+		// Use fastutil primitive IntArrayList to perform double-buffered layered BFS [3]
 		IntArrayList currentLayer = new IntArrayList();
 		IntArrayList nextLayer = new IntArrayList();
 
@@ -130,15 +130,21 @@ public class PhysicalNetwork {
 			mutablePos.set(startPos).move(dir);
 			long adjacentPacked = mutablePos.asLong();
 			BlockState state = level.getBlockState(mutablePos);
+			BlockEntity adjacentBe = level.getBlockEntity(mutablePos);
 
-			// Only allow conductive cables/clusters to extend the pathfinding search
+			// Always evaluate card targets inside adjacent clusters regardless of conduction [3]
+			if (adjacentBe instanceof CableClusterBlockEntity) {
+				evaluateAndAddInventory(level, mutablePos.immutable(), state, 1, visited, true);
+			}
+
+			// Only allow conductive cables/clusters to extend the pathfinding search [3]
 			if (canConductNetwork(level, mutablePos, state)) {
 				int adjacentId = this.networkMap.getOrAddNode(adjacentPacked);
 				visited.set(adjacentId);
 				this.networkMap.addEdge(startId, adjacentId);
 
 				currentLayer.add(adjacentId);
-			} else if (!state.is(ModBlocks.MANAGER_BLOCK.get())) {
+			} else if (!state.is(ModBlocks.MANAGER_BLOCK.get()) && !(adjacentBe instanceof CableClusterBlockEntity)) {
 				evaluateAndAddInventory(level, mutablePos.immutable(), state, 1, visited, false);
 			}
 		}
@@ -165,8 +171,14 @@ public class PhysicalNetwork {
 					}
 
 					BlockState state = level.getBlockState(mutablePos);
+					BlockEntity neighborBe = level.getBlockEntity(mutablePos);
 
-					// Only allow conductive cables/clusters to extend the pathfinding search
+					// Always evaluate card targets inside neighbor clusters regardless of conduction [3]
+					if (neighborBe instanceof CableClusterBlockEntity) {
+						evaluateAndAddInventory(level, mutablePos.immutable(), state, depth + 1, visited, true);
+					}
+
+					// Only allow conductive cables/clusters to extend the pathfinding search [3]
 					if (canConductNetwork(level, mutablePos, state)) {
 						int newNeighborId = this.networkMap.getOrAddNode(neighborPacked);
 						visited.set(newNeighborId);
@@ -174,7 +186,7 @@ public class PhysicalNetwork {
 
 						nextLayer.add(newNeighborId);
 					} else if (this.scannedInventories.size() < maxInventories
-							&& !state.is(ModBlocks.MANAGER_BLOCK.get())) {
+							&& !state.is(ModBlocks.MANAGER_BLOCK.get()) && !(neighborBe instanceof CableClusterBlockEntity)) {
 						evaluateAndAddInventory(level, mutablePos.immutable(), state, depth + 1, visited, false);
 					}
 				}
@@ -187,8 +199,7 @@ public class PhysicalNetwork {
 			depth++;
 		}
 
-		// Batch register all mapped cables in one loop after queue processing completes
-		// [3]
+		// Batch register all mapped cables in one loop after queue processing completes [3]
 		for (BlockPos cablePos : this.scannedCables) {
 			CableNetworkRegistry.registerCable(level, cablePos, startPos);
 		}
@@ -242,7 +253,12 @@ public class PhysicalNetwork {
 
 		BlockEntity be = level.getBlockEntity(pos);
 
-		// If the block is a Cable Cluster, index and add each active card independently [3]
+		// Defensive Guard: If the level block entity is pending, resolve it directly from the chunk map
+		if (be == null && (state.is(ModBlocks.CABLE_CLUSTER_BLOCK.get()) || state.is(ModBlocks.ADVANCED_CABLE_CLUSTER_BLOCK.get()))) {
+			be = level.getChunkAt(pos).getBlockEntity(pos);
+		}
+
+		// If the block is a Cable Cluster, index and add each active card independently
 		if (be instanceof CableClusterBlockEntity cluster) {
 			int numSlots = cluster.getNumSlots();
 			for (int slotIndex = 0; slotIndex < numSlots; slotIndex++) {
@@ -262,8 +278,9 @@ public class PhysicalNetwork {
 					}
 				}
 
-				if (card.is(ModBlocks.REDSTONE_EMITTER_BLOCK.get().asItem())
-						|| card.is(ModBlocks.REDSTONE_RECEIVER_BLOCK.get().asItem())) {
+				// Dynamically identify redstone capabilities using the common redstone cables tag
+				BlockState cardState = Block.byItem(card.getItem()).defaultBlockState();
+				if (cardState.is(ModTags.REDSTONE_CABLES)) {
 					cardCaps.add(ResourceLocation.fromNamespaceAndPath("sfmflow", "redstone"));
 				}
 
@@ -295,7 +312,7 @@ public class PhysicalNetwork {
 					this.scannedInventories.add(connection);
 				}
 			}
-			return;
+			return; // Skip standard block registration for Cable Clusters entirely
 		}
 
 		Set<ResourceLocation> discoveredTypes = new HashSet<>();
@@ -321,7 +338,7 @@ public class PhysicalNetwork {
 			this.networkMap.indexCapability(sculkCapId, posId);
 		}
 
-		// Explicitly scan and index the Sign Updater Cable blocks [3]
+		// Explicitly scan and index the Sign Updater Cable blocks
 		if (state.is(ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get())) {
 			ResourceLocation signUpdaterCapId = ResourceLocation.fromNamespaceAndPath("sfmflow", "sign_updater");
 			discoveredTypes.add(signUpdaterCapId);

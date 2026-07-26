@@ -2,6 +2,7 @@
   "values": [
     "sfmflow:redstone_emitter_block",
     "sfmflow:redstone_receiver_block",
-    "sfmflow:observer_cable_block"
+    "sfmflow:observer_cable_block",
+    "sfmflow:sculk_trigger_cable_block"
   ]
 }

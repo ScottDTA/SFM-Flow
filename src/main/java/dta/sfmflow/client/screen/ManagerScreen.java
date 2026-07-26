@@ -172,6 +172,13 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		return activeBreadcrumbs;
 	}
 	
+	@Override
+	protected void containerTick() {
+		super.containerTick();
+		if (this.menu.getManagerBlockEntity() != null && this.menu.getManagerBlockEntity().pollNeedsRefresh()) {
+			this.refreshWidgetLayout();
+		}
+	}	
 	
 	@Override
 	public void removed() {

@@ -2,6 +2,8 @@
 
 
 ### [Added]
+* Sign Updater List: Added a new variable component allowing multiple Sign Updater Cable block selections to be grouped and referenced together as a single card.
+* Dynamic Overlays for Signs: Sign updater list cards now cycle dynamically through the icons of your configured updater blocks in screens and inventories.
 * Redstone List Card Visuals: Added complete client rendering and tooltip line support for Redstone Inventories List variable cards, which now cycle through the icons of your configured Redstone blocks.
 * Energy Inventories List: Added a new variable component allowing multiple energy storage selections (such as batteries or generators) to be grouped and referenced together as a single card.
 * Dynamic Overlays for Energy: Energy inventory list cards now cycle dynamically through the icons of your configured energy blocks in screens and inventories.
@@ -19,6 +21,7 @@
 * Network Scanning: Updated physical pathfinder scans to properly recognize and index multi-inventory list variable endpoints.
 
 ### [Fixed]
+* Cable Cluster UI Latency: Resolved a visual synchronization bug where changing slot directions or card configurations inside a Cable Cluster block did not update the client-side screen widgets instantly.
 * Ghost Slot Security Lock: Implemented a security block in the Manager menu that prevents dragging, dropping, or shift-moving any list-based variable cards (Item, Fluid, or Energy) into filter ghost slots, eliminating placement issues.
 * Client Tooltip Crashes: Wrapped the variable card tooltip system in a protective try-catch barrier to prevent client crashes if a custom variable handler fails.
 * Rendering State Leaks: Cleanly flushed model rendering batches on the variable card renderer, resolving visual anomalies and glint glitches on item cards.

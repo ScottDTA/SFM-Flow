@@ -779,6 +779,10 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public void onDataPacket(Connection connection, ClientboundBlockEntityDataPacket packet,
 			HolderLookup.Provider registries) {
 		super.onDataPacket(connection, packet, registries);
+		CompoundTag tag = packet.getTag();
+		if (tag != null) {
+			this.loadAdditional(tag, registries);
+		}
 		this.needsRefresh = true;
 	}
 

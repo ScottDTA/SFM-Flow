@@ -37,6 +37,7 @@ import dta.sfmflow.flowcomponents.RedstoneInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.RedstoneTriggerComponent;
 import dta.sfmflow.flowcomponents.SculkTriggerComponent;
 import dta.sfmflow.flowcomponents.SignUpdaterComponent;
+import dta.sfmflow.flowcomponents.SignUpdaterInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.SplitterComponent;
 import dta.sfmflow.networking.packets.clientbound.SyncSignTextPacket;
 import dta.sfmflow.flowcomponents.EnergyTransferComponent;
@@ -108,6 +109,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> FLUID_INVENTORIES_LIST_VARIABLE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INVENTORIES_LIST_VARIABLE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_INVENTORIES_LIST_VARIABLE;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> SIGN_UPDATER_INVENTORIES_LIST_VARIABLE;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -368,6 +370,12 @@ public class VanillaSFMFlowPlugin {
 				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/redstone_trigger_button.png")
 				.displayName("gui.sfmflow.redstone_inventories_list_variable")
 				.codec(RedstoneInventoriesListVariableComponent.CODEC).build(registry);
+		
+		SIGN_UPDATER_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
+				.create("sign_updater_inventories_list_variable", SignUpdaterInventoriesListVariableComponent::new)
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/sign_button.png")
+				.displayName("gui.sfmflow.sign_updater_inventories_list_variable")
+				.codec(SignUpdaterInventoriesListVariableComponent.CODEC).build(registry);
 	}
 
 	/**

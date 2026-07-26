@@ -47,6 +47,8 @@ public class ModLanguageProvider extends LanguageProvider {
 		
 		add("gui.sfmflow.redstone_inventories_list_variable", "Redstone Inventories List");
 		add("gui.sfmflow.warning.empty_redstone_inventories_list", "Redstone inventories list variable cannot be empty!");
+		add("gui.sfmflow.sign_updater_inventories_list_variable", "Sign Updater Inventories List");
+		add("gui.sfmflow.warning.empty_sign_updater_inventories_list", "Sign updater inventories list variable cannot be empty!");
 		
 
 		add("gui.sfmflow.commands", "Commands: %1$s");
