@@ -124,9 +124,9 @@ public class ModBlockStateProvider extends BlockStateProvider {
 		simpleBlockItem(ModBlocks.ENERGY_RELAY_BLOCK.get(), models().cubeAll("energy_relay_block", modLoc("block/energy_relay_block")));
 		
 		BlockModelBuilder signUpdaterModel = models().orientable("sign_updater_cable_block",
-				modLoc("block/observer_cable_side"), // Default side re-use
-				modLoc("block/observer_cable_front"), // Default front re-use
-				modLoc("block/cable_block")); // Default top/back re-use
+				modLoc("block/sign_cable_side"), // Default side re-use
+				modLoc("block/sign_cable_front"), // Default front re-use
+				modLoc("block/sign_cable_side")); // Default top/back re-use
 		directionalBlockFacingNorth(ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get(), signUpdaterModel);
 		simpleBlockItem(ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get(), signUpdaterModel);
 		

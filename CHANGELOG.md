@@ -1,4 +1,14 @@
-7-25-2026
+
+
+7-26-2026
+
+### [Changed]
+* Standardized the visual icons of all Inventories List variable cards (Item, Fluid, Energy, Redstone, and Sign Updater) in the UI drawers to use distinct, dedicated list graphics.
+* Updated Splitter and Collector components to use unique UI menu button icons rather than sharing a generic flow control texture.
+* Modified the Sign Updater Cable block's blockstate model to display sign-themed side and front textures instead of reusing observer assets.
+
+
+7-25-2026 (0.5.19.alpha)
 
 ### [Added]
 * Selector List Filtering: Settings overlays now support slot-binding any Inventories List variable card directly inside the selector widget to filter and display only your listed targets.

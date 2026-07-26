@@ -36,7 +36,7 @@ import java.util.function.Supplier;
 @OnlyIn(Dist.CLIENT)
 public class RedstoneInventoriesListProperties implements INodeClientProperties, IVariableClientProperties {
 	@Override public NodeCategory getCategory() { return NodeCategory.VARIABLE; }
-	@Override public ResourceLocation getIconTexture() { return ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/menu_buttons/redstone_trigger_button.png"); }
+	@Override public ResourceLocation getIconTexture() { return ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "textures/gui/menu_buttons/redstone_list_button.png"); }
 	@Override public Component getDisplayName() { return Component.translatable("gui.sfmflow.redstone_inventories_list_variable"); }
 	@Override public Supplier<Boolean> isEnabled() { return () -> true; }
 

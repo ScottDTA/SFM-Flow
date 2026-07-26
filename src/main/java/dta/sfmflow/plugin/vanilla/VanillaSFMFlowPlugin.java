@@ -188,16 +188,16 @@ public class VanillaSFMFlowPlugin {
 				.displayName("gui.sfmflow.energy_conditional").codec(EnergyConditionalComponent.CODEC).build(registry);
 
 		REDSTONE_CONDITIONAL = FlowComponentBuilder.create("redstone_conditional", RedstoneConditionalComponent::new)
-				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/condition_button.png")
+				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/redstone_condition_button.png")
 				.displayName("gui.sfmflow.redstone_conditional").codec(RedstoneConditionalComponent.CODEC)
 				.build(registry);
 
 		SPLITTER = FlowComponentBuilder.create("splitter", SplitterComponent::new).category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/flow_control_button.png").displayName("gui.sfmflow.splitter")
+				.icon("textures/gui/menu_buttons/splitter_button.png").displayName("gui.sfmflow.splitter")
 				.codec(SplitterComponent.CODEC).build(registry);
 
 		COLLECTOR = FlowComponentBuilder.create("collector", CollectorComponent::new).category(NodeCategory.LOGIC)
-				.icon("textures/gui/menu_buttons/flow_control_button.png").displayName("gui.sfmflow.collector")
+				.icon("textures/gui/menu_buttons/collector_button.png").displayName("gui.sfmflow.collector")
 				.codec(CollectorComponent.CODEC).build(registry);
 
 		SCULK_TRIGGER = FlowComponentBuilder.create("sculk_trigger", SculkTriggerComponent::new)
@@ -209,11 +209,11 @@ public class VanillaSFMFlowPlugin {
 				.codec(GroupComponent.CODEC).build(registry);
 
 		GROUP_INPUT = FlowComponentBuilder.create("group_input", GroupInputComponent::new)
-				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/input_button.png")
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_input_button.png")
 				.displayName("Group Input").codec(GroupInputComponent.CODEC).build(registry);
 
 		GROUP_OUTPUT = FlowComponentBuilder.create("group_output", GroupOutputComponent::new)
-				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/output_button.png")
+				.category(NodeCategory.UTILITY).icon("textures/gui/menu_buttons/group_output_button.png")
 				.displayName("Group Output").codec(GroupOutputComponent.CODEC).build(registry);
 
 		SIGN_UPDATER = FlowComponentBuilder.create("sign_updater", SignUpdaterComponent::new)
@@ -349,31 +349,31 @@ public class VanillaSFMFlowPlugin {
 
 		ITEM_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
 				.create("item_inventories_list_variable", ItemInventoriesListVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/variable_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/list_button.png")
 				.displayName("gui.sfmflow.item_inventories_list_variable")
 				.codec(ItemInventoriesListVariableComponent.CODEC).build(registry);
 		
 		FLUID_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
 				.create("fluid_inventories_list_variable", FluidInventoriesListVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/fluid_variable_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/fluid_list_button.png")
 				.displayName("gui.sfmflow.fluid_inventories_list_variable")
 				.codec(FluidInventoriesListVariableComponent.CODEC).build(registry);
 
 		ENERGY_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
 				.create("energy_inventories_list_variable", EnergyInventoriesListVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/energy_input_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/energy_list_button.png")
 				.displayName("gui.sfmflow.energy_inventories_list_variable")
 				.codec(EnergyInventoriesListVariableComponent.CODEC).build(registry);
 		
 		REDSTONE_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
 				.create("redstone_inventories_list_variable", RedstoneInventoriesListVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/redstone_trigger_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/redstone_list_button.png")
 				.displayName("gui.sfmflow.redstone_inventories_list_variable")
 				.codec(RedstoneInventoriesListVariableComponent.CODEC).build(registry);
 		
 		SIGN_UPDATER_INVENTORIES_LIST_VARIABLE = FlowComponentBuilder
 				.create("sign_updater_inventories_list_variable", SignUpdaterInventoriesListVariableComponent::new)
-				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/sign_button.png")
+				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/sign_list_button.png")
 				.displayName("gui.sfmflow.sign_updater_inventories_list_variable")
 				.codec(SignUpdaterInventoriesListVariableComponent.CODEC).build(registry);
 	}
