@@ -71,6 +71,7 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 	private final int originalGuiScale;
 	private final Minecraft mc;
 	private UUID currentGroupId = null; 
+	private long lastVariablePickupTime = 0L;
 	private final List<BreadcrumbNode> activeBreadcrumbs = new ArrayList<>();
 	public record BreadcrumbNode(String label, @Nullable UUID id, int xStart, int xEnd) {}
 
@@ -170,6 +171,14 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 
 	public List<BreadcrumbNode> getActiveBreadcrumbs() {
 		return activeBreadcrumbs;
+	}
+	
+	public long getLastVariablePickupTime() {
+		return this.lastVariablePickupTime;
+	}
+
+	public void setLastVariablePickupTime(long time) {
+		this.lastVariablePickupTime = time;
 	}
 	
 	@Override
@@ -723,6 +732,20 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 		}
 
 		return Math.max(4, targetY);
+	}
+	
+	@Override
+	protected boolean hasClickedOutside(double mouseX, double mouseY, int guiLeft, int guiTop, int button) {
+		// Symmetrically protect drawer coordinates from triggering out-of-bounds drop transactions
+		for (var renderable : this.renderables) {
+			if (renderable instanceof InventoryDrawerWidget drawer && drawer.visible && drawer.isMouseOver(mouseX, mouseY)) {
+				return false;
+			}
+			if (renderable instanceof VariableDrawerWidget drawer && drawer.visible && drawer.isMouseOver(mouseX, mouseY)) {
+				return false;
+			}
+		}
+		return super.hasClickedOutside(mouseX, mouseY, guiLeft, guiTop, button);
 	}
 
 }

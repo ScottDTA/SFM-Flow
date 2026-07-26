@@ -1,20 +1,33 @@
 package dta.sfmflow.api.client.widget;
 
+import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.IInventoryTarget;
+import dta.sfmflow.block.entity.FilterGhostSlot;
 import dta.sfmflow.client.screen.ManagerScreen;
-import dta.sfmflow.flowcomponents.ItemInventoriesListVariableComponent;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
+import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import dta.sfmflow.util.ConnectionBlock;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,10 +37,14 @@ import java.util.function.Predicate;
 
 /**
  * Reusable side-scrolling UI selector list allowing users to find, search, and
- * select target blocks matching a specific capability registry key.
+ * select target blocks matching a specific capability registry key. Upgraded to
+ * support real-time filtering via custom inventory list variable cards.
  */
 @OnlyIn(Dist.CLIENT)
 public class InventorySelectorWidget extends AbstractFlowWidget {
+	private static final ResourceLocation FILTER_SLOT_TEXTURE = ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+			"textures/gui/flowcomponents/filter_slot.png");
+
 	private final IInventoryTarget model;
 	private ResourceLocation capabilityType;
 	private final ManagerScreen parentScreen;
@@ -36,6 +53,10 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 	private final Predicate<ConnectionBlock> filter;
 
 	private float scrollX = 0.0F;
+
+	// Real-time filtering variables
+	private ItemStack boundListCard = ItemStack.EMPTY;
+	private final List<Integer> allowedInventoryIds = new ArrayList<>();
 
 	public InventorySelectorWidget(int x, int y, IInventoryTarget model, ResourceLocation capabilityType,
 			ManagerScreen parentScreen, Consumer<ConnectionBlock> onSelected) {
@@ -51,10 +72,10 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 		this.onSelected = onSelected;
 		this.filter = filter;
 
-		// Initialize local search box
-		this.searchEdit = new EditBox(parentScreen.getFont(), getX(), getY() + 12, 260, 14,
+		// Shortened local search box to leave space on the right for the filter slot
+		this.searchEdit = new EditBox(parentScreen.getFont(), getX(), getY() + 12, 238, 14,
 				Component.literal("Search"));
-		this.searchEdit.setHint(Component.literal("Search inventories..."));
+		this.searchEdit.setHint(Component.literal("Search..."));
 		this.searchEdit.setCanLoseFocus(true);
 		this.children.add(new ApiWidgetAdapter<>(this.searchEdit));
 	}
@@ -65,8 +86,15 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 
 		List<ConnectionBlock> filtered = new ArrayList<>();
 		for (ConnectionBlock inv : list) {
-			// Pre-filter by our target capability type and dynamic block state filters
+			// Pre-filter by target capability type, dynamic block filters, and active list
+			// variable card selections
 			if (inv.getTypes().contains(capabilityType) && (this.filter == null || this.filter.test(inv))) {
+
+				// Apply active list variable filter if a card is bound
+				if (!this.boundListCard.isEmpty() && !this.allowedInventoryIds.contains(inv.getId())) {
+					continue;
+				}
+
 				String name = inv.getDisplayName(level).getString().toLowerCase(Locale.ROOT);
 				if (query.isEmpty() || name.contains(query)) {
 					filtered.add(inv);
@@ -76,15 +104,61 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 		return filtered;
 	}
 
+	private void bindListCard(ItemStack stack) {
+		this.boundListCard = stack.copy();
+		this.allowedInventoryIds.clear();
+		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+		if (customData != null) {
+			CompoundTag tag = customData.copyTag();
+			if (tag.contains("entries")) {
+				ListTag list = tag.getList("entries", Tag.TAG_COMPOUND);
+				for (int i = 0; i < list.size(); i++) {
+					CompoundTag entryTag = list.getCompound(i);
+					this.allowedInventoryIds.add(entryTag.getInt("inventoryId"));
+				}
+			}
+		}
+		this.resetScroll();
+	}
+
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (!this.visible || !this.active) {
 			return false;
 		}
 
+		// Check variable list filter ghost slot clicks first
+		int slotX = getX() + 242;
+		int slotY = getY() + 10;
+		if (button == 0 && mouseX >= slotX && mouseX < slotX + 18 && mouseY >= slotY && mouseY < slotY + 18) {
+			ItemStack carried = parentScreen.getMenu().getCarried();
+
+			if (!carried.isEmpty() && FilterGhostSlot.isInventoryListCard(carried)) {
+				// Bind the inventories list variable card to filter the selector list
+				bindListCard(carried);
+
+				// Clear the carried cursor stack securely [3]
+				parentScreen.getMenu().setCarried(ItemStack.EMPTY);
+				PacketDistributor.sendToServer(new SyncCarriedItemPacket(ItemStack.EMPTY));
+
+				Minecraft.getInstance().getSoundManager()
+						.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+				return true;
+			} else if (carried.isEmpty() && !this.boundListCard.isEmpty()) {
+				// Just clear the slot and un-filter the list
+				this.boundListCard = ItemStack.EMPTY;
+				this.allowedInventoryIds.clear();
+				this.resetScroll();
+
+				Minecraft.getInstance().getSoundManager()
+						.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+				return true;
+			}
+		}
+
 		for (GuiEventListener child : children) {
 			if (child.mouseClicked(mouseX, mouseY, button)) {
-				this.setFocused(child); // Fix: Set focused child on click so key events propagate
+				this.setFocused(child); // Set focused child on click so key events propagate
 				return true;
 			}
 		}
@@ -140,6 +214,23 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 				widget.active = this.active;
 				widget.render(guiGraphics, mouseX, mouseY, partialTick);
 			}
+		}
+
+		// Render the custom variable list filter slot on the right
+		int slotX = getX() + 242;
+		int slotY = getY() + 10;
+		boolean slotHovered = mouseX >= slotX && mouseX < slotX + 18 && mouseY >= slotY && mouseY < slotY + 18;
+
+		int vOffset = this.boundListCard.isEmpty() ? 0 : 18;
+		guiGraphics.blit(FILTER_SLOT_TEXTURE, slotX, slotY, 0, vOffset, 18, 18, 18, 36);
+
+		if (slotHovered) {
+			guiGraphics.renderOutline(slotX, slotY, 18, 18, 0xFF8B8B8B);
+		}
+
+		if (!this.boundListCard.isEmpty()) {
+			guiGraphics.renderItem(this.boundListCard, slotX + 1, slotY + 1);
+			guiGraphics.renderItemDecorations(parentScreen.getFont(), this.boundListCard, slotX + 1, slotY + 1);
 		}
 
 		Level level = parentScreen.getMenu().getManagerBlockEntity().getLevel();
@@ -216,6 +307,21 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 				}
 			}
 		}
+
+		// Render filter slot tooltip [3]
+		if (slotHovered) {
+			if (FlowLayoutHelper.isWidgetActiveAndOnTop(this, parentScreen)) {
+				if (this.boundListCard.isEmpty()) {
+					guiGraphics.renderTooltip(parentScreen.getFont(),
+							Component.literal("Filter by Inventories List card (Place card here)"), mouseX, mouseY);
+				} else {
+					List<Component> lines = new ArrayList<>();
+					lines.add(this.boundListCard.getHoverName().copy().withStyle(ChatFormatting.LIGHT_PURPLE));
+					lines.add(Component.literal("Click to clear filter").withStyle(ChatFormatting.GRAY));
+					guiGraphics.renderComponentTooltip(parentScreen.getFont(), lines, mouseX, mouseY);
+				}
+			}
+		}
 	}
 
 	@Override
@@ -245,5 +351,4 @@ public class InventorySelectorWidget extends AbstractFlowWidget {
 	public void resetScroll() {
 		this.scrollX = 0.0F;
 	}
-
 }

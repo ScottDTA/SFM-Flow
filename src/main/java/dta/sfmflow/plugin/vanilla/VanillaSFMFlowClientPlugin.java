@@ -6,8 +6,14 @@ import dta.sfmflow.ServerConfig;
 import dta.sfmflow.api.client.DataComponentOverlayRegistry;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.WorkspaceValidatorRegistry;
+import dta.sfmflow.api.client.variable.EnergyInventoriesListProperties;
+import dta.sfmflow.api.client.variable.FluidInventoriesListProperties;
+import dta.sfmflow.api.client.variable.FluidVariableProperties;
+import dta.sfmflow.api.client.variable.ItemInventoriesListProperties;
+import dta.sfmflow.api.client.variable.ItemVariableProperties;
+import dta.sfmflow.api.client.variable.RedstoneInventoriesListProperties;
+import dta.sfmflow.api.client.variable.SignUpdaterInventoriesListProperties;
 import dta.sfmflow.api.component.AbstractFlowComponent;
-import dta.sfmflow.client.render.VariableClientProperties;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.helper.WorkspaceValidator;
 import dta.sfmflow.client.screen.widgets.AdvancedFluidFilterVariableSettingsOverlay;
@@ -315,13 +321,13 @@ public class VanillaSFMFlowClientPlugin {
 		DataComponentOverlayRegistry.register(DataComponents.ENCHANTMENTS, EnchantmentsComponentSettingsModal::new);
 		
 		// Symmetrical registration of specialized variable client properties
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_ITEM_FILTER_VARIABLE.get(), new VariableClientProperties.ItemVariableProperties());
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get(), new VariableClientProperties.FluidVariableProperties());
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.ITEM_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.ItemInventoriesListProperties());
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.FluidInventoriesListProperties());
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.ENERGY_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.EnergyInventoriesListProperties()); 
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.REDSTONE_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.RedstoneInventoriesListProperties());
-		FlowClientRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER_INVENTORIES_LIST_VARIABLE.get(), new VariableClientProperties.SignUpdaterInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_ITEM_FILTER_VARIABLE.get(), new ItemVariableProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.ADVANCED_FLUID_FILTER_VARIABLE.get(), new FluidVariableProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.ITEM_INVENTORIES_LIST_VARIABLE.get(), new ItemInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.FLUID_INVENTORIES_LIST_VARIABLE.get(), new FluidInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.ENERGY_INVENTORIES_LIST_VARIABLE.get(), new EnergyInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.REDSTONE_INVENTORIES_LIST_VARIABLE.get(), new RedstoneInventoriesListProperties());
+		FlowClientRegistry.register(VanillaSFMFlowPlugin.SIGN_UPDATER_INVENTORIES_LIST_VARIABLE.get(), new SignUpdaterInventoriesListProperties());
 		
 		// =========================================================================
 		// WORKSPACE VALIDATION REGISTRATIONS

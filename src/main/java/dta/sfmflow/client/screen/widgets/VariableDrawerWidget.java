@@ -5,6 +5,7 @@ import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.client.widget.ApiWidgetAdapter;
 import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.item.ModItems;
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.math.Axis;
@@ -102,6 +103,20 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 			return false;
 		}
 
+		// Symmetrically clear card from mouse cursor when clicking back into the drawer [3]
+		ItemStack carried = parentScreen.getMenu().getCarried();
+		if (button == 0 && !carried.isEmpty() && carried.is(ModItems.VARIABLE_CARD.get())) {
+			// Enforce a 250ms click cooldown to prevent instant disposal on fast clicks/jitters [3]
+			if (Util.getMillis() - parentScreen.getLastVariablePickupTime() < 250L) {
+				return false;
+			}
+			parentScreen.getMenu().setCarried(ItemStack.EMPTY);
+			PacketDistributor.sendToServer(new SyncCarriedItemPacket(ItemStack.EMPTY));
+			parentScreen.getMinecraft().getSoundManager().play(
+					SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+			return true;
+		}
+
 		if (button == 0 && mouseX >= getX() + width && mouseX < getX() + width + HANDLE_TEX_WIDTH
 				&& mouseY >= getY() - 1 && mouseY < getY() + HANDLE_TEX_HEIGHT - 1) {
 			this.open = !this.open;
@@ -136,6 +151,10 @@ public class VariableDrawerWidget extends AbstractFlowWidget {
 
 					parentScreen.getMenu().setCarried(stack);
 					PacketDistributor.sendToServer(new SyncCarriedItemPacket(stack));
+					parentScreen.setLastVariablePickupTime(Util.getMillis()); // Record pickup timestamp [3]
+
+					parentScreen.getMinecraft().getSoundManager().play(
+							SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 					return true;
 				}
 			}

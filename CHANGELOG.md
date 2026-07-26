@@ -1,7 +1,7 @@
 7-25-2026
 
-
 ### [Added]
+* Selector List Filtering: Settings overlays now support slot-binding any Inventories List variable card directly inside the selector widget to filter and display only your listed targets.
 * Sign Updater List: Added a new variable component allowing multiple Sign Updater Cable block selections to be grouped and referenced together as a single card.
 * Dynamic Overlays for Signs: Sign updater list cards now cycle dynamically through the icons of your configured updater blocks in screens and inventories.
 * Redstone List Card Visuals: Added complete client rendering and tooltip line support for Redstone Inventories List variable cards, which now cycle through the icons of your configured Redstone blocks.
@@ -14,6 +14,7 @@
 * Custom Variable Client Renderers: Implemented extensible client-side property handlers for custom variable cards, supporting tailored central overlays and dynamic multi-line tooltips.
 
 ### [Changed]
+* Drawer Clicks Shielded: Clicks inside the sliding variable or inventory drawer panels are now fully protected from triggering out-of-bounds inventory drops.
 * Performance Optimizations: Redesigned the safety validation check for variable cards to run on a thread-safe memory cache, reducing behind-the-scenes allocations and game lag.
 * Drawer Tooltips: Relocated variable drawer tooltips to a separate, deferred rendering pass, resolving depth-clipping and scissor-culling bugs in the UI.
 * Sign Updater Cable Optimization: Refactored the Sign Updater Cable block to operate as a regular block without tile entity overhead, reducing server resource usage on large networks.
@@ -21,6 +22,7 @@
 * Network Scanning: Updated physical pathfinder scans to properly recognize and index multi-inventory list variable endpoints.
 
 ### [Fixed]
+* Pickup Click Cooldown: Added a short safety delay when clicking variable cards inside drawers, preventing items from being accidentally discarded on fast double-clicks or mouse jitters.
 * Cable Cluster UI Latency: Resolved a visual synchronization bug where changing slot directions or card configurations inside a Cable Cluster block did not update the client-side screen widgets instantly.
 * Ghost Slot Security Lock: Implemented a security block in the Manager menu that prevents dragging, dropping, or shift-moving any list-based variable cards (Item, Fluid, or Energy) into filter ghost slots, eliminating placement issues.
 * Client Tooltip Crashes: Wrapped the variable card tooltip system in a protective try-catch barrier to prevent client crashes if a custom variable handler fails.
