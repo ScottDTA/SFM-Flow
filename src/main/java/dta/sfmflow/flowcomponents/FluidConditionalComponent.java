@@ -33,7 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Conditional logic node that checks the contents of targeted fluid tanks off-thread [3].
+ * Conditional logic node that checks the contents of targeted fluid tanks off-thread.
  */
 public class FluidConditionalComponent extends AbstractFilterableConditionalComponent {
 
@@ -165,13 +165,13 @@ public class FluidConditionalComponent extends AbstractFilterableConditionalComp
 
 	@Override
 	public boolean renderAsFluid() {
-		return true; // Decoupled fluid rendering hook [3]
+		return true;
 	}
 
 	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // Output 0 = True, Output 1 = False [3]
+		int targetOutputIdx = isMet ? 0 : 1;
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -181,14 +181,7 @@ public class FluidConditionalComponent extends AbstractFilterableConditionalComp
 	}
 
 	private boolean evaluateCondition(FlowchartPlanningContext context) {
-		List<ConnectionBlock> inventories = context.getConnectedInventories();
-		ConnectionBlock targetBlock = null;
-		for (ConnectionBlock block : inventories) {
-			if (block.getId() == this.inventoryId && !block.isSleeping()) {
-				targetBlock = block;
-				break;
-			}
-		}
+		ConnectionBlock targetBlock = ConnectionBlock.resolve(context, this.inventoryId);
 		if (targetBlock == null) {
 			return false;
 		}
@@ -296,8 +289,8 @@ public class FluidConditionalComponent extends AbstractFilterableConditionalComp
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-		compoundTag.putString("matchMode", this.matchMode.getSerializedName()); // Case-safety fix [3]
-		compoundTag.putString("operator", this.operator.getSerializedName());   // Case-safety fix [3]
+		compoundTag.putString("matchMode", this.matchMode.getSerializedName());
+		compoundTag.putString("operator", this.operator.getSerializedName());
 		return compoundTag;
 	}
 
@@ -331,7 +324,7 @@ public class FluidConditionalComponent extends AbstractFilterableConditionalComp
 					this.operator = decoded.getOperator();
 				});
 
-		super.loadData(compoundTag); // Load parent class fields [3]
+		super.loadData(compoundTag); // Load parent class fields
 
 		if (compoundTag.contains("matchMode")) {
 			String val = compoundTag.getString("matchMode");

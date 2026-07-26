@@ -11,7 +11,7 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
  * Fluent API builder streamlining the registration of custom flowchart
- * component types [3].
+ * component types.
  */
 public class FlowComponentBuilder {
 	private static final List<FlowComponentBuilder> REGISTERED_BUILDERS = new ArrayList<>();
@@ -30,21 +30,21 @@ public class FlowComponentBuilder {
 	}
 
 	/**
-	 * Instantiates a new builder chain for a designated flowchart node type [3].
+	 * Instantiates a new builder chain for a designated flowchart node type.
 	 *
-	 * @param name    the unique registry identifier path [3]
-	 * @param factory the instantiation factory mapping [3]
-	 * @return a new fluent builder instance [3]
+	 * @param name    the unique registry identifier path
+	 * @param factory the instantiation factory mapping
+	 * @return a new fluent builder instance
 	 */
 	public static FlowComponentBuilder create(String name, Function<UUID, AbstractFlowComponent> factory) {
 		return new FlowComponentBuilder(name, factory);
 	}
 
 	/**
-	 * Configures the node category for visual grouping in the hover menu [3].
+	 * Configures the node category for visual grouping in the hover menu.
 	 *
-	 * @param category the node category classification [3]
-	 * @return the active builder instance [3]
+	 * @param category the node category classification
+	 * @return the active builder instance
 	 */
 	public FlowComponentBuilder category(NodeCategory category) {
 		this.category = category;
@@ -52,11 +52,10 @@ public class FlowComponentBuilder {
 	}
 
 	/**
-	 * Configures the relative icon texture asset path for client-side rendering
-	 * [3].
+	 * Configures the relative icon texture asset path for client-side rendering.
 	 *
-	 * @param iconPath the relative path [3]
-	 * @return the active builder instance [3]
+	 * @param iconPath the relative path
+	 * @return the active builder instance
 	 */
 	public FlowComponentBuilder icon(String iconPath) {
 		this.iconPath = iconPath;
@@ -64,10 +63,10 @@ public class FlowComponentBuilder {
 	}
 
 	/**
-	 * Configures the localized display translation key [3].
+	 * Configures the localized display translation key.
 	 *
-	 * @param displayNameKey the translation bundle key path [3]
-	 * @return the active builder instance [3]
+	 * @param displayNameKey the translation bundle key path
+	 * @return the active builder instance
 	 */
 	public FlowComponentBuilder displayName(String displayNameKey) {
 		this.displayNameKey = displayNameKey;
@@ -75,10 +74,10 @@ public class FlowComponentBuilder {
 	}
 
 	/**
-	 * Configures the declarative codec mapped to this component type [3].
+	 * Configures the declarative codec mapped to this component type.
 	 *
-	 * @param codec the subclass map codec [3]
-	 * @return the active builder instance [3]
+	 * @param codec the subclass map codec
+	 * @return the active builder instance
 	 */
 	public FlowComponentBuilder codec(MapCodec<? extends AbstractFlowComponent> codec) {
 		this.codec = codec;
@@ -86,10 +85,10 @@ public class FlowComponentBuilder {
 	}
 
 	/**
-	 * Builds and enqueues the component type into the NeoForge registry system [3].
+	 * Builds and enqueues the component type into the NeoForge registry system.
 	 *
-	 * @param registry the DeferredRegister manager [3]
-	 * @return the registered holder containing the flow component type [3]
+	 * @param registry the DeferredRegister manager
+	 * @return the registered holder containing the flow component type
 	 */
 	public DeferredHolder<FlowComponentType, FlowComponentType> build(DeferredRegister<FlowComponentType> registry) {
 		this.holder = registry.register(name, () -> new FlowComponentType(factory, codec));

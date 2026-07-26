@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Conditional logic node that checks the Forge Energy (FE) levels of targeted blocks off-thread [3].
+ * Conditional logic node that checks the Forge Energy (FE) levels of targeted blocks off-thread.
  */
 public class EnergyConditionalComponent extends AbstractConditionalComponent {
 
@@ -115,7 +115,7 @@ public class EnergyConditionalComponent extends AbstractConditionalComponent {
 	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // Output 0 = True, Output 1 = False [3]
+		int targetOutputIdx = isMet ? 0 : 1; // Output 0 = True, Output 1 = False
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -125,14 +125,7 @@ public class EnergyConditionalComponent extends AbstractConditionalComponent {
 	}
 
 	private boolean evaluateCondition(FlowchartPlanningContext context) {
-		List<ConnectionBlock> inventories = context.getConnectedInventories();
-		ConnectionBlock targetBlock = null;
-		for (ConnectionBlock block : inventories) {
-			if (block.getId() == this.inventoryId && !block.isSleeping()) {
-				targetBlock = block;
-				break;
-			}
-		}
+		ConnectionBlock targetBlock = ConnectionBlock.resolve(context, this.inventoryId);
 		if (targetBlock == null) {
 			return false;
 		}
@@ -163,7 +156,7 @@ public class EnergyConditionalComponent extends AbstractConditionalComponent {
 	@Override
 	public CompoundTag saveData(CompoundTag compoundTag) {
 		super.saveData(compoundTag);
-		compoundTag.putString("operator", this.operator.getSerializedName()); // Case-safety fix [3]
+		compoundTag.putString("operator", this.operator.getSerializedName()); // Case-safety fix
 		compoundTag.putInt("threshold", this.threshold);
 		return compoundTag;
 	}
@@ -183,7 +176,7 @@ public class EnergyConditionalComponent extends AbstractConditionalComponent {
 					this.threshold = decoded.getThreshold();
 				});
 
-		super.loadData(compoundTag); // Load parent class fields [3]
+		super.loadData(compoundTag); // Load parent class fields
 
 		if (compoundTag.contains("operator")) {
 			String val = compoundTag.getString("operator");

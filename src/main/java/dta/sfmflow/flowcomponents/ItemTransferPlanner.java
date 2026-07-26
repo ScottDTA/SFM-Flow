@@ -119,15 +119,7 @@ public final class ItemTransferPlanner {
 
 	private static void extractItemsIntoBuffer(FlowchartPlanningContext context, ItemTransferComponent component,
 			FlowItemBuffer buffer) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock srcInventory = null;
-
-		for (var block : inventories) {
-			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
-				srcInventory = block;
-				break;
-			}
-		}
+		ConnectionBlock srcInventory = ConnectionBlock.resolve(context, component.getInventoryId());
 
 		if (srcInventory == null) {
 			return;
@@ -229,15 +221,7 @@ public final class ItemTransferPlanner {
 
 	private static void depositItemsFromBuffer(FlowchartPlanningContext context, ItemTransferComponent component,
 			FlowItemBuffer inputBuffer, FlowItemBuffer outputBuffer) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock tgtInventory = null;
-
-		for (var block : inventories) {
-			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
-				tgtInventory = block;
-				break;
-			}
-		}
+		ConnectionBlock tgtInventory = ConnectionBlock.resolve(context, component.getInventoryId());
 
 		if (tgtInventory == null) {
 			for (FlowItemBuffer.BufferedItem item : inputBuffer.getItems()) {

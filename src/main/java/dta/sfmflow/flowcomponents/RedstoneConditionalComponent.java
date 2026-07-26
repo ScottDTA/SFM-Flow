@@ -112,7 +112,7 @@ public class RedstoneConditionalComponent extends AbstractConditionalComponent i
 	@Override
 	public void plan(FlowchartPlanningContext context) {
 		boolean isMet = evaluateCondition(context);
-		int targetOutputIdx = isMet ? 0 : 1; // True = Output 0, False = Output 1 [3]
+		int targetOutputIdx = isMet ? 0 : 1; // True = Output 0, False = Output 1
 
 		for (FlowComponentConnections conn : context.getConnections()) {
 			if (conn.getSourceComponentId().equals(this.getId()) && conn.getOutputNodeIndex() == targetOutputIdx) {
@@ -122,14 +122,7 @@ public class RedstoneConditionalComponent extends AbstractConditionalComponent i
 	}
 
 	private boolean evaluateCondition(FlowchartPlanningContext context) {
-		List<ConnectionBlock> inventories = context.getConnectedInventories();
-		ConnectionBlock targetBlock = null;
-		for (ConnectionBlock block : inventories) {
-			if (block.getId() == this.inventoryId && !block.isSleeping()) {
-				targetBlock = block;
-				break;
-			}
-		}
+		ConnectionBlock targetBlock = ConnectionBlock.resolve(context, this.inventoryId);
 		if (targetBlock == null) {
 			return false;
 		}
@@ -184,7 +177,7 @@ public class RedstoneConditionalComponent extends AbstractConditionalComponent i
 
 		ListTag opsList = new ListTag();
 		for (RedstoneTriggerComponent.Operator op : operators) {
-			opsList.add(StringTag.valueOf(op.getSerializedName())); // Case-safety fix [3]
+			opsList.add(StringTag.valueOf(op.getSerializedName())); // Case-safety fix
 		}
 		compoundTag.put("operators", opsList);
 
@@ -209,7 +202,7 @@ public class RedstoneConditionalComponent extends AbstractConditionalComponent i
 					}
 				});
 
-		super.loadData(compoundTag); // Load parent class fields [3]
+		super.loadData(compoundTag); // Load parent class fields
 
 		if (compoundTag.contains("requiresAll")) {
 			this.requiresAll = compoundTag.getBoolean("requiresAll");

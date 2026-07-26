@@ -180,14 +180,7 @@ public class ItemConditionalComponent extends AbstractFilterableConditionalCompo
 	}
 
 	private boolean evaluateCondition(FlowchartPlanningContext context) {
-		List<ConnectionBlock> inventories = context.getConnectedInventories();
-		ConnectionBlock targetBlock = null;
-		for (ConnectionBlock block : inventories) {
-			if (block.getId() == this.inventoryId && !block.isSleeping()) {
-				targetBlock = block;
-				break;
-			}
-		}
+		ConnectionBlock targetBlock = ConnectionBlock.resolve(context, this.inventoryId);
 		if (targetBlock == null) {
 			return false;
 		}

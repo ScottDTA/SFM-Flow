@@ -10,6 +10,7 @@ import java.util.Set;
 
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -87,6 +88,25 @@ public class ConnectionBlock implements IContainerSelection {
 		this.slotIndex = other.slotIndex;
 		this.cardStack = other.cardStack != null ? other.cardStack.copy() : ItemStack.EMPTY;
 		this.direction = other.direction;
+	}
+	
+	public static @Nullable ConnectionBlock resolve(FlowchartPlanningContext context, int inventoryId) {
+		for (var comp : context.getComponents().values()) {
+			if (comp.getId().hashCode() == inventoryId) {
+				ResourceLocation key = ResourceLocation.fromNamespaceAndPath("sfmflow", "active_foreach_block");
+				Object obj = context.getPipelineBuffer(comp.getId(), key);
+				if (obj instanceof ConnectionBlock block) {
+					return block;
+				}
+				return null;
+			}
+		}
+		for (ConnectionBlock block : context.getConnectedInventories()) {
+			if (block.getId() == inventoryId && !block.isSleeping()) {
+				return block;
+			}
+		}
+		return null;
 	}
 
 	public @Nullable Direction getDirection() {

@@ -1,8 +1,10 @@
-
-
 7-26-2026
 
+### [Added]
+* Added support for dynamic block resolution, allowing the automation pipeline to evaluate virtual inventory references. This prepares the planning kernel to support "For Each" loop execution paths over grouped machines.
+
 ### [Changed]
+* Refactored all transfer planners (Item, Fluid, Energy) and logical conditional nodes to resolve their targets dynamically at runtime rather than matching only static connected blocks.
 * Standardized the visual icons of all Inventories List variable cards (Item, Fluid, Energy, Redstone, and Sign Updater) in the UI drawers to use distinct, dedicated list graphics.
 * Updated Splitter and Collector components to use unique UI menu button icons rather than sharing a generic flow control texture.
 * Modified the Sign Updater Cable block's blockstate model to display sign-themed side and front textures instead of reusing observer assets.

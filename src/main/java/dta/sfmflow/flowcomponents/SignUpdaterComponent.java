@@ -176,15 +176,7 @@ public class SignUpdaterComponent extends AbstractFlowComponent implements IInve
 
 	@Override
 	public void plan(FlowchartPlanningContext context) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock targetBlock = null;
-
-		for (var block : inventories) {
-			if (block.getId() == this.inventoryId && !block.isSleeping()) {
-				targetBlock = block;
-				break;
-			}
-		}
+		ConnectionBlock targetBlock = ConnectionBlock.resolve(context, this.inventoryId);
 
 		if (targetBlock != null) {
 			BlockPos updaterPos = targetBlock.getBlockPos();

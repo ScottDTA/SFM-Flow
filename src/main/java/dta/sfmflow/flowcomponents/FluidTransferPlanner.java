@@ -159,15 +159,7 @@ public final class FluidTransferPlanner {
 
 	private static void extractFluidsIntoBuffer(FlowchartPlanningContext context, FluidTransferComponent component,
 			FlowFluidBuffer buffer) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock srcInventory = null;
-
-		for (var block : inventories) {
-			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
-				srcInventory = block;
-				break;
-			}
-		}
+		ConnectionBlock srcInventory = ConnectionBlock.resolve(context, component.getInventoryId());
 
 		if (srcInventory == null) {
 			return;
@@ -249,15 +241,7 @@ public final class FluidTransferPlanner {
 
 	private static void depositFluidsFromBuffer(FlowchartPlanningContext context, FluidTransferComponent component,
 			FlowFluidBuffer inputBuffer, FlowFluidBuffer outputBuffer) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock tgtInventory = null;
-
-		for (var block : inventories) {
-			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
-				tgtInventory = block;
-				break;
-			}
-		}
+		ConnectionBlock tgtInventory = ConnectionBlock.resolve(context, component.getInventoryId());
 
 		if (tgtInventory == null) {
 			for (FlowFluidBuffer.BufferedFluid fluid : inputBuffer.getFluids()) {

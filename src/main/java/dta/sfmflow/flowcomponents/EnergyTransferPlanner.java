@@ -18,7 +18,7 @@ import java.util.UUID;
 
 /**
  * Common, stateless helper consolidating energy transfer simulation, extraction, and
- * deposition planning routines utilizing thread-safe snapshots [3].
+ * deposition planning routines utilizing thread-safe snapshots.
  */
 public final class EnergyTransferPlanner {
 
@@ -46,7 +46,7 @@ public final class EnergyTransferPlanner {
 	public static void planInput(FlowchartPlanningContext context, EnergyTransferComponent component) {
 		FlowEnergyBuffer myOutputBuffer = new FlowEnergyBuffer();
 
-		// Carry over any incoming energy from upstream nodes [3]
+		// Carry over any incoming energy from upstream nodes
 		FlowEnergyBuffer myInputBuffer = context.getEnergyComponentBuffer(component.getId());
 		if (!myInputBuffer.isEmpty()) {
 			for (FlowEnergyBuffer.BufferedEnergy energy : myInputBuffer.getEnergies()) {
@@ -54,10 +54,10 @@ public final class EnergyTransferPlanner {
 			}
 		}
 
-		// Extract energy from our configured energy block into the combined buffer [3]
+		// Extract energy from our configured energy block into the combined buffer
 		extractEnergyIntoBuffer(context, component, myOutputBuffer);
 
-		// Copy extracted buffer contents onto connected target input buffers sequentially [3]
+		// Copy extracted buffer contents onto connected target input buffers sequentially
 		if (!myOutputBuffer.isEmpty()) {
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
@@ -80,7 +80,7 @@ public final class EnergyTransferPlanner {
 			FlowEnergyBuffer myOutputBuffer = new FlowEnergyBuffer();
 			depositEnergyFromBuffer(context, component, myInputBuffer, myOutputBuffer);
 
-			// Propagate remaining un-deposited leftovers downstream along the connection lines [3]
+			// Propagate remaining un-deposited leftovers downstream along the connection lines
 			for (var conn : context.getConnections()) {
 				if (conn.getSourceComponentId().equals(component.getId())) {
 					UUID targetId = conn.getTargetComponentId();
@@ -96,15 +96,7 @@ public final class EnergyTransferPlanner {
 	}
 
 	private static void extractEnergyIntoBuffer(FlowchartPlanningContext context, EnergyTransferComponent component, FlowEnergyBuffer buffer) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock srcInventory = null;
-
-		for (var block : inventories) {
-			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
-				srcInventory = block;
-				break;
-			}
-		}
+		ConnectionBlock srcInventory = ConnectionBlock.resolve(context, component.getInventoryId());
 
 		if (srcInventory == null) {
 			return;
@@ -138,7 +130,7 @@ public final class EnergyTransferPlanner {
 			if (toExtract > 0) {
 				FlowLogger.execution("Simulating Energy Extract from %s: Side=%s, Amount=%d", srcPos, srcSide, toExtract);
 
-				// Track simulated extraction changes [3]
+				// Track simulated extraction changes
 				EnergyKey key = new EnergyKey(srcPos, srcSide);
 				simulatedEnergy.put(key, currentEnergy - toExtract);
 
@@ -149,15 +141,7 @@ public final class EnergyTransferPlanner {
 
 	private static void depositEnergyFromBuffer(FlowchartPlanningContext context, EnergyTransferComponent component,
 			FlowEnergyBuffer inputBuffer, FlowEnergyBuffer outputBuffer) {
-		var inventories = context.getConnectedInventories();
-		ConnectionBlock tgtInventory = null;
-
-		for (var block : inventories) {
-			if (block.getId() == component.getInventoryId() && !block.isSleeping()) {
-				tgtInventory = block;
-				break;
-			}
-		}
+		ConnectionBlock tgtInventory = ConnectionBlock.resolve(context, component.getInventoryId());
 
 		if (tgtInventory == null) {
 			for (FlowEnergyBuffer.BufferedEnergy energy : inputBuffer.getEnergies()) {
@@ -205,7 +189,7 @@ public final class EnergyTransferPlanner {
 					if (success) {
 						FlowLogger.execution("Simulating Energy Deposit to %s: Side=%s, Amount=%d", tgtPos, tgtSide, toDeposit);
 
-						// Track simulated deposit changes [3]
+						// Track simulated deposit changes
 						EnergyKey key = new EnergyKey(tgtPos, tgtSide);
 						simulatedEnergy.put(key, currentEnergy + toDeposit);
 
