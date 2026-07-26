@@ -2,11 +2,13 @@ package dta.sfmflow.api.client.widget;
 
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.SideConfigPopupRegistry;
+import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.Preview3DRenderer;
 import dta.sfmflow.client.render.SceneProjectionHelper; // Import added [3]
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.flowcomponents.ForEachComponent;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -26,6 +28,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -224,8 +227,29 @@ public class BlockPreview3DWidget extends AbstractFlowWidget {
 			RenderSystem.depthMask(true);
 			RenderSystem.enableDepthTest();
 		} else {
-			guiGraphics.drawCenteredString(parentScreen.getFont(), "NO", centerX, centerY - 10, 0xFF8B8B8B);
-			guiGraphics.drawCenteredString(parentScreen.getFont(), "PREVIEW", centerX, centerY + 2, 0xFF8B8B8B);
+			boolean isForEachElement = false;
+			String elemName = "";
+			if (sideModel instanceof IInventoryTarget target) {
+				int selectedId = target.getInventoryId();
+				if (selectedId != -1) {
+					for (var comp : parentScreen.getMenu().getManagerBlockEntity().getFlowComponents().values()) {
+						if (comp instanceof ForEachComponent forEach && forEach.getId().hashCode() == selectedId) {
+							isForEachElement = true;
+							elemName = forEach.getElementName();
+							break;
+						}
+					}
+				}
+			}
+
+			if (isForEachElement) {
+				guiGraphics.drawCenteredString(parentScreen.getFont(), "USING ELEMENT:", centerX, centerY - 15, 0xFF8B8B8B);
+				guiGraphics.drawCenteredString(parentScreen.getFont(), elemName.toUpperCase(Locale.ROOT), centerX, centerY - 3, 0xFFD4AF37); // Gold text
+				guiGraphics.drawCenteredString(parentScreen.getFont(), "FROM FOREACH LOOP", centerX, centerY + 9, 0xFF8B8B8B);
+			} else {
+				guiGraphics.drawCenteredString(parentScreen.getFont(), "NO", centerX, centerY - 10, 0xFF8B8B8B);
+				guiGraphics.drawCenteredString(parentScreen.getFont(), "PREVIEW", centerX, centerY + 2, 0xFF8B8B8B);
+			}
 		}
 
 		guiGraphics.pose().pushPose();

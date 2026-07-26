@@ -12,8 +12,8 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 /**
  * Client-only graphic rendering utility class that draws smooth, orthogonal cubic Bezier
- * connection lines (S-curves) between component node input and output pins [3].
- * Aligned with the Painter's Algorithm: executes zero Z-shifts to render directly on background [3].
+ * connection lines (S-curves) between component node input and output pins.
+ * Aligned with the Painter's Algorithm: executes zero Z-shifts to render directly on background.
  */
 @OnlyIn(Dist.CLIENT)
 public final class VectorWireRenderer {
@@ -22,13 +22,13 @@ public final class VectorWireRenderer {
 
     /**
      * Loops through the screen flowchart's active wires, resolves node targets, computes Bezier geometries,
-     * blends hexadecimal gradient colors, and draws dense anti-aliased connection lines [3].
+     * blends hexadecimal gradient colors, and draws dense anti-aliased connection lines.
      *
-     * @param guiGraphics the game rendering canvas [3]
-     * @param screen the active manager screen interface [3]
-     * @param mouseX current cursor horizontal offset [3]
-     * @param mouseY current cursor vertical offset [3]
-     * @param partialTick partial frame ticker [3]
+     * @param guiGraphics the game rendering canvas
+     * @param screen the active manager screen interface
+     * @param mouseX current cursor horizontal offset
+     * @param mouseY current cursor vertical offset
+     * @param partialTick partial frame ticker
      */
     public static void renderWires(GuiGraphics guiGraphics, ManagerScreen screen, int mouseX, int mouseY, float partialTick) {
         var manager = screen.getMenu().getManagerBlockEntity();
@@ -53,8 +53,14 @@ public final class VectorWireRenderer {
                 AbstractFlowComponent src = srcContainer.getComponent();
                 AbstractFlowComponent tgt = tgtContainer.getComponent();
 
+                boolean isRightPin = src.isRightOutput(conn.getOutputNodeIndex());
+
                 int srcPinX = srcContainer.getX() + FlowLayoutHelper.getOutputOffset(src, conn.getOutputNodeIndex()) + 3;
-                int srcPinY = srcContainer.getY() + 23;
+                int srcPinY = srcContainer.getY() + FlowLayoutHelper.getOutputYOffset(src, conn.getOutputNodeIndex()) + 3;
+
+                if (isRightPin) {
+                    srcPinX += 6; // Shift wire start coordinate out to the tip of the shifted pin
+                }
 
                 int tgtPinX = tgtContainer.getX() + FlowLayoutHelper.getInputOffset(tgt, conn.getInputNodeIndex()) + 3;
                 int tgtPinY = tgtContainer.getY() - 3;
@@ -76,10 +82,8 @@ public final class VectorWireRenderer {
 
                 int steps = Math.max(64, Math.min(400, (int) (distance * 1.5F)));
 
-                float deltaY = Math.max(12.0F, Math.abs(tgtPinY - srcPinY) / 2.0F);
-
                 guiGraphics.pose().pushPose();
-                // Flat 0.0F translation: painter's algorithm handles correct draw sorting [3]
+                // Flat 0.0F translation: painter's algorithm handles correct draw sorting
                 guiGraphics.pose().translate(0.0F, 0.0F, 0.0F);
 
                 for (int i = 0; i <= steps; i++) {
@@ -90,8 +94,17 @@ public final class VectorWireRenderer {
                     float t2 = t * t;
                     float t3 = t2 * t;
 
-                    float x = mt3 * srcPinX + 3.0F * mt2 * t * srcPinX + 3.0F * mt * t2 * tgtPinX + t3 * tgtPinX;
-                    float y = mt3 * srcPinY + 3.0F * mt2 * t * (srcPinY + deltaY) + 3.0F * mt * t2 * (tgtPinY - deltaY) + t3 * tgtPinY;
+                    float x, y;
+                    if (isRightPin) {
+                        float deltaX = Math.max(12.0F, Math.abs(tgtPinX - srcPinX) / 2.0F);
+                        float deltaY = Math.max(12.0F, Math.abs(tgtPinY - srcPinY) / 2.0F);
+                        x = mt3 * srcPinX + 3.0F * mt2 * t * (srcPinX + deltaX) + 3.0F * mt * t2 * tgtPinX + t3 * tgtPinX;
+                        y = mt3 * srcPinY + 3.0F * mt2 * t * srcPinY + 3.0F * mt * t2 * (tgtPinY - deltaY) + t3 * tgtPinY;
+                    } else {
+                        float deltaY = Math.max(12.0F, Math.abs(tgtPinY - srcPinY) / 2.0F);
+                        x = mt3 * srcPinX + 3.0F * mt2 * t * srcPinX + 3.0F * mt * t2 * tgtPinX + t3 * tgtPinX;
+                        y = mt3 * srcPinY + 3.0F * mt2 * t * (srcPinY + deltaY) + 3.0F * mt * t2 * (tgtPinY - deltaY) + t3 * tgtPinY;
+                    }
 
                     int r = (int) (mt * r0 + t * r3);
                     int g = (int) (mt * g0 + t * g3);

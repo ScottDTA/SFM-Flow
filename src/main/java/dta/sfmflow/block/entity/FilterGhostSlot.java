@@ -37,6 +37,16 @@ public class FilterGhostSlot extends Slot {
 	@Override
 	public ItemStack getItem() {
 		AbstractFlowComponent comp = menu.getActiveComponent();
+		if (comp != null && comp.acceptsInventoryListCards()) {
+			UUID varId = comp.getBoundInventoryListVariableId();
+			if (varId != null) {
+				var listComp = menu.getManagerBlockEntity().getFlowComponents().get(varId);
+				if (listComp instanceof IFlowchartVariable flowchartVar) {
+					return flowchartVar.toItemStack();
+				}
+			}
+			return ItemStack.EMPTY;
+		}
 		if (comp instanceof IGhostSlotAware aware && filterIndex < aware.getGhostSlotCount()) {
 			return aware.getGhostStack(filterIndex);
 		}
@@ -46,9 +56,14 @@ public class FilterGhostSlot extends Slot {
 	@Override
 	public void set(ItemStack stack) {
 		AbstractFlowComponent comp = menu.getActiveComponent();
+		if (comp != null && comp.acceptsInventoryListCards()) {
+			UUID varId = VariableCardItem.getVariableId(stack);
+			comp.setBoundInventoryListVariableId(varId);
+			menu.getManagerBlockEntity().setChanged();
+			return;
+		}
 		if (comp instanceof IGhostSlotAware aware && filterIndex < aware.getGhostSlotCount()) {
-			// Symmetrical Guard: Block setting inventory list variables into filter ghost slots
-			if (isInventoryListCard(stack)) {
+			if (isInventoryListCard(stack) && !comp.acceptsInventoryListCards()) {
 				return;
 			}
 			aware.setGhostStack(filterIndex, stack);

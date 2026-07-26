@@ -3,6 +3,7 @@ package dta.sfmflow.client.screen.widgets;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.screen.helper.FlowLayoutHelper;
 import dta.sfmflow.util.NodeCount;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
@@ -56,13 +57,10 @@ public class FlowWidgetContainer extends AbstractFlowWidget {
 
 		// Only calculate spacings and spawn pins if the component actually has active ports
 		if (component.hasOutputNodes() && component.getNumOutputs() > 0) {
-			int baseY = this.getY() + 20;
-			NodeCount nodeCount = NodeCount.getForCount(component.getNumOutputs());
-			int[] spacing = nodeCount.getOffsets(false);
 			for (int i = 0; i < component.getNumOutputs(); i++) {
-				int xOffset = spacing[i];
-				int finalX = getX() + xOffset;
-				FlowWidgetOutputNode pin = new FlowWidgetOutputNode(i, this, finalX, baseY);
+				int finalX = this.getX() + FlowLayoutHelper.getOutputOffset(component, i);
+				int finalY = this.getY() + FlowLayoutHelper.getOutputYOffset(component, i);
+				FlowWidgetOutputNode pin = new FlowWidgetOutputNode(i, this, finalX, finalY);
 				Component pinTooltip = component.getOutputNodeTooltip(i);
 				if (pinTooltip != null) {
 					pin.setCustomTooltip(Tooltip.create(pinTooltip));

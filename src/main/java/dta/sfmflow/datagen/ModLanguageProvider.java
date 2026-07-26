@@ -37,19 +37,27 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.sign_updater", "Sign Updater");
 		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
 		add("container.sfmflow.cable_cluster", "Cable Cluster");
-		
+
 		add("gui.sfmflow.item_inventories_list_variable", "Item Inventories List");
 		add("gui.sfmflow.warning.empty_inventories_list", "Inventories list variable cannot be empty!");
 		add("gui.sfmflow.fluid_inventories_list_variable", "Fluid Inventories List");
 		add("gui.sfmflow.warning.empty_fluid_inventories_list", "Fluid inventories list variable cannot be empty!");
 		add("gui.sfmflow.energy_inventories_list_variable", "Energy Inventories List");
 		add("gui.sfmflow.warning.empty_energy_inventories_list", "Energy inventories list variable cannot be empty!");
-		
+
 		add("gui.sfmflow.redstone_inventories_list_variable", "Redstone Inventories List");
-		add("gui.sfmflow.warning.empty_redstone_inventories_list", "Redstone inventories list variable cannot be empty!");
+		add("gui.sfmflow.warning.empty_redstone_inventories_list",
+				"Redstone inventories list variable cannot be empty!");
 		add("gui.sfmflow.sign_updater_inventories_list_variable", "Sign Updater Inventories List");
-		add("gui.sfmflow.warning.empty_sign_updater_inventories_list", "Sign updater inventories list variable cannot be empty!");
-		
+		add("gui.sfmflow.warning.empty_sign_updater_inventories_list",
+				"Sign updater inventories list variable cannot be empty!");
+
+		add("gui.sfmflow.foreach_loop", "ForEach Loop");
+		add("sfmflow.configuration.maxChainedForEach", "Max Chained ForEach Loops");
+		add("sfmflow.configuration.maxChainedForEach.tooltip",
+				"The maximum number of consecutive ForEach loop components that can be nested or chained together in a single execution path to prevent server budget starvation.");
+		add("gui.sfmflow.error.foreach_chain_limit",
+				"Consecutive ForEach loop limit exceeded! Max allowed chained loops: %s");
 
 		add("gui.sfmflow.commands", "Commands: %1$s");
 		add("gui.sfmflow.error.empty_whitelist", "Active whitelist cannot be completely empty!");
@@ -71,21 +79,21 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.redstone_trigger.output.on_high_pulse", "On High Pulse");
 		add("gui.sfmflow.redstone_trigger.output.on_low_pulse", "On Low Pulse");
 		add("gui.sfmflow.redstone_emitter", "Redstone Emitter");
-		add("gui.sfmflow.item_conditional", "Item Conditional");		
+		add("gui.sfmflow.item_conditional", "Item Conditional");
 		add("gui.sfmflow.fluid_conditional", "Fluid Conditional");
 		add("gui.sfmflow.energy_conditional", "Energy Conditional");
 		add("gui.sfmflow.redstone_conditional", "Redstone Conditional");
 		add("gui.sfmflow.splitter", "Splitter");
 		add("gui.sfmflow.collector", "Collector");
-		
+
 		add("block.sfmflow.sculk_trigger_cable_block", "Sculk Trigger Cable");
 		add("gui.sfmflow.sculk_trigger", "Sculk Trigger");
-		
+
 		add("gui.sfmflow.observer_trigger", "Observer Trigger");
-		
+
 		add("gui.sfmflow.redstone_trigger", "Redstone Trigger");
-		add("block.sfmflow.redstone_trigger", "Redstone Trigger");		
-		
+		add("block.sfmflow.redstone_trigger", "Redstone Trigger");
+
 		add("gui.sfmflow.loading", "%1$s REQUESTS LOADING...");
 
 		add("gui.sfmflow.menu.camo", "Camouflage");
@@ -224,19 +232,17 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("sfmflow.configuration.section.sfmflow.server.toml.title", "SFM-Flow Server Configs");
 		add("sfmflow.configuration.general", "General Client Settings");
 		add("sfmflow.configuration.general.button", "Configure General Settings");
-		add("sfmflow.configuration.general.tooltip", 
-				"Configure core client UI rendering and scaling behaviors.");
-		
+		add("sfmflow.configuration.general.tooltip", "Configure core client UI rendering and scaling behaviors.");
+
 		add("sfmflow.configuration.limits", "Performance Limits");
 		add("sfmflow.configuration.limits.button", "Configure Limits");
-		add("sfmflow.configuration.limits.tooltip", 
+		add("sfmflow.configuration.limits.tooltip",
 				"Configure scanning thresholds and workspace restrictions to protect server performance.");
 
 		// Execution Budget Option
 		add("sfmflow.configuration.maxExecutionBudgetUs", "Max Execution Budget (Microseconds)");
-		add("sfmflow.configuration.maxExecutionBudgetUs.tooltip", 
+		add("sfmflow.configuration.maxExecutionBudgetUs.tooltip",
 				"The maximum time budget (in microseconds) per Manager block per tick to execute transfer tasks.");
-		
 
 		add("sfmflow.configuration.text", "Label Text Hex");
 		add("sfmflow.configuration.text.button", "Edit Text Color");
@@ -251,11 +257,13 @@ public class ModLanguageProvider extends LanguageProvider {
 
 		add("sfmflow.configuration.yellow", "Yellow");
 		add("sfmflow.configuration.yellow.button", "Yellow Settings");
-		add("sfmflow.configuration.yellow.tooltip", "Custom color overrides for the yellow mask.");		
-		
+		add("sfmflow.configuration.yellow.tooltip", "Custom color overrides for the yellow mask.");
+
 		add("sfmflow.configuration.maxChainedSplitters", "Max Chained Splitters");
-		add("sfmflow.configuration.maxChainedSplitters.tooltip", "The maximum number of consecutive Splitter components that can be chained together in a single execution path to prevent server budget starvation.");
-		add("gui.sfmflow.error.splitter_chain_limit", "Consecutive splitter limit exceeded! Max allowed chained splitters: %s");		
+		add("sfmflow.configuration.maxChainedSplitters.tooltip",
+				"The maximum number of consecutive Splitter components that can be chained together in a single execution path to prevent server budget starvation.");
+		add("gui.sfmflow.error.splitter_chain_limit",
+				"Consecutive splitter limit exceeded! Max allowed chained splitters: %s");
 
 		// Slot Layout entries
 		add("gui.sfmflow.error.slot_not_accessible", "Slot not accessible on selected side");

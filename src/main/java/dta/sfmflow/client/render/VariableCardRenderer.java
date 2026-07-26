@@ -16,7 +16,6 @@ import net.minecraft.client.renderer.entity.ItemRenderer;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.resources.model.ModelResourceLocation;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
@@ -24,6 +23,8 @@ import net.minecraft.world.item.component.CustomData;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import java.util.UUID;
+
+import javax.annotation.Nullable;
 
 /**
  * Handles multi-layered programmatic blending of filter cards inside screens
@@ -80,7 +81,7 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 	}
 
 	public static boolean hasComponentFilter(ItemStack stack) {
-		UUID varId = getVariableId(stack);
+		UUID varId = VariableCardItem.getVariableId(stack);
 		if (varId != null && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
 			var comp = screen.getMenu().getManagerBlockEntity().getFlowComponents().get(varId);
 			if (comp instanceof IFlowchartVariable flowchartVar) {
@@ -93,15 +94,13 @@ public class VariableCardRenderer extends BlockEntityWithoutLevelRenderer {
 		}
 		return false;
 	}
-
-	public static UUID getVariableId(ItemStack stack) {
-		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
-		if (customData != null) {
-			CompoundTag tag = customData.copyTag();
-			if (tag.contains("VariableId")) {
-				return tag.getUUID("VariableId");
-			}
-		}
-		return null;
+	
+	/**
+	 * Client-side helper delegate ensuring that all client properties classes and item 
+	 * colors compiling against this class can resolve the variable UUID side-safely.
+	 */
+	public static @Nullable UUID getVariableId(ItemStack stack) {
+		return VariableCardItem.getVariableId(stack);
 	}
+
 }

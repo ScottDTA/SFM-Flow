@@ -8,10 +8,25 @@ import java.util.List;
 
 /**
  * Public API container representing energy flowing along a specific connection wire,
- * preserving source block coordinate metadata for downstream evaluation [3].
+ * preserving source block coordinate metadata for downstream evaluation.
  */
 public final class FlowEnergyBuffer {
-	public record BufferedEnergy(BlockPos srcPos, @Nullable Direction srcSide, int amount) {}
+	public static final class BufferedEnergy {
+		private final BlockPos srcPos;
+		private final @Nullable Direction srcSide;
+		private int amount;
+
+		public BufferedEnergy(BlockPos srcPos, @Nullable Direction srcSide, int amount) {
+			this.srcPos = srcPos;
+			this.srcSide = srcSide;
+			this.amount = amount;
+		}
+
+		public BlockPos srcPos() { return srcPos; }
+		public @Nullable Direction srcSide() { return srcSide; }
+		public int amount() { return amount; }
+		public void shrink(int amt) { this.amount = Math.max(0, this.amount - amt); }
+	}
 
 	private final List<BufferedEnergy> energies = new ArrayList<>();
 

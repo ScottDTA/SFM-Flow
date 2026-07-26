@@ -324,6 +324,15 @@ public class ItemInventoriesListVariableComponent extends AbstractFlowComponent 
 	}
 	
 	@Override
+	public List<Integer> getBoundInventoryIds() {
+		List<Integer> ids = new ArrayList<>();
+		for (var entry : entries) {
+			ids.add(entry.inventoryId());
+		}
+		return ids;
+	}
+	
+	@Override
 	public boolean isInventoryBound(int id) {
 		if (id == -1) {
 			return false;

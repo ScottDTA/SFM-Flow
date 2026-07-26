@@ -1,6 +1,8 @@
 package dta.sfmflow.client.screen.widgets;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.math.Axis;
+
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.api.component.AbstractFlowComponent;
@@ -56,7 +58,7 @@ public class FlowWidgetOutputNode extends AbstractFlowWidget {
 		AbstractFlowComponent comp = container.getComponent();
 		Color mask = comp.getColorMask();
 
-	    float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
+		float[] colors = GradientBlitUtil.getBottomColorComponents(mask);
 		RenderSystem.setShaderColor(colors[0], colors[1], colors[2], 1.0F);
 		
 		int vOffset = 0;
@@ -65,7 +67,24 @@ public class FlowWidgetOutputNode extends AbstractFlowWidget {
 		}
 		RenderSystem.setShader(GameRenderer::getPositionTexShader);
 		RenderSystem.setShaderTexture(0, OUTPUT_NODE);
-		guiGraphics.blit(OUTPUT_NODE, getX(), getY(), 0, vOffset, 6, 6, 6, 12);
+
+		boolean isRightPin = comp.isRightOutput(id);
+
+		if (isRightPin) {
+			guiGraphics.pose().pushPose();
+			// Translate to the center of our 6x6 pin
+			guiGraphics.pose().translate(getX() + 3.0F, getY() + 3.0F, 0.0F);
+			// Rotate -90 degrees around Z-axis to point the bottom pin face to the right
+			guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(-90.0F));
+			// Translate back to the corner origin
+			guiGraphics.pose().translate(-3.0F, -3.0F, 0.0F);
+			
+			guiGraphics.blit(OUTPUT_NODE, 0, 3, 0, vOffset, 6, 6, 6, 12);
+			guiGraphics.pose().popPose();
+		} else {
+			guiGraphics.blit(OUTPUT_NODE, getX(), getY(), 0, vOffset, 6, 6, 6, 12);
+		}
+
 		RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 	}
 

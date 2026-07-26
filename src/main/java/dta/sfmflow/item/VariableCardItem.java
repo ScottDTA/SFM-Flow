@@ -18,6 +18,7 @@ import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -50,6 +51,17 @@ public class VariableCardItem extends Item {
 			}
 		}
 		return ResourceLocation.fromNamespaceAndPath("sfmflow", "advanced_item_filter_variable");
+	}
+	
+	public static @Nullable UUID getVariableId(ItemStack stack) {
+		CustomData customData = stack.get(DataComponents.CUSTOM_DATA);
+		if (customData != null) {
+			CompoundTag tag = customData.copyTag();
+			if (tag.contains("VariableId")) {
+				return tag.getUUID("VariableId");
+			}
+		}
+		return null;
 	}
 
 	@Override

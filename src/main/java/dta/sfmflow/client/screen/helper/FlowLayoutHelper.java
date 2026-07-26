@@ -4,6 +4,7 @@ import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.client.widget.AbstractFlowWidget;
 import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
+import dta.sfmflow.flowcomponents.ForEachComponent;
 import dta.sfmflow.util.NodeCount;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.neoforged.api.distmarker.Dist;
@@ -46,11 +47,20 @@ public final class FlowLayoutHelper {
      * Resolves the horizontal pin output offset for rendering or hit testing.
      */
     public static int getOutputOffset(AbstractFlowComponent component, int index) {
-        // Added component.getNumOutputs() <= 0 safety guard
         if (!component.hasOutputNodes() || index < 0 || index >= component.getNumOutputs() || component.getNumOutputs() <= 0) {
             return 29;
         }
-        NodeCount nodeCount = NodeCount.getForCount(component.getNumOutputs());
+        if (component.isRightOutput(index)) {
+            return 61; // Right edge offset
+        }
+
+        // Dynamically calculate spacing using only the bottom outputs
+        int totalBottomOutputs = component.getNumOutputs() - (component.hasRightOutput() ? 1 : 0);
+        if (totalBottomOutputs <= 0) {
+            return 29;
+        }
+
+        NodeCount nodeCount = NodeCount.getForCount(totalBottomOutputs);
         int[] spacing = nodeCount.getOffsets(false);
         if (index < spacing.length) {
             return spacing[index];
@@ -58,6 +68,13 @@ public final class FlowLayoutHelper {
         return 29;
     }
 
+    public static int getOutputYOffset(AbstractFlowComponent component, int index) {
+        if (component.isRightOutput(index)) {
+            return 7; // Vertically centered on the right edge of the card
+        }
+        return 20; // Default bottom edge y-offset
+    }
+    
     /**
      * Resolves the horizontal pin input offset for rendering or hit testing.
      */

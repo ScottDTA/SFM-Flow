@@ -5,6 +5,7 @@ import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.block.entity.FilterGhostSlot;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.IGhostSlotAware;
+import dta.sfmflow.flowcomponents.ForEachComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
@@ -157,9 +158,8 @@ public class ManagerMenu extends AbstractContainerMenu {
 				if (clickType == ClickType.PICKUP) {
 					if (button == 0) { // Left-click: Clone item to slot
 						if (!carriedStack.isEmpty()) {
-							// Guard: Block setting inventory list variable cards into filter ghost slots
-							// [3]
-							if (FilterGhostSlot.isInventoryListCard(carriedStack)) {
+							// Guard: Block setting inventory list variable cards into filter ghost slots (except for ForEach loop node)
+							if (FilterGhostSlot.isInventoryListCard(carriedStack) && !activeComponent.acceptsInventoryListCards()) {
 								this.broadcastChanges();
 								return;
 							}
@@ -168,14 +168,14 @@ public class ManagerMenu extends AbstractContainerMenu {
 							ghostSlot.set(filterCopy);
 
 							// Symmetrical Cursor Clearing & Snap-back: return stack back to its original
-							// slot index [3]
+							// slot index
 							if (carriedStack.is(ModItems.VARIABLE_CARD.get())) {
 								this.setCarried(ItemStack.EMPTY); // Variables just dissolve silently
 							} else {
 								ItemStack returnStack = carriedStack.copy();
 								this.setCarried(ItemStack.EMPTY); // Clear the mouse cursor first
 
-								// Symmetrically return items back to the origin slot [3]
+								// Symmetrically return items back to the origin slot
 								if (lastPickedUpSlotId >= 0 && lastPickedUpSlotId < 36) {
 									Slot originalSlot = this.slots.get(lastPickedUpSlotId);
 									if (!originalSlot.hasItem()) {

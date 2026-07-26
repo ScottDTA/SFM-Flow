@@ -126,15 +126,7 @@ public final class ItemTransferPlanner {
 		}
 
 		BlockPos srcInventoryPos = srcInventory.getBlockPos();
-		List<Direction> activeSrcSides = new ArrayList<>();
-		for (Direction dir : Direction.values()) {
-			if (component.isSideActive(dir)) {
-				activeSrcSides.add(dir);
-			}
-		}
-		if (activeSrcSides.isEmpty()) {
-			activeSrcSides.add(null);
-		}
+		List<Direction> activeSrcSides = ConnectionBlock.getActiveSides(context, component.getInventoryId(), component, srcInventory);
 
 		Map<Item, Integer> grabbedCounts = new HashMap<>();
 
@@ -231,15 +223,9 @@ public final class ItemTransferPlanner {
 		}
 
 		BlockPos tgtInventoryPos = tgtInventory.getBlockPos();
-		List<Direction> activeTgtSides = new ArrayList<>();
-		for (Direction dir : Direction.values()) {
-			if (component.isSideActive(dir)) {
-				activeTgtSides.add(dir);
-			}
-		}
-		if (activeTgtSides.isEmpty()) {
-			activeTgtSides.add(null);
-		}
+		FlowLogger.execution("[Item Output] Planning deposit from buffer (size: %d items) into target %s at %s", 
+				inputBuffer.getItems().size(), tgtInventory.getDisplayName(null).getString(), tgtInventoryPos);
+		List<Direction> activeTgtSides = ConnectionBlock.getActiveSides(context, component.getInventoryId(), component, tgtInventory);
 
 		Map<Item, Integer> alreadyHeldBack = new HashMap<>();
 
@@ -249,6 +235,7 @@ public final class ItemTransferPlanner {
 				continue;
 
 			if (!matchesFilter(context, component, incoming)) {
+				FlowLogger.execution("[Item Output] Item %s failed the output node's filter checks", incoming.getHoverName().getString());
 				outputBuffer.add(incomingItem.srcPos(), incomingItem.srcSlot(), incomingItem.srcSide(),
 						incoming.copy());
 				continue;
@@ -333,6 +320,8 @@ public final class ItemTransferPlanner {
 										incomingItem.srcSide(), tgtInventoryPos, taskDestSlot, tgtSide, incoming,
 										amountToTransfer);
 								if (success) {
+									FlowLogger.execution("[Item Output] Successfully scheduled transfer of %d %s into slot %d (Side: %s)", 
+											amountToTransfer, incoming.getHoverName().getString(), tgtSlot, tgtSide);
 									tgtStack.grow(amountToTransfer);
 									updateSnapshotCopies(context, tgtInventoryPos, mainTgtSlot, tgtStack); // PASS mainTgtSlot here
 									incoming.shrink(amountToTransfer);

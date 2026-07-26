@@ -25,6 +25,7 @@ import dta.sfmflow.flowcomponents.CollectorComponent;
 import dta.sfmflow.flowcomponents.EnergyConditionalComponent;
 import dta.sfmflow.flowcomponents.EnergyInventoriesListVariableComponent;
 import dta.sfmflow.flowcomponents.FluidTransferComponent;
+import dta.sfmflow.flowcomponents.ForEachComponent;
 import dta.sfmflow.flowcomponents.GroupComponent;
 import dta.sfmflow.flowcomponents.GroupInputComponent;
 import dta.sfmflow.flowcomponents.GroupOutputComponent;
@@ -110,6 +111,7 @@ public class VanillaSFMFlowPlugin {
 	public static DeferredHolder<FlowComponentType, FlowComponentType> ENERGY_INVENTORIES_LIST_VARIABLE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> REDSTONE_INVENTORIES_LIST_VARIABLE;
 	public static DeferredHolder<FlowComponentType, FlowComponentType> SIGN_UPDATER_INVENTORIES_LIST_VARIABLE;
+	public static DeferredHolder<FlowComponentType, FlowComponentType> FOREACH_LOOP;
 
 	public void registerComponents(DeferredRegister<FlowComponentType> registry) {
 		// Register capabilities natively
@@ -376,6 +378,10 @@ public class VanillaSFMFlowPlugin {
 				.category(NodeCategory.VARIABLE).icon("textures/gui/menu_buttons/sign_list_button.png")
 				.displayName("gui.sfmflow.sign_updater_inventories_list_variable")
 				.codec(SignUpdaterInventoriesListVariableComponent.CODEC).build(registry);
+		
+		FOREACH_LOOP = FlowComponentBuilder.create("foreach_loop", ForEachComponent::new)
+				.category(NodeCategory.LOGIC).icon("textures/gui/menu_buttons/foreach_button.png")
+				.displayName("gui.sfmflow.foreach_loop").codec(ForEachComponent.CODEC).build(registry);
 	}
 
 	/**

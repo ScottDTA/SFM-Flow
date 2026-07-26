@@ -231,6 +231,16 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					}
 				}
 
+				// Safely append block positions configured inside any list variables
+				for (int listId : comp.getBoundInventoryIds()) {
+					for (ConnectionBlock block : getInventories()) {
+						if (block.getId() == listId) {
+							positions.add(block.getBlockPos());
+							break;
+						}
+					}
+				}
+
 				// Special manual query mappings for sculk triggers
 				if (comp instanceof SculkTriggerComponent sculk) {
 					int targetId = sculk.getInventoryId();

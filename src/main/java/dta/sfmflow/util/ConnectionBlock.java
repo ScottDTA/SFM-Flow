@@ -10,6 +10,7 @@ import java.util.Set;
 
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
+import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -107,6 +108,31 @@ public class ConnectionBlock implements IContainerSelection {
 			}
 		}
 		return null;
+	}
+
+	public static List<Direction> getActiveSides(FlowchartPlanningContext context, int inventoryId, ISideConfigurable component, @Nullable ConnectionBlock resolvedBlock) {
+		List<Direction> activeSides = new ArrayList<>();
+		boolean isForEach = false;
+		for (var comp : context.getComponents().values()) {
+			if (comp.getId().hashCode() == inventoryId) {
+				isForEach = true;
+				break;
+			}
+		}
+		// If targeting a loop element, inherit its customized direction face from the list variable
+		if (isForEach && resolvedBlock != null && resolvedBlock.getDirection() != null) {
+			activeSides.add(resolvedBlock.getDirection());
+		} else {
+			for (Direction dir : Direction.values()) {
+				if (component.isSideActive(dir)) {
+					activeSides.add(dir);
+				}
+			}
+		}
+		if (activeSides.isEmpty()) {
+			activeSides.add(null);
+		}
+		return activeSides;
 	}
 
 	public @Nullable Direction getDirection() {

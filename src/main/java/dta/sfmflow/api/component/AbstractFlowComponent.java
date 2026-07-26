@@ -4,6 +4,8 @@ import java.util.UUID;
 
 import javax.annotation.Nullable;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
@@ -71,6 +73,7 @@ public abstract class AbstractFlowComponent {
 	protected int numOutputs = 0;
 	protected boolean hasInputNodes = false;
 	protected int numInputs = 0;
+	protected boolean hasRightOutput = false;
 	protected String customName = "";
 	protected Color colorMask = Color.WHITE;
 	protected @Nullable UUID parentGroupId = null;
@@ -96,6 +99,30 @@ public abstract class AbstractFlowComponent {
 		this.colorMask = props.colorMask() == null ? Color.WHITE : props.colorMask();
 		this.parentGroupId = props.parentGroupId().orElse(null);
 	}
+	
+	public boolean hasRightOutput() {
+		return hasRightOutput;
+	}
+
+	public boolean isRightOutput(int index) {
+		return hasRightOutput && index == numOutputs - 1;
+	}
+
+	public boolean acceptsInventoryListCards() {
+		return false;
+	}
+
+	public @Nullable UUID getBoundInventoryListVariableId() {
+		return null;
+	}
+
+	public void setBoundInventoryListVariableId(@Nullable UUID id) {
+	}
+	
+	public List<Integer> getBoundInventoryIds() {
+		return Collections.emptyList();
+	}
+	
 	/**
 	 * Locked to 64px width standard.
 	 */

@@ -10,7 +10,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,15 +102,7 @@ public final class EnergyTransferPlanner {
 		}
 
 		BlockPos srcPos = srcInventory.getBlockPos();
-		List<Direction> activeSrcSides = new ArrayList<>();
-		for (Direction dir : Direction.values()) {
-			if (component.isSideActive(dir)) {
-				activeSrcSides.add(dir);
-			}
-		}
-		if (activeSrcSides.isEmpty()) {
-			activeSrcSides.add(null);
-		}
+		List<Direction> activeSrcSides = ConnectionBlock.getActiveSides(context, component.getInventoryId(), component, srcInventory);
 
 		Map<EnergyKey, Integer> simulatedEnergy = getSimulatedEnergy(context);
 
@@ -151,15 +142,7 @@ public final class EnergyTransferPlanner {
 		}
 
 		BlockPos tgtPos = tgtInventory.getBlockPos();
-		List<Direction> activeTgtSides = new ArrayList<>();
-		for (Direction dir : Direction.values()) {
-			if (component.isSideActive(dir)) {
-				activeTgtSides.add(dir);
-			}
-		}
-		if (activeTgtSides.isEmpty()) {
-			activeTgtSides.add(null);
-		}
+		List<Direction> activeTgtSides = ConnectionBlock.getActiveSides(context, component.getInventoryId(), component, tgtInventory);
 
 		Map<EnergyKey, Integer> simulatedEnergy = getSimulatedEnergy(context);
 
@@ -189,10 +172,11 @@ public final class EnergyTransferPlanner {
 					if (success) {
 						FlowLogger.execution("Simulating Energy Deposit to %s: Side=%s, Amount=%d", tgtPos, tgtSide, toDeposit);
 
-						// Track simulated deposit changes
+						// Track simulated deposit changes [3]
 						EnergyKey key = new EnergyKey(tgtPos, tgtSide);
 						simulatedEnergy.put(key, currentEnergy + toDeposit);
 
+						incomingEnergy.shrink(toDeposit); // Symmetrically consume and shrink energy in the buffer
 						remainingToDeposit -= toDeposit;
 					}
 				}

@@ -17,7 +17,6 @@ import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -166,15 +165,7 @@ public final class FluidTransferPlanner {
 		}
 
 		BlockPos srcPos = srcInventory.getBlockPos();
-		List<Direction> activeSrcSides = new ArrayList<>();
-		for (Direction dir : Direction.values()) {
-			if (component.isSideActive(dir)) {
-				activeSrcSides.add(dir);
-			}
-		}
-		if (activeSrcSides.isEmpty()) {
-			activeSrcSides.add(null);
-		}
+		List<Direction> activeSrcSides = ConnectionBlock.getActiveSides(context, component.getInventoryId(), component, srcInventory);
 
 		Map<TankKey, FluidStack> simulatedTanks = getSimulatedTanks(context);
 
@@ -251,15 +242,7 @@ public final class FluidTransferPlanner {
 		}
 
 		BlockPos tgtPos = tgtInventory.getBlockPos();
-		List<Direction> activeTgtSides = new ArrayList<>();
-		for (Direction dir : Direction.values()) {
-			if (component.isSideActive(dir)) {
-				activeTgtSides.add(dir);
-			}
-		}
-		if (activeTgtSides.isEmpty()) {
-			activeTgtSides.add(null);
-		}
+		List<Direction> activeTgtSides = ConnectionBlock.getActiveSides(context, component.getInventoryId(), component, tgtInventory);
 
 		Map<TankKey, FluidStack> simulatedTanks = getSimulatedTanks(context);
 
@@ -329,6 +312,7 @@ public final class FluidTransferPlanner {
 						if (success) {
 							FlowLogger.execution("Simulated Depositing Fluid to Tank %d: Side=%s, Amount=%d", tankIndex,
 									tgtSide, filled);
+							incoming.shrink(filled); // Symmetrically consume and shrink fluid in the buffer
 							remainingToDeposit -= filled;
 						}
 					}
