@@ -23,6 +23,7 @@ import dta.sfmflow.client.screen.widgets.DropdownMenuWidget;
 import dta.sfmflow.client.screen.widgets.FlowWidgetBase;
 import dta.sfmflow.client.screen.widgets.FlowWidgetContainer;
 import dta.sfmflow.client.screen.widgets.InventoryDrawerWidget;
+import dta.sfmflow.client.screen.widgets.ManagerAccessButton;
 import dta.sfmflow.client.screen.widgets.VariableDrawerWidget;
 import dta.sfmflow.util.MenuSlotRepositioner;
 import dta.sfmflow.client.render.VectorWireRenderer;
@@ -104,6 +105,9 @@ public class ManagerScreen extends AbstractContainerScreen<ManagerMenu> {
 			this.addRenderableWidget(new CategoryButton(category, x + 4, y + categoryYOffset, this));
 			categoryYOffset += 16;
 		}
+		
+		// Anchor the Access Settings button at the bottom of the left button strip
+		this.addRenderableWidget(new ManagerAccessButton(x + 4, y + 226, this));
 
 		buildComponents(x, y);
 

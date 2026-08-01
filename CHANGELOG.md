@@ -1,4 +1,17 @@
-7-26-2026
+8-1-2026
+
+### [Added]
+* Added a block ownership and access control system for Machine Inventory Managers. When placed, blocks are registered to the placer as the owner.
+* Added an Access Settings button and permission modal to the Manager screen, enabling owners to toggle between Owner-only, Team-only (utilizing scoreboard teams), and Public access modes.
+* Added localization keys and red floating warning prompts shown to unauthorized players attempting to access private Managers.
+* Added a secondary-use override for server operators with level 2+ permissions, permitting administrative bypass of locked nodes.
+
+### [Changed]
+* Block interaction is now restricted according to the assigned access level.
+* Adjusted the vertical text coordinate offset of the sliding drawer label slightly to improve layout alignment.
+
+
+7-26-2026 (0.5.20.alpha)
 
 ### [Added]
 * Added the ForEach Loop node, enabling sequential execution of flowchart branches across entire groups of machines or inventories.

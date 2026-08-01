@@ -4,14 +4,17 @@ import javax.annotation.Nullable;
 
 import com.mojang.serialization.MapCodec;
 
+import dta.sfmflow.api.security.ManagerAccessLevel;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.block.entity.ModBlockEntities;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -24,6 +27,8 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.scores.PlayerTeam;
+import net.minecraft.world.scores.Scoreboard;
 
 public class ManagerBlock extends BaseEntityBlock {
 	public static final MapCodec<ManagerBlock> CODEC = simpleCodec(ManagerBlock::new);
@@ -81,7 +86,7 @@ public class ManagerBlock extends BaseEntityBlock {
 			if (!pLevel.isClientSide()) {
 				BlockEntity bEntity = pLevel.getBlockEntity(pPos);
 				if (bEntity instanceof ManagerBlockEntity manager) {
-					// Clean up the external file before final block removal [3]
+					// Clean up the external file before final block removal
 					manager.deleteExternalData();
 				}
 			}
@@ -92,20 +97,67 @@ public class ManagerBlock extends BaseEntityBlock {
 	}
 
 	@Override
+	public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
+		super.setPlacedBy(level, pos, state, placer, stack);
+		if (!level.isClientSide() && placer instanceof Player player) {
+			BlockEntity be = level.getBlockEntity(pos);
+			if (be instanceof ManagerBlockEntity manager) {
+				manager.setOwner(player.getUUID(), player.getGameProfile().getName());
+			}
+		}
+	}
+	
+	@Override
 	protected ItemInteractionResult useItemOn(ItemStack pStack, BlockState pState, Level pLevel, BlockPos pPos,
 			Player pPlayer, InteractionHand pHand, BlockHitResult pHitResult) {
 		if (!pLevel.isClientSide()) {
 			BlockEntity bEntity = pLevel.getBlockEntity(pPos);
 			if (bEntity instanceof ManagerBlockEntity managerBlockEntity) {
-				((ServerPlayer) pPlayer)
-						.openMenu(new SimpleMenuProvider(managerBlockEntity, Component.literal("Manager")), pPos);
-				return ItemInteractionResult.SUCCESS;
+				// Shifting players with admin permissions (level 2+) bypass access restrictions
+				boolean isAdminBypass = pPlayer.isSecondaryUseActive() && pPlayer.hasPermissions(2);
+
+				if (isAdminBypass || canAccess(pPlayer, managerBlockEntity)) {
+					((ServerPlayer) pPlayer)
+							.openMenu(new SimpleMenuProvider(managerBlockEntity, Component.literal("Manager")), pPos);
+					return ItemInteractionResult.SUCCESS;
+				} else {
+					pPlayer.sendSystemMessage(Component.translatable("gui.sfmflow.error.no_access", managerBlockEntity.getOwnerName())
+							.withStyle(ChatFormatting.RED));
+					return ItemInteractionResult.FAIL;
+				}
 			} else {
 				return ItemInteractionResult.FAIL;
 			}
 		}
 
 		return ItemInteractionResult.sidedSuccess(pLevel.isClientSide());
+	}
+	
+	private boolean canAccess(Player player, ManagerBlockEntity manager) {
+		// Symmetrical compatibility fallback: allow access if no owner is assigned
+		if (manager.getOwnerUUID() == null) {
+			return true;
+		}
+		if (player.getUUID().equals(manager.getOwnerUUID())) {
+			return true;
+		}
+
+		ManagerAccessLevel level = manager.getAccessLevel();
+		if (level == ManagerAccessLevel.PUBLIC) {
+			return true;
+		}
+
+		if (level == ManagerAccessLevel.TEAM) {
+			// Symmetrical team access verification using Vanilla Scoreboard teams
+			Scoreboard scoreboard = player.level().getScoreboard();
+			PlayerTeam playerTeam = scoreboard.getPlayersTeam(player.getScoreboardName());
+			PlayerTeam ownerTeam = scoreboard.getPlayersTeam(manager.getOwnerName());
+			if (playerTeam != null && ownerTeam != null && playerTeam.equals(ownerTeam)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	@Nullable

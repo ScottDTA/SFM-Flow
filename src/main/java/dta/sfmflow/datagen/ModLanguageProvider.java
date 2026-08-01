@@ -44,6 +44,7 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.warning.empty_fluid_inventories_list", "Fluid inventories list variable cannot be empty!");
 		add("gui.sfmflow.energy_inventories_list_variable", "Energy Inventories List");
 		add("gui.sfmflow.warning.empty_energy_inventories_list", "Energy inventories list variable cannot be empty!");
+		add("gui.sfmflow.error.no_access", "You do not have permission to access this Manager. Owned by %s.");
 
 		add("gui.sfmflow.redstone_inventories_list_variable", "Redstone Inventories List");
 		add("gui.sfmflow.warning.empty_redstone_inventories_list",

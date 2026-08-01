@@ -32,6 +32,7 @@
   "gui.sfmflow.error.empty_whitelist": "Active whitelist cannot be completely empty!",
   "gui.sfmflow.error.foreach_chain_limit": "Consecutive ForEach loop limit exceeded! Max allowed chained loops: %s",
   "gui.sfmflow.error.nested_group_error": "An error exists inside this group folder!",
+  "gui.sfmflow.error.no_access": "You do not have permission to access this Manager. Owned by %s.",
   "gui.sfmflow.error.no_active_sides": "At least one active inventory side must be selected!",
   "gui.sfmflow.error.slot_not_accessible": "Slot not accessible on selected side",
   "gui.sfmflow.error.splitter_chain_limit": "Consecutive splitter limit exceeded! Max allowed chained splitters: %s",

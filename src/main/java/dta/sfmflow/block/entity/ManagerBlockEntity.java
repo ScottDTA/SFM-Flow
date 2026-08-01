@@ -27,6 +27,7 @@ import dta.sfmflow.api.event.TaskExecutionEvent;
 import dta.sfmflow.api.execution.ThreadSafeInventorySnapshot;
 import dta.sfmflow.api.flowchart.Flowchart;
 import dta.sfmflow.api.logging.FlowLogger;
+import dta.sfmflow.api.security.ManagerAccessLevel;
 import dta.sfmflow.api.variable.InventoryGroupVariable;
 import dta.sfmflow.api.variable.ItemFilterVariable;
 import dta.sfmflow.api.capability.FlowCapabilityRegistry;
@@ -93,6 +94,10 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private UUID managerId;
 	private boolean loadedExternal = false;
 	private boolean isDataDirty = false;
+	
+	private UUID ownerUUID = null;
+	private String ownerName = "";
+	private ManagerAccessLevel accessLevel = ManagerAccessLevel.OWNER;
 
 	private transient HolderLookup.Provider savedRegistries = null;
 	private final List<AbstractTriggerComponent> cachedTriggers = new ArrayList<>();
@@ -117,7 +122,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	private transient CompoundTag cachedFlowchartNbt = null;
 	private transient ThreadSafeInventorySnapshot.SnapshotProfile snapshotProfile = null;
 	private transient boolean isProfileDirty = true;
-	private boolean isFlowchartCacheDirty = true; // Rebuilt on first load [3]
+	private boolean isFlowchartCacheDirty = true; // Rebuilt on first load
 
 	public List<InventoryGroupVariable> getGroupVariables() {
 		return this.groupVariables;
@@ -134,7 +139,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	public ManagerBlockEntity(BlockPos pos, BlockState blockState) {
 		super(ModBlockEntities.MANAGER_BE.get(), pos, blockState);
 
-		// Synchronize the size of our live components map dynamically [3]
+		// Synchronize the size of our live components map dynamically
 		data = new ContainerData() {
 			@Override
 			public int get(int index) {
@@ -205,6 +210,30 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 	}
 
+	public UUID getOwnerUUID() {
+		return ownerUUID;
+	}
+
+	public String getOwnerName() {
+		return ownerName;
+	}
+
+	public ManagerAccessLevel getAccessLevel() {
+		return accessLevel;
+	}
+
+	public void setOwner(UUID uuid, String name) {
+		this.ownerUUID = uuid;
+		this.ownerName = name == null ? "" : name;
+		this.setChanged();
+	}
+
+	public void setAccessLevel(ManagerAccessLevel accessLevel) {
+		this.accessLevel = accessLevel == null ? ManagerAccessLevel.OWNER : accessLevel;
+		this.setChanged();
+	}
+	
+	
 	public boolean isDataDirty() {
 		return this.isDataDirty;
 	}
@@ -344,8 +373,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 					var profile = getSnapshotProfile();
 					var snapshot = ThreadSafeInventorySnapshot.create(this, profile);
 
-					// 1. Resolve or lazily compute the cached flowchart NBT [3]
-					// 1. Resolve or lazily compute the cached flowchart NBT [3]
+					// 1. Resolve or lazily compute the cached flowchart NBT
 					var registries = pLevel.registryAccess();
 					if (this.cachedFlowchartNbt == null || this.isFlowchartCacheDirty) {
 						var ops = RegistryOps.create(NbtOps.INSTANCE, registries);
@@ -356,7 +384,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 						
 						//SFMFlow.LOGGER.info("[SFM-Flow] [C2S Diagnostic] Recompiled cachedFlowchartNbt! Dirty was: {}, Result NBT: {}", this.isFlowchartCacheDirty, this.cachedFlowchartNbt);
 						
-						this.isFlowchartCacheDirty = false; // Cleanly clear only the compiler cache flag here [3]
+						this.isFlowchartCacheDirty = false; // Cleanly clear only the compiler cache flag here
 					
 					}
 					CompoundTag flowchartNbt = this.cachedFlowchartNbt.copy(); // Deep copy so worker can safely
@@ -510,6 +538,12 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 		}
 		pTag.put("ScannedInventories", invList);
 
+		if (this.ownerUUID != null) {
+			pTag.putUUID("OwnerUUID", this.ownerUUID);
+			pTag.putString("OwnerName", this.ownerName);
+		}
+		pTag.putString("AccessLevel", this.accessLevel.getSerializedName());
+		
 		super.saveAdditional(pTag, pRegistries);
 	}
 
@@ -715,6 +749,20 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 						this.loadedExternal = true;
 					});
 		}
+		
+		if (pTag.contains("OwnerUUID")) {
+			this.ownerUUID = pTag.getUUID("OwnerUUID");
+			this.ownerName = pTag.getString("OwnerName");
+		}
+		if (pTag.contains("AccessLevel")) {
+			String accStr = pTag.getString("AccessLevel");
+			for (ManagerAccessLevel lvl : ManagerAccessLevel.values()) {
+				if (lvl.getSerializedName().equalsIgnoreCase(accStr)) {
+					this.accessLevel = lvl;
+					break;
+				}
+			}
+		}		
 
 		if (pTag.contains("ScannedInventories")) {
 			ListTag invList = pTag.getList("ScannedInventories", Tag.TAG_COMPOUND);
@@ -781,7 +829,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 
 		this.isTriggerCacheDirty = true;
 		this.isProfileDirty = true;
-		this.isFlowchartCacheDirty = true; // Mark dirty on load [3]
+		this.isFlowchartCacheDirty = true;
 		this.cachedFlowchartNbt = null;
 	}
 

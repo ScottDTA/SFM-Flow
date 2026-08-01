@@ -17,6 +17,7 @@ import dta.sfmflow.block.entity.CableClusterBlockEntity;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
+import dta.sfmflow.api.security.ManagerAccessLevel;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
@@ -29,6 +30,7 @@ import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
+import dta.sfmflow.networking.packets.serverbound.SaveManagerAccessPacket;
 import dta.sfmflow.networking.packets.serverbound.SetActiveFilterComponentPacket;
 import dta.sfmflow.networking.packets.serverbound.SyncCarriedItemPacket;
 import dta.sfmflow.networking.packets.serverbound.SyncClusterSlotDirectionPacket;
@@ -38,6 +40,7 @@ import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -98,6 +101,22 @@ public class ServerPayloadHandler {
 				if (!manager.isRemoved() && manager.getBlockPos().equals(data.pos())) {
 					manager.componentMoved(data, context);
 					manager.setChanged();
+				}
+			}
+		});
+	}
+	
+	public static void handleSaveManagerAccess(final SaveManagerAccessPacket data, final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			Player player = context.player();
+			if (player.level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
+				// Security check: Only the owner can alter permissions
+				if (player.getUUID().equals(manager.getOwnerUUID())) {
+					int ord = data.accessLevelOrdinal();
+					if (ord >= 0 && ord < ManagerAccessLevel.values().length) {
+						manager.setAccessLevel(ManagerAccessLevel.values()[ord]);
+						manager.setChanged();
+					}
 				}
 			}
 		});

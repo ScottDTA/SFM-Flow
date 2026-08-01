@@ -38,6 +38,8 @@ public class ModNetworking {
                 (payload, context) -> ServerPayloadHandler.handleRequestSideConfigProperties(payload, context));
         registrar.playToServer(MoveComponentGroupPacket.TYPE, MoveComponentGroupPacket.STREAM_CODEC,
                 (payload, context) -> ServerPayloadHandler.handleMoveComponentGroup(payload, context));
+        registrar.playToServer(SaveManagerAccessPacket.TYPE, SaveManagerAccessPacket.STREAM_CODEC,
+                (payload, context) -> ServerPayloadHandler.handleSaveManagerAccess(payload, context));
 
         // Clientbound Packets (Server to Client)
         registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,
@@ -48,7 +50,6 @@ public class ModNetworking {
                 PacketHandlerManager::handleSyncInventorySlots);
         registrar.playToClient(SyncSideConfigPropertiesPacket.TYPE, SyncSideConfigPropertiesPacket.STREAM_CODEC,
                 PacketHandlerManager::handleSyncSideConfigProperties);
-     // Clientbound Packets (Server to Client)
         registrar.playToClient(SyncSignTextPacket.TYPE, SyncSignTextPacket.STREAM_CODEC,
                 PacketHandlerManager::handleSyncSignText);
     }

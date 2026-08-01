@@ -95,10 +95,8 @@ public class InventoryDrawerWidget extends AbstractFlowWidget {
 			return false;
 		}
 
-		// Symmetrically clear card from mouse cursor when clicking back into the drawer [3]
 		ItemStack carried = parentScreen.getMenu().getCarried();
 		if (button == 0 && !carried.isEmpty() && carried.is(ModItems.VARIABLE_CARD.get())) {
-			// Enforce a 250ms click cooldown to prevent instant disposal on fast clicks/jitters [3]
 			if (Util.getMillis() - parentScreen.getLastVariablePickupTime() < 250L) {
 				return false;
 			}
@@ -226,7 +224,7 @@ public class InventoryDrawerWidget extends AbstractFlowWidget {
 
 		guiGraphics.pose().translate(textX, textY, 0.0F);
 		guiGraphics.pose().mulPose(Axis.ZP.rotationDegrees(270.0F));
-		guiGraphics.drawString(parentScreen.getFont(), "Inventories", 0, 0, 0xFF404040, false);
+		guiGraphics.drawString(parentScreen.getFont(), "Inventories", 0, 1, 0xFF404040, false);
 		guiGraphics.pose().popPose();
 
 		this.searchEdit.setX(getX() + 4);
