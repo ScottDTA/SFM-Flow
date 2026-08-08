@@ -1,5 +1,6 @@
 package dta.sfmflow.networking;
 
+import dta.sfmflow.networking.packets.clientbound.OpenDiskOverwriteConfirmPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
 import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
@@ -78,6 +79,21 @@ public final class PacketHandlerManager {
 
 	public static void handleSyncSignText(final SyncSignTextPacket payload, final IPayloadContext context) {
 		SIGN_TEXT_HANDLER.get().handle(payload, context);
+	}
+	
+	private static final Supplier<IPacketHandler<OpenDiskOverwriteConfirmPacket>> OVERWRITE_CONFIRM_HANDLER = () -> {
+		if (FMLEnvironment.dist == Dist.CLIENT) {
+			return (payload, context) -> {
+				context.enqueueWork(() -> {
+					net.minecraft.client.Minecraft.getInstance().setScreen(new dta.sfmflow.client.screen.ConfirmOverwriteScreen(payload.pos()));
+				});
+			};
+		}
+		return (payload, context) -> {};
+	};
+
+	public static void handleOpenDiskOverwriteConfirm(final OpenDiskOverwriteConfirmPacket payload, final IPayloadContext context) {
+		OVERWRITE_CONFIRM_HANDLER.get().handle(payload, context);
 	}
 	
 }

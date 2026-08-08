@@ -18,6 +18,9 @@ public class ModItems {
 	 */
 	public static final DeferredItem<Item> VARIABLE_CARD = ITEMS.register("variable_card",
 			() -> new VariableCardItem(new Item.Properties().stacksTo(1)));
+	
+	public static final DeferredItem<Item> PROGRAM_DISK = ITEMS.register("program_disk",
+			() -> new ProgramDiskItem(new Item.Properties().stacksTo(1)));
 
 	public static void register(IEventBus eventBus) {
 		ITEMS.register(eventBus);

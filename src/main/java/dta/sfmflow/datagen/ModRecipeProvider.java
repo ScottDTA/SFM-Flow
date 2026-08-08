@@ -2,6 +2,7 @@ package dta.sfmflow.datagen;
 
 import java.util.concurrent.CompletableFuture;
 import dta.sfmflow.block.ModBlocks;
+import dta.sfmflow.item.ModItems;
 import net.minecraft.core.HolderLookup.Provider;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.recipes.RecipeCategory;
@@ -114,6 +115,11 @@ public class ModRecipeProvider extends RecipeProvider implements IConditionBuild
 		ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get())
 				.requires(ModBlocks.CABLE_BLOCK.get()).requires(ItemTags.SIGNS)
 				.unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get())).save(recipeOutput);
+
+		ShapedRecipeBuilder.shaped(RecipeCategory.MISC, ModItems.PROGRAM_DISK.get(), 1).pattern("GRG").pattern("RCR")
+				.pattern("GRG").define('G', Items.GOLD_INGOT).define('R', Items.REDSTONE)
+				.define('C', ModBlocks.CABLE_BLOCK.get()).unlockedBy("has_cable", has(ModBlocks.CABLE_BLOCK.get()))
+				.save(recipeOutput);
 
 	}
 }

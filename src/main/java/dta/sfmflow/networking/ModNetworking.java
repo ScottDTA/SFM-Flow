@@ -40,6 +40,8 @@ public class ModNetworking {
                 (payload, context) -> ServerPayloadHandler.handleMoveComponentGroup(payload, context));
         registrar.playToServer(SaveManagerAccessPacket.TYPE, SaveManagerAccessPacket.STREAM_CODEC,
                 (payload, context) -> ServerPayloadHandler.handleSaveManagerAccess(payload, context));
+        registrar.playToServer(ConfirmPastePacket.TYPE, ConfirmPastePacket.STREAM_CODEC,
+                (payload, context) -> ServerPayloadHandler.handleConfirmPaste(payload, context));
 
         // Clientbound Packets (Server to Client)
         registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,
@@ -52,5 +54,8 @@ public class ModNetworking {
                 PacketHandlerManager::handleSyncSideConfigProperties);
         registrar.playToClient(SyncSignTextPacket.TYPE, SyncSignTextPacket.STREAM_CODEC,
                 PacketHandlerManager::handleSyncSignText);
+        registrar.playToClient(OpenDiskOverwriteConfirmPacket.TYPE, OpenDiskOverwriteConfirmPacket.STREAM_CODEC,
+                PacketHandlerManager::handleOpenDiskOverwriteConfirm);
+
     }
 }

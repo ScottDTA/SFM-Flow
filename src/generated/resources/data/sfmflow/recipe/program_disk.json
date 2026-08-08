@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": {
+      "item": "sfmflow:cable_block"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "pattern": [
+    "GRG",
+    "RCR",
+    "GRG"
+  ],
+  "result": {
+    "count": 1,
+    "id": "sfmflow:program_disk"
+  }
+}

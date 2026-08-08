@@ -34,6 +34,9 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("block.sfmflow.fluid_relay_block", "Fluid Relay");
 		add("block.sfmflow.energy_relay_block", "Energy Relay");
 		add("block.sfmflow.sign_updater_cable_block", "Sign Updater Cable");
+		
+		add("item.sfmflow.program_disk", "Program Disk");
+		
 		add("gui.sfmflow.sign_updater", "Sign Updater");
 		add("container.sfmflow.advanced_cable_cluster", "Advanced Cable Cluster");
 		add("container.sfmflow.cable_cluster", "Cable Cluster");
@@ -45,6 +48,9 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.energy_inventories_list_variable", "Energy Inventories List");
 		add("gui.sfmflow.warning.empty_energy_inventories_list", "Energy inventories list variable cannot be empty!");
 		add("gui.sfmflow.error.no_access", "You do not have permission to access this Manager. Owned by %s.");
+		
+		add("gui.sfmflow.disk.copied", "Flowchart successfully copied to disk.");
+		add("gui.sfmflow.disk.pasted", "Flowchart successfully pasted from disk.");
 
 		add("gui.sfmflow.redstone_inventories_list_variable", "Redstone Inventories List");
 		add("gui.sfmflow.warning.empty_redstone_inventories_list",
@@ -52,6 +58,7 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.sign_updater_inventories_list_variable", "Sign Updater Inventories List");
 		add("gui.sfmflow.warning.empty_sign_updater_inventories_list",
 				"Sign updater inventories list variable cannot be empty!");
+		
 
 		add("gui.sfmflow.foreach_loop", "ForEach Loop");
 		add("sfmflow.configuration.maxChainedForEach", "Max Chained ForEach Loops");
@@ -118,7 +125,6 @@ public class ModLanguageProvider extends LanguageProvider {
 		add("gui.sfmflow.type_inventory", "Inventory");
 		add("gui.sfmflow.type_redstone", "Redstone");
 
-		add("item.sfmflow.test_item", "Test Item");
 		add("itemGroup.sfmflow", "SFM-Flow");
 
 		add("sfmflow.configuration.background", "Background Mask Hex");

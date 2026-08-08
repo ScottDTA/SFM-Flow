@@ -1,5 +1,7 @@
 package dta.sfmflow.block;
 
+import java.util.UUID;
+
 import javax.annotation.Nullable;
 
 import com.mojang.serialization.MapCodec;
@@ -7,16 +9,24 @@ import com.mojang.serialization.MapCodec;
 import dta.sfmflow.api.security.ManagerAccessLevel;
 import dta.sfmflow.block.entity.ManagerBlockEntity;
 import dta.sfmflow.block.entity.ModBlockEntities;
+import dta.sfmflow.item.ModItems;
+import dta.sfmflow.item.ProgramDiskItem;
+import dta.sfmflow.networking.packets.clientbound.OpenDiskOverwriteConfirmPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
@@ -29,6 +39,7 @@ import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.scores.PlayerTeam;
 import net.minecraft.world.scores.Scoreboard;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 public class ManagerBlock extends BaseEntityBlock {
 	public static final MapCodec<ManagerBlock> CODEC = simpleCodec(ManagerBlock::new);
@@ -116,21 +127,80 @@ public class ManagerBlock extends BaseEntityBlock {
 				// Shifting players with admin permissions (level 2+) bypass access restrictions
 				boolean isAdminBypass = pPlayer.isSecondaryUseActive() && pPlayer.hasPermissions(2);
 
-				if (isAdminBypass || canAccess(pPlayer, managerBlockEntity)) {
-					((ServerPlayer) pPlayer)
-							.openMenu(new SimpleMenuProvider(managerBlockEntity, Component.literal("Manager")), pPos);
-					return ItemInteractionResult.SUCCESS;
-				} else {
+				if (!isAdminBypass && !canAccess(pPlayer, managerBlockEntity)) {
 					pPlayer.sendSystemMessage(Component.translatable("gui.sfmflow.error.no_access", managerBlockEntity.getOwnerName())
 							.withStyle(ChatFormatting.RED));
 					return ItemInteractionResult.FAIL;
 				}
+
+				// Intercept Program Disk usage
+				if (pStack.is(ModItems.PROGRAM_DISK.get())) {
+					if (!ProgramDiskItem.isProgrammed(pStack)) {
+						// COPY PHASE [3]
+						CompoundTag serializedTag = managerBlockEntity.getUpdateTag(pLevel.registryAccess());
+						CompoundTag diskData = new CompoundTag();
+						if (serializedTag.contains("flowchart")) {
+							diskData.put("flowchart", serializedTag.get("flowchart"));
+						}
+						if (serializedTag.contains("GroupVariables")) {
+							diskData.put("GroupVariables", serializedTag.get("GroupVariables"));
+						}
+						if (serializedTag.contains("FilterVariables")) {
+							diskData.put("FilterVariables", serializedTag.get("FilterVariables"));
+						}
+
+						pStack.set(DataComponents.CUSTOM_DATA, CustomData.of(diskData));
+						pPlayer.sendSystemMessage(Component.translatable("gui.sfmflow.disk.copied").withStyle(ChatFormatting.GREEN));
+						pLevel.playSound(null, pPos, SoundEvents.UI_BUTTON_CLICK.value(), SoundSource.BLOCKS, 1.0F, 1.2F);
+						return ItemInteractionResult.SUCCESS;
+					} else {
+						// PASTE PHASE [3]
+						if (managerBlockEntity.getFlowComponents().isEmpty()) {
+							// Empty target, paste immediately
+							pasteDiskLayout(managerBlockEntity, pStack, pLevel);
+							pPlayer.sendSystemMessage(Component.translatable("gui.sfmflow.disk.pasted").withStyle(ChatFormatting.GREEN));
+							return ItemInteractionResult.SUCCESS;
+						} else {
+							// Active target, query confirmation popup
+							PacketDistributor.sendToPlayer((ServerPlayer) pPlayer, new OpenDiskOverwriteConfirmPacket(pPos));
+							return ItemInteractionResult.SUCCESS;
+						}
+					}
+				}
+
+				((ServerPlayer) pPlayer)
+						.openMenu(new SimpleMenuProvider(managerBlockEntity, Component.literal("Manager")), pPos);
+				return ItemInteractionResult.SUCCESS;
 			} else {
 				return ItemInteractionResult.FAIL;
 			}
 		}
 
 		return ItemInteractionResult.sidedSuccess(pLevel.isClientSide());
+	}
+
+	public static void pasteDiskLayout(ManagerBlockEntity manager, ItemStack diskStack, Level level) {
+		CustomData customData = diskStack.get(DataComponents.CUSTOM_DATA);
+		if (customData != null) {
+			CompoundTag tag = customData.copyTag();
+			CompoundTag updateTag = new CompoundTag();
+			if (tag.contains("flowchart")) {
+				updateTag.put("flowchart", tag.get("flowchart"));
+			}
+			if (tag.contains("GroupVariables")) {
+				updateTag.put("GroupVariables", tag.get("GroupVariables"));
+			}
+			if (tag.contains("FilterVariables")) {
+				updateTag.put("FilterVariables", tag.get("FilterVariables"));
+			}
+			updateTag.putUUID("ManagerId", UUID.randomUUID()); // Assign a fresh layout ID
+			
+			manager.loadAdditional(updateTag, level.registryAccess());
+			manager.setDataDirty(true);
+			manager.setChanged();
+			manager.rebuildListeners();
+			level.playSound(null, manager.getBlockPos(), SoundEvents.UI_BUTTON_CLICK.value(), SoundSource.BLOCKS, 1.0F, 0.8F);
+		}
 	}
 	
 	private boolean canAccess(Player player, ManagerBlockEntity manager) {

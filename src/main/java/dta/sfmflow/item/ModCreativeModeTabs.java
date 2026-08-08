@@ -38,6 +38,7 @@ public class ModCreativeModeTabs {
 						output.accept(ModBlocks.FLUID_RELAY_BLOCK.get());
 						output.accept(ModBlocks.ENERGY_RELAY_BLOCK.get());
 						output.accept(ModBlocks.SIGN_UPDATER_CABLE_BLOCK.get());
+						output.accept(ModItems.PROGRAM_DISK.get());
 					}).build());
 
 	public static void register(IEventBus eventBus) {

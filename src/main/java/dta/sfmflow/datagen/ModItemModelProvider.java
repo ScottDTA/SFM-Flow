@@ -9,7 +9,7 @@ import net.neoforged.neoforge.client.model.generators.ModelFile;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
 
 /**
- * Programmatic item model compiler for data generation cycles [3].
+ * Programmatic item model compiler for data generation cycles.
  */
 public class ModItemModelProvider extends ItemModelProvider {
 	public ModItemModelProvider(PackOutput output, ExistingFileHelper existingFileHelper) {
@@ -18,19 +18,20 @@ public class ModItemModelProvider extends ItemModelProvider {
 
 	@Override
 	protected void registerModels() {
-		/* STREAMING_CHUNK:Registering variable card item model */
-		// Generates variable_card item model referencing the active dynamic entity template [3]
 		getBuilder(ModItems.VARIABLE_CARD.getId().getPath())
-				.parent(new ModelFile.UncheckedModelFile(
-						ResourceLocation.withDefaultNamespace("builtin/entity")
-				))
-				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item/" + ModItems.VARIABLE_CARD.getId().getPath()));
+				.parent(new ModelFile.UncheckedModelFile(ResourceLocation.withDefaultNamespace("builtin/entity")))
+				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+						"item/" + ModItems.VARIABLE_CARD.getId().getPath()));
 
-		// Generates the hidden variable_card_flat item model utilized by the BEWLR renderer [3]
 		getBuilder(ModItems.VARIABLE_CARD.getId().getPath() + "_flat")
-				.parent(new ModelFile.UncheckedModelFile(
-						ResourceLocation.withDefaultNamespace("item/generated")
-				))
-				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID, "item/" + ModItems.VARIABLE_CARD.getId().getPath()));
+				.parent(new ModelFile.UncheckedModelFile(ResourceLocation.withDefaultNamespace("item/generated")))
+				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+						"item/" + ModItems.VARIABLE_CARD.getId().getPath()));
+
+		getBuilder(ModItems.PROGRAM_DISK.getId().getPath())
+				.parent(new ModelFile.UncheckedModelFile(ResourceLocation.withDefaultNamespace("item/generated")))
+				.texture("layer0", ResourceLocation.fromNamespaceAndPath(SFMFlow.MODID,
+						"item/" + ModItems.PROGRAM_DISK.getId().getPath()));
+
 	}
 }

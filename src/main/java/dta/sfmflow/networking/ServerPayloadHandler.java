@@ -13,6 +13,8 @@ import dta.sfmflow.flowcomponents.GroupInputComponent;
 import dta.sfmflow.flowcomponents.GroupOutputComponent;
 import dta.sfmflow.flowcomponents.ItemTransferComponent;
 import dta.sfmflow.item.ModItems;
+import dta.sfmflow.item.ProgramDiskItem;
+import dta.sfmflow.block.ManagerBlock;
 import dta.sfmflow.block.entity.CableClusterBlockEntity;
 import dta.sfmflow.api.capability.SpecialBlockCapabilityRegistry;
 import dta.sfmflow.api.component.AbstractFlowComponent;
@@ -28,6 +30,7 @@ import dta.sfmflow.networking.packets.serverbound.CreateNodePacket;
 import dta.sfmflow.networking.packets.serverbound.MoveComponentGroupPacket;
 import dta.sfmflow.networking.packets.serverbound.RemoveConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.ComponentMoved;
+import dta.sfmflow.networking.packets.serverbound.ConfirmPastePacket;
 import dta.sfmflow.networking.packets.serverbound.CreateConnectionPacket;
 import dta.sfmflow.networking.packets.serverbound.SaveComponentSettings;
 import dta.sfmflow.networking.packets.serverbound.SaveManagerAccessPacket;
@@ -39,15 +42,18 @@ import dta.sfmflow.networking.packets.serverbound.RequestSideConfigPropertiesPac
 import dta.sfmflow.screen.ManagerMenu;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.WorldlyContainer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.ChatFormatting;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -121,6 +127,28 @@ public class ServerPayloadHandler {
 			}
 		});
 	}
+	
+	public static void handleConfirmPaste(final ConfirmPastePacket data, final IPayloadContext context) {
+		context.enqueueWork(() -> {
+			Player player = context.player();
+			ItemStack held = player.getItemInHand(InteractionHand.MAIN_HAND);
+			if (!held.is(ModItems.PROGRAM_DISK.get())) {
+				held = player.getItemInHand(InteractionHand.OFF_HAND);
+			}
+
+			if (held.is(ModItems.PROGRAM_DISK.get()) && ProgramDiskItem.isProgrammed(held)) {
+				if (player.level().getBlockEntity(data.pos()) instanceof ManagerBlockEntity manager) {
+					// Verify access control rights prior to executing confirmed paste
+					boolean isAdminBypass = player.isSecondaryUseActive() && player.hasPermissions(2);
+					if (isAdminBypass || player.getUUID().equals(manager.getOwnerUUID()) || manager.getAccessLevel() == ManagerAccessLevel.PUBLIC) {
+						ManagerBlock.pasteDiskLayout(manager, held, player.level());
+						player.sendSystemMessage(Component.translatable("gui.sfmflow.disk.pasted").withStyle(ChatFormatting.GREEN));
+					}
+				}
+			}
+		});
+	}
+
 
 	public static void handleSaveComponentSettings(final SaveComponentSettings data, final IPayloadContext context) {
 		context.enqueueWork(() -> {

@@ -692,7 +692,7 @@ public class ManagerBlockEntity extends BlockEntity implements MenuProvider {
 	}
 
 	@Override
-	protected void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
+	public void loadAdditional(CompoundTag pTag, HolderLookup.Provider pRegistries) {
 		super.loadAdditional(pTag, pRegistries);
 		this.savedRegistries = pRegistries; // Save the composite provider context for onLoad
 
