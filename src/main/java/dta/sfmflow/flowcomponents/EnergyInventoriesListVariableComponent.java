@@ -1,8 +1,15 @@
 package dta.sfmflow.flowcomponents;
 
+import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
+
 import dta.sfmflow.SFMFlow;
 import dta.sfmflow.api.component.AbstractFlowComponent;
 import dta.sfmflow.api.component.FlowComponentType;
@@ -10,13 +17,10 @@ import dta.sfmflow.api.component.IFlowchartVariable;
 import dta.sfmflow.api.component.IInventoryTarget;
 import dta.sfmflow.api.component.ISideConfigurable;
 import dta.sfmflow.api.execution.FlowchartPlanningContext;
-import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.item.ModItems;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowPlugin;
 import dta.sfmflow.util.Color;
 import dta.sfmflow.util.ConnectionBlock;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.RegistryAccess;
@@ -31,14 +35,6 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.component.DyedItemColor;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
 
 public class EnergyInventoriesListVariableComponent extends AbstractFlowComponent implements IInventoryTarget, ISideConfigurable, IFlowchartVariable {
 
@@ -164,30 +160,6 @@ public class EnergyInventoriesListVariableComponent extends AbstractFlowComponen
 			entriesList.add(entryTag);
 		}
 		tag.put("entries", entriesList);
-
-		ListTag itemsList = new ListTag();
-		Level level = Minecraft.getInstance().level;
-		if (level != null && !this.entries.isEmpty() && Minecraft.getInstance().screen instanceof ManagerScreen screen) {
-			for (var entry : this.entries) {
-				BlockPos targetPos = null;
-				for (var block : screen.getMenu().getManagerBlockEntity().getInventories()) {
-					if (block.getId() == entry.inventoryId()) {
-						targetPos = block.getBlockPos();
-						break;
-					}
-				}
-				if (targetPos != null) {
-					BlockState state = level.getBlockState(targetPos);
-					if (!state.isAir()) {
-						ItemStack blockItem = new ItemStack(state.getBlock().asItem());
-						if (!blockItem.isEmpty()) {
-							itemsList.add(blockItem.save(level.registryAccess()));
-						}
-					}
-				}
-			}
-		}
-		tag.put("InventoriesListItems", itemsList);
 
 		stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 		stack.set(DataComponents.CUSTOM_NAME, this.getName());

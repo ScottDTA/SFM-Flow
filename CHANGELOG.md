@@ -1,3 +1,16 @@
+8-7-2026
+
+### [Added]
+* Added a dedicated side-safe packet routing registry to handle network communications on the client. This protects server environments from loading client-only rendering classes and prevents dedicated server startup crashes.
+* Added the Program Disk utility item, enabling players to clone entire flowchart layouts and variables between different Machine Inventory Managers.
+* Added an interactive overwrite confirmation screen that queries the player before pasting configurations onto a Manager that already contains layout nodes.
+* Added a shaped crafting recipe and creative tab registration for the Program Disk.
+
+### [Changed]
+* Standardized all inventories list variables (Item, Fluid, Energy, Redstone, and Sign Updater) to resolve their block targets polymorphically.
+* Re-routed all clientbound network packet processing securely through the client-only bootstrapping phase.
+* Updated the Machine Inventory Manager block's interaction handler to support copying and pasting with the Program Disk.
+
 8-1-2026
 
 ### [Added]

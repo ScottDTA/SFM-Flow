@@ -43,19 +43,19 @@ public class ModNetworking {
         registrar.playToServer(ConfirmPastePacket.TYPE, ConfirmPastePacket.STREAM_CODEC,
                 (payload, context) -> ServerPayloadHandler.handleConfirmPaste(payload, context));
 
-        // Clientbound Packets (Server to Client)
+        // Clientbound Packets (Server to Client) - Delegated side-safely via our registry
         registrar.playToClient(SyncConnectionsPacket.TYPE, SyncConnectionsPacket.STREAM_CODEC,
-                PacketHandlerManager::handleSyncConnections);
+                ClientPacketHandlers::handle);
         registrar.playToClient(SyncComponentDeltaPacket.TYPE, SyncComponentDeltaPacket.STREAM_CODEC,
-                PacketHandlerManager::handleSyncComponentDelta);
+                ClientPacketHandlers::handle);
         registrar.playToClient(SyncInventorySlotsPacket.TYPE, SyncInventorySlotsPacket.STREAM_CODEC,
-                PacketHandlerManager::handleSyncInventorySlots);
+                ClientPacketHandlers::handle);
         registrar.playToClient(SyncSideConfigPropertiesPacket.TYPE, SyncSideConfigPropertiesPacket.STREAM_CODEC,
-                PacketHandlerManager::handleSyncSideConfigProperties);
+                ClientPacketHandlers::handle);
         registrar.playToClient(SyncSignTextPacket.TYPE, SyncSignTextPacket.STREAM_CODEC,
-                PacketHandlerManager::handleSyncSignText);
+                ClientPacketHandlers::handle);
         registrar.playToClient(OpenDiskOverwriteConfirmPacket.TYPE, OpenDiskOverwriteConfirmPacket.STREAM_CODEC,
-                PacketHandlerManager::handleOpenDiskOverwriteConfirm);
+                ClientPacketHandlers::handle);
 
     }
 }

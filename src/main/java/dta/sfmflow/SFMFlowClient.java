@@ -1,17 +1,33 @@
 package dta.sfmflow;
 
+import java.util.UUID;
+import java.util.function.Supplier;
+
 import dta.sfmflow.api.NodeCategory;
 import dta.sfmflow.api.client.FlowClientRegistry;
 import dta.sfmflow.api.client.INodeClientProperties;
 import dta.sfmflow.api.component.FlowComponentBuilder;
 import dta.sfmflow.api.component.FlowComponentType;
 import dta.sfmflow.api.component.IFlowchartVariable;
-import dta.sfmflow.client.screen.ManagerScreen;
+import dta.sfmflow.client.network.ClientConnectionsPacketHandlerImpl;
+import dta.sfmflow.client.network.ClientInventorySlotsPacketHandlerImpl;
+import dta.sfmflow.client.network.ClientPacketHandlerImpl;
+import dta.sfmflow.client.network.ClientSideConfigPropertiesPacketHandlerImpl;
+import dta.sfmflow.client.network.ClientSyncSignTextPacketHandlerImpl;
 import dta.sfmflow.client.render.HighlightManager;
 import dta.sfmflow.client.render.VariableCardRenderer;
 import dta.sfmflow.client.screen.CableClusterScreen;
+import dta.sfmflow.client.screen.ConfirmOverwriteScreen;
+import dta.sfmflow.client.screen.ManagerScreen;
 import dta.sfmflow.client.screen.helper.SlotLayoutManager;
 import dta.sfmflow.item.ModItems;
+import dta.sfmflow.networking.ClientPacketHandlers;
+import dta.sfmflow.networking.packets.clientbound.OpenDiskOverwriteConfirmPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncComponentDeltaPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncConnectionsPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncInventorySlotsPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncSideConfigPropertiesPacket;
+import dta.sfmflow.networking.packets.clientbound.SyncSignTextPacket;
 import dta.sfmflow.plugin.vanilla.VanillaSFMFlowClientPlugin;
 import dta.sfmflow.screen.ModMenuTypes;
 import dta.sfmflow.util.Color;
@@ -26,17 +42,14 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.event.ModelEvent;
 import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
+import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
-import net.neoforged.neoforge.client.event.RegisterColorHandlersEvent;
-import net.neoforged.neoforge.client.event.ModelEvent;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.client.gui.ConfigurationScreen;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 import net.neoforged.neoforge.common.NeoForge;
-
-import java.util.UUID;
-import java.util.function.Supplier;
 
 /**
  * Client-only event subscriber and bootstrappery driver.
@@ -49,8 +62,7 @@ public class SFMFlowClient {
 
 	/**
 	 * Safely registers all client-side event listeners and extension points on the
-	 * physical client. Called explicitly inside the main mod constructor
-	 * context.
+	 * physical client. Called explicitly inside the main mod constructor context.
 	 *
 	 * @param modEventBus  the Mod-scoped event bus
 	 * @param modContainer the current mod container
@@ -103,7 +115,22 @@ public class SFMFlowClient {
 		NeoForge.EVENT_BUS.register(HighlightManager.class);
 
 		event.enqueueWork(() -> {
-			// Register vanilla client properties directly, completely avoiding static plugin lists
+
+			ClientPacketHandlers.register(SyncConnectionsPacket.TYPE, new ClientConnectionsPacketHandlerImpl());
+			ClientPacketHandlers.register(SyncComponentDeltaPacket.TYPE, new ClientPacketHandlerImpl());
+			ClientPacketHandlers.register(SyncInventorySlotsPacket.TYPE, new ClientInventorySlotsPacketHandlerImpl());
+			ClientPacketHandlers.register(SyncSideConfigPropertiesPacket.TYPE,
+					new ClientSideConfigPropertiesPacketHandlerImpl());
+			ClientPacketHandlers.register(SyncSignTextPacket.TYPE, new ClientSyncSignTextPacketHandlerImpl());
+
+			ClientPacketHandlers.register(OpenDiskOverwriteConfirmPacket.TYPE, (payload, context) -> {
+				context.enqueueWork(() -> {
+					Minecraft.getInstance().setScreen(new ConfirmOverwriteScreen(payload.pos()));
+				});
+			});
+
+			// Register vanilla client properties directly, completely avoiding static
+			// plugin lists
 			new VanillaSFMFlowClientPlugin().registerClientProperties();
 
 			Color.setResolver((color, isText) -> {
